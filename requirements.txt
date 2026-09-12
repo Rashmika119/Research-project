@@ -1,0 +1,19 @@
+# Core
+torch>=2.1
+numpy
+pandas
+pyyaml
+matplotlib
+
+# Graph encoders (Phase 1+). On Colab, torch-geometric sometimes needs a
+# CUDA/torch-version-matched wheel index — if the plain pip install below
+# fails, follow the install snippet at https://pytorch-geometric.readthedocs.io
+# for the exact Colab runtime's torch/cuda version.
+torch-geometric
+
+# Frozen LM conditioning (Phase 2+)
+transformers
+
+# KGE scoring utilities (DistMult/ComplEx baselines) — already used in the
+# preliminary diagnostic experiment described in README.md.
+torchkge
