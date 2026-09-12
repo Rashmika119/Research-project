@@ -1,0 +1,31 @@
+# Phase 1 (toy-subset smoke test): KG Encoder Phase 1 + DistMult, no LM.
+# Purpose: prove the model/training/eval code works correctly before ever
+# touching the full FB15k-237 training set. See CLAUDE.md Phase 1 gate.
+
+seed: 0
+
+dataset:
+  raw_dir: data/raw/fb15k237
+  download_if_missing: true
+  use_synthetic_fallback: true
+
+use_toy_subset: true
+toy_subset:
+  max_entities: 50
+  seed: 0
+
+model:
+  dim: 32 # deliberately small for a fast smoke test
+  num_layers: 2
+  dropout: 0.2
+
+training:
+  lr: 0.01
+  weight_decay: 0.0
+  epochs: 20
+  batch_size: 16
+  num_negatives: 4
+  eval_every: 5
+  grad_clip_norm: 1.0
+
+checkpoint_path: experiments/checkpoints/phase1_toy.pt
