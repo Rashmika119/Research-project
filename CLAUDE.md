@@ -225,7 +225,7 @@ training run. Full-dataset training only happens after the smoke test passes.
    train/valid/test).
 
 2. **Phase 1 — KG-only baseline (Encoder Phase 1 + scorer, no LM at all).
-   ✅ Implemented, gate not yet run.**
+   ✅ Toy-subset gate PASSED in Colab; full-scale training not yet run.**
    Relation-aware R-GCN encoder + DistMult scorer, built as a standalone
    trainable model (`models/kg_encoder.py`, `models/scorer.py`,
    `models/kg_only_baseline.py`), trained via a config-driven loop
@@ -233,25 +233,27 @@ training run. Full-dataset training only happens after the smoke test passes.
    and filtered negative sampling (`training/negative_sampling.py`), scored
    with filtered MRR/Hits@K (`evaluation/metrics.py`). See "Repository Map"
    below for the full file list.
-   `run_phase1_smoke_test.py` (mirrors `run_phase0_smoke_test.py`'s pattern)
-   trains on the toy subset only, using `experiments/configs/phase1_toy.yaml`
-   (dim=32, 20 epochs — deliberately tiny for speed), and checks: loss stays
-   finite, loss improves early-vs-late average, validation metrics compute
-   without error, and the saved checkpoint reloads into a fresh model with
-   identical parameters. **This has been written but not yet run — no local
-   Python/GPU in this dev environment, same as Phase 0's first pass.** Run it
-   in Colab before writing any Phase 2 code.
-   Once the toy smoke test passes, the next step (not yet built) is a
-   `phase1_full.yaml` config pointed at the real FB15k-237 training set
-   (no `use_toy_subset`, realistic `dim` e.g. 256, more epochs) — training
-   on toy data was deliberately kept separate from training on real data so
-   a bug is caught on the fast, tiny run rather than partway through a long
-   real one.
-   Save a checkpoint (`kg_only_baseline.pt`, once trained on real data) —
-   this becomes a reusable artifact and the actual "KG-only baseline" row in
-   the validation table, not just a stepping stone.
-   *Gate:* stable training curve, reasonable filtered MRR/Hits@K, checkpoint
-   saved and reloadable.
+   *Toy gate:* `run_phase1_smoke_test.py` run in Colab against
+   `experiments/configs/phase1_toy.yaml` (dim=32, 20 epochs) and printed
+   PASSED — loss finite throughout, loss improved (early avg 0.6944 → late
+   avg 0.0033; the near-zero end loss is expected memorization of a 72-triple
+   toy set, not a meaningful result), validation metrics computed without
+   error, checkpoint reload verified identical. Note validation MRR did
+   **not** improve monotonically across evaluations (0.2546 → 0.3174 →
+   0.3214 → 0.3169) — this directly motivated adding best-checkpoint
+   tracking (see below) before the real run, rather than just saving
+   whatever the last epoch happens to produce.
+   *Real run, not yet executed:* `experiments/configs/phase1_full.yaml`
+   (real FB15k-237, no toy subset, dim=256, 100 epochs, `save_best: true`)
+   plus `run_phase1_full_training.py` to launch it — use this runner script
+   rather than `python training/train_kg_baseline.py ...` directly, since
+   the latter breaks the package-relative imports (Python puts the script's
+   own folder, not the repo root, on `sys.path` in that case). Needs a GPU
+   Colab runtime, unlike everything before this point. Produces
+   `experiments/checkpoints/kg_only_baseline.pt` — the real "KG-only
+   baseline" row in the validation table, not just a stepping stone.
+   *Gate (for the real run):* stable training curve, reasonable filtered
+   MRR/Hits@K, best-validation checkpoint saved and reloadable.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
@@ -398,32 +400,33 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `training/negative_sampling.py` | `sample_negatives` — corrupts head or tail per positive triple, filtered against **training-only** known-true triples (a narrower set than evaluation's filter index — see the module docstring for why the two must not be conflated). |
 | `evaluation/metrics.py` | `build_filter_index` + `evaluate_filtered` — standard filtered-ranking MRR/Hits@1/3/10, filtering built from all splits combined (used only for ranking, never as training signal). |
 | `training/train_kg_baseline.py` | The Phase 1 training loop. Config-driven so the same code runs the toy-subset smoke test and (later) the full FB15k-237 run — encodes the whole graph once per optimizer step and reuses it for every positive/negative triple in that step (rule #7), rather than recomputing per triple. |
-| `experiments/configs/phase1_toy.yaml` | Phase 1 toy-subset run settings (dim=32, 20 epochs — deliberately tiny/fast). No `phase1_full.yaml` yet — that's the next step, only after this smoke test passes. |
-| `run_phase1_smoke_test.py` | The Phase 1 gate script, mirroring `run_phase0_smoke_test.py`'s pattern: trains on the toy subset and checks loss is finite and improves, validation metrics compute without error, and the saved checkpoint reloads with identical parameters. **Written but not yet run** (no local Python/GPU in this dev environment) — run this in Colab before writing any Phase 2 code. |
-| `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints (e.g. `phase1_toy.pt`, later `kg_only_baseline.pt`) land. |
+| `experiments/configs/phase1_toy.yaml` | Phase 1 toy-subset run settings (dim=32, 20 epochs — deliberately tiny/fast). **Verified in Colab — gate passed.** |
+| `run_phase1_smoke_test.py` | The Phase 1 toy-subset gate script, mirroring `run_phase0_smoke_test.py`'s pattern: trains on the toy subset and checks loss is finite and improves, validation metrics compute without error, and the saved checkpoint reloads with identical parameters. **Passed in Colab.** |
+| `experiments/configs/phase1_full.yaml` | Real FB15k-237 training settings (dim=256, 100 epochs, `save_best: true`, `use_synthetic_fallback: false` since a silent fallback here would be misleading). **Not yet run** — needs a GPU Colab runtime. |
+| `run_phase1_full_training.py` | Launches the real Phase 1 training run using `phase1_full.yaml`. Use this rather than invoking `training/train_kg_baseline.py` directly — running that file as a bare script puts its own folder, not the repo root, on `sys.path`, breaking its `models`/`evaluation`/`preprocessing` imports (see this script's own docstring). Produces `experiments/checkpoints/kg_only_baseline.pt`. |
+| `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints land (`phase1_toy.pt` already produced there; `kg_only_baseline.pt` once the real run completes). |
 
 ## Current stage / priority
 
 Intermediate report stage is complete. Phase 0 is **done — verified in
 Colab against real FB15k-237**, gate passed (see rule #6 for the WN18RR →
-WN18 → FB15k-237 dataset history). Phase 1 (KG-only baseline: R-GCN encoder
-+ DistMult) is **implemented but not yet run anywhere** — same
-not-yet-verified state Phase 0 was in before its first Colab run. Next
-actual work, in order:
-1. Run `run_phase1_smoke_test.py` in Colab and confirm it prints PASSED
-   (loss finite and improving, validation metrics compute, checkpoint
-   round-trips). Fix anything it flags before moving on.
-2. Add a `phase1_full.yaml` config (real FB15k-237, no toy subset, a
-   realistic `dim` e.g. 256) and train the actual KG-only baseline,
-   checkpointed as `kg_only_baseline.pt` — this becomes the real "KG-only
-   baseline" row in the validation table, not just a smoke test artifact.
-3. Full KG → LM → KG pipeline implementation per the build order above
+WN18 → FB15k-237 dataset history). Phase 1's toy-subset smoke test is
+**done — passed in Colab** (loss finite and improving, validation metrics
+computed, checkpoint round-tripped); the real, full-dataset training run is
+**built but not yet executed**. Next actual work, in order:
+1. Run `run_phase1_full_training.py` in Colab (GPU runtime) using
+   `experiments/configs/phase1_full.yaml`, and confirm it produces a stable
+   training curve and plausible filtered MRR/Hits@K on real FB15k-237. This
+   produces `experiments/checkpoints/kg_only_baseline.pt` — the real
+   "KG-only baseline" row in the validation table, not just a smoke-test
+   artifact.
+2. Full KG → LM → KG pipeline implementation per the build order above
    (Phases 2–5) — starting with Phase 2 (LM module in isolation), only
-   after step 2 above gives us a trustworthy Phase 1 checkpoint to
+   after step 1 above gives us a trustworthy Phase 1 checkpoint to
    eventually feed into it.
-4. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
+3. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
    proposed w/ ComplEx).
-5. Ablations (warm-up on/off, embedding dimension).
+4. Ablations (warm-up on/off, embedding dimension).
 
 Do not present WN18RR results from the preliminary experiment as evidence
 about the proposed architecture's viability — they predate loss-function and

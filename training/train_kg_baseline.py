@@ -93,6 +93,17 @@ def run(config: dict) -> dict:
 
     train_triples_t = torch.tensor(dataset.train, dtype=torch.long, device=device)
 
+    # When `save_best` is on, the checkpoint written at the end is the
+    # best-validation-MRR epoch's parameters, not just whatever the last
+    # epoch happened to produce — validation MRR is not guaranteed to
+    # improve monotonically (confirmed by the Phase 1 toy smoke test run),
+    # so for a real result this matters. Off by default so the existing toy
+    # smoke test's "checkpoint == final in-memory model" assumption still
+    # holds unless a config explicitly opts in.
+    save_best = train_cfg.get("save_best", False)
+    best_val_mrr = -1.0
+    best_state: dict[str, torch.Tensor] | None = None
+
     history: list[dict] = []
     for epoch in range(1, train_cfg["epochs"] + 1):
         model.train()
@@ -154,6 +165,12 @@ def run(config: dict) -> dict:
                     f"val_MRR={val_metrics['MRR']:.4f} | "
                     f"val_Hits@10={val_metrics['Hits@10']:.4f}"
                 )
+                if save_best and val_metrics["MRR"] > best_val_mrr:
+                    best_val_mrr = val_metrics["MRR"]
+                    best_state = {
+                        k: v.detach().cpu().clone()
+                        for k, v in model.state_dict().items()
+                    }
             else:
                 print(
                     f"Epoch {epoch:03d} | loss={avg_loss:.4f} | "
@@ -164,6 +181,13 @@ def run(config: dict) -> dict:
 
         history.append(row)
 
+    if save_best and best_state is not None:
+        model.load_state_dict(best_state)
+        print(
+            f"Restoring best checkpoint (val_MRR={best_val_mrr:.4f}) "
+            "for saving — not necessarily the final epoch."
+        )
+
     checkpoint_path = Path(config["checkpoint_path"])
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
@@ -172,6 +196,7 @@ def run(config: dict) -> dict:
             "config": config,
             "num_entities": dataset.num_entities,
             "num_relations": dataset.num_relations,
+            "best_val_mrr": best_val_mrr if save_best else None,
         },
         checkpoint_path,
     )

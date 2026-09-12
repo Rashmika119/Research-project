@@ -1,0 +1,37 @@
+# Phase 1 (real run): KG-only baseline on the full FB15k-237 training set.
+# Only run this after run_phase1_smoke_test.py has printed PASSED — this
+# config trains the actual "KG-only baseline" artifact used in the
+# project's validation table (README.md §12), not a quick sanity check.
+#
+# Needs a GPU runtime in Colab (Runtime -> Change runtime type -> T4 or
+# better) — unlike Phase 0 and the Phase 1 toy smoke test, which ran fine
+# on CPU.
+
+seed: 0
+
+dataset:
+  raw_dir: data/raw/fb15k237
+  download_if_missing: true
+  # False on purpose here (unlike the toy/smoke-test configs): a download
+  # failure during a real run must be a loud error, not a silent fallback
+  # to a 40-entity fake graph that could be mistaken for a real result.
+  use_synthetic_fallback: false
+
+use_toy_subset: false
+
+model:
+  dim: 256 # per README.md §3.1's practical starting dimension
+  num_layers: 2
+  dropout: 0.2
+
+training:
+  lr: 0.001
+  weight_decay: 0.00001
+  epochs: 100 # starting point; increase later if validation MRR is still improving
+  batch_size: 512
+  num_negatives: 4
+  eval_every: 5
+  grad_clip_norm: 1.0
+  save_best: true # keep the best-validation-MRR checkpoint, not just the last epoch
+
+checkpoint_path: experiments/checkpoints/kg_only_baseline.pt
