@@ -1,28 +1,36 @@
-"""Dataset loading and entity/relation ID mapping for WN18.
+"""Dataset loading and entity/relation ID mapping for FB15k-237.
 
-Loads the standard WN18 train/valid/test triple files. On disk each line is
-tab-separated as "head \\t tail \\t relation" (the original WN18/wordnet-mlj12
-release's "e1, e2, rel" column order — confirmed by inspecting a real
-downloaded file; NOT "head, relation, tail" despite that being the more
-intuitive reading order, see `_read_triples` for exactly where this is
-handled). `_read_triples` re-orders these into the project's canonical
-`(head, relation, tail)` triple shape immediately on read, so every other
-module always sees the canonical order regardless of the file's on-disk
-column layout. Converts to integer-ID triples plus entity2id / relation2id
-vocabularies built in train-first order, so IDs are reproducible and
-independent of how valid/test happen to be ordered on disk.
+Loads the standard FB15k-237 train/valid/test triple files and converts them
+into integer-ID triples plus entity2id / relation2id vocabularies built in
+train-first order, so IDs are reproducible and independent of how valid/test
+happen to be ordered on disk.
 
-WN18 (not WN18RR) is used as the project's primary dataset per explicit
-supervisor direction — see CLAUDE.md non-negotiable rule #6 for why this
-differs from the more commonly cited WN18RR benchmark, and what that
-implies for interpreting results against other published KGE numbers.
+FB15k-237 (Freebase-derived) is this project's primary dataset per explicit
+supervisor direction — see CLAUDE.md non-negotiable rule #6 for the history
+of this decision (WN18RR -> WN18 -> FB15k-237) and why Freebase-style data,
+with its much richer per-entity text, is a better fit for testing whether
+language-model semantics actually help than WordNet-style data (WN18/WN18RR)
+is.
 
-If the raw WN18 files aren't present and can't be downloaded (no network,
-blocked host, etc.), `load_synthetic_toy_graph` produces a small deterministic
-fake knowledge graph with the same shape/contract as a real `KGDataset`, so
-the rest of the Phase 0 pipeline (ID mapping, adjacency building, leakage
-checks) can still be smoke-tested offline. It is not meant to be trained on
-for real results — only for exercising the data-handling code.
+Column order: assumed "head \\t relation \\t tail" (the conventional order
+most modern KGE codebases distribute FB15k-237 in) — UNVERIFIED from this
+dev machine (no network access here). This is NOT a safe assumption to trust
+blindly: WN18's original release turned out to use a different column order
+than expected, silently producing a nonsense relation count that still
+passed every consistency check. Before trusting this loader's output,
+compare `KGDataset.num_relations` against the published FB15k-237 statistics
+(14,541 entities / 237 relations / 272,115 train / 17,535 valid / 20,466
+test triples) — if the relation count is wildly off, inspect a raw
+downloaded line the same way this project did for WN18 and fix
+`_read_triples` accordingly.
+
+If the raw FB15k-237 files aren't present and can't be downloaded (no
+network, blocked host, etc.), `load_synthetic_toy_graph` produces a small
+deterministic fake knowledge graph with the same shape/contract as a real
+`KGDataset`, so the rest of the Phase 0 pipeline (ID mapping, adjacency
+building, leakage checks) can still be smoke-tested offline. It is not meant
+to be trained on for real results — only for exercising the data-handling
+code.
 """
 
 from __future__ import annotations
@@ -37,19 +45,21 @@ from pathlib import Path
 Triple = tuple[str, str, str]
 IdTriple = tuple[int, int, int]
 
-# WN18 mirrors in the same tab-separated train/valid/test.txt layout used by
-# most KGE codebases (the same layout WN18RR, FB15k-237, etc. also use).
+# FB15k-237 mirrors in the same tab-separated train/valid/test.txt layout
+# used by most KGE codebases (the same layout WN18, WN18RR, etc. also use).
 # Tried in order, first one that serves all three files wins. NONE of these
-# have been verified from this dev machine (no network access here) — the
-# first entry already 404'd once in practice. If every candidate below fails
-# when you run the Phase 0 smoke test in Colab, either add another working
-# mirror here or place train.txt/valid.txt/test.txt in `raw_dir` manually;
-# `load_dataset(..., use_synthetic_fallback=True)` will still let you
-# smoke-test the rest of the pipeline in the meantime.
-_WN18_URL_CANDIDATES = [
-    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/master/WN18/",
-    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/main/WN18/",
-    "https://raw.githubusercontent.com/ZhenfengLei/KGDatasets/master/WN18/",
+# have been verified from this dev machine (no network access here) — one of
+# these same repos' WN18 folder already 404'd once and needed a fallback
+# mirror in practice, so don't be surprised if this needs the same treatment.
+# If every candidate below fails when you run the Phase 0 smoke test in
+# Colab, either add another working mirror here or place
+# train.txt/valid.txt/test.txt in `raw_dir` manually; `load_dataset(...,
+# use_synthetic_fallback=True)` will still let you smoke-test the rest of
+# the pipeline in the meantime.
+_FB15K237_URL_CANDIDATES = [
+    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/master/FB15k-237/",
+    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/main/FB15k-237/",
+    "https://raw.githubusercontent.com/ZhenfengLei/KGDatasets/master/FB15k-237/",
 ]
 _SPLIT_FILES = {"train": "train.txt", "valid": "valid.txt", "test": "test.txt"}
 
@@ -89,11 +99,11 @@ def _download_split_files(base_url: str, dest_dir: Path) -> None:
             shutil.move(str(tmp_dir / filename), str(dest_dir / filename))
 
 
-def download_wn18(raw_dir: str | Path) -> Path:
-    """Download WN18 train/valid/test files into `raw_dir` if missing.
+def download_fb15k237(raw_dir: str | Path) -> Path:
+    """Download FB15k-237 train/valid/test files into `raw_dir` if missing.
 
-    Tries each mirror in `_WN18_URL_CANDIDATES` in order; the first one that
-    serves all three files wins. Returns the directory containing them.
+    Tries each mirror in `_FB15K237_URL_CANDIDATES` in order; the first one
+    that serves all three files wins. Returns the directory containing them.
     Raises `RuntimeError` (listing every mirror that failed and why) if none
     of them work — callers should catch this and fall back to
     `load_synthetic_toy_graph` when offline.
@@ -105,7 +115,7 @@ def download_wn18(raw_dir: str | Path) -> Path:
         return raw_dir  # already downloaded, nothing to do
 
     errors: list[str] = []
-    for base_url in _WN18_URL_CANDIDATES:
+    for base_url in _FB15K237_URL_CANDIDATES:
         try:
             _download_split_files(base_url, raw_dir)
             break
@@ -113,7 +123,7 @@ def download_wn18(raw_dir: str | Path) -> Path:
             errors.append(f"{base_url} -> {exc}")
     else:
         raise RuntimeError(
-            "Could not download WN18 from any known mirror:\n  "
+            "Could not download FB15k-237 from any known mirror:\n  "
             + "\n  ".join(errors)
             + "\nPlace train.txt/valid.txt/test.txt in raw_dir manually, or "
             "call load_dataset(..., use_synthetic_fallback=True) for an "
@@ -122,22 +132,23 @@ def download_wn18(raw_dir: str | Path) -> Path:
 
     missing = [f for f in _SPLIT_FILES.values() if not (raw_dir / f).exists()]
     if missing:
-        raise RuntimeError(f"Missing WN18 files after download attempt: {missing}")
+        raise RuntimeError(
+            f"Missing FB15k-237 files after download attempt: {missing}"
+        )
     return raw_dir
 
 
 def _read_triples(path: Path) -> list[Triple]:
-    """Read one WN18 split file and return canonical (head, relation, tail)
+    """Read one FB15k-237 split file and return (head, relation, tail)
     triples.
 
-    On disk, each line is "head \\t tail \\t relation" — confirmed by
-    inspecting a real downloaded file, e.g.:
-        03964744    04371774    _hyponym
-        00260881    00260622    _hypernym
-    That's WN18's original column order, not the more intuitive
-    (head, relation, tail) reading order. This function is the one place
-    that reordering happens, so every caller downstream always works with
-    canonical (head, relation, tail) triples regardless of file layout.
+    Assumes the on-disk column order is already "head \\t relation \\t tail"
+    (the conventional order) — this is UNVERIFIED for whichever mirror
+    actually serves the files (see the module docstring). If
+    `KGDataset.num_relations` comes out wildly wrong (should be 237) after
+    a real download, inspect a raw line from the downloaded file and swap
+    the unpacking order below to match, the same way this project had to
+    fix WN18's non-obvious (head, tail, relation) column order.
     """
     triples: list[Triple] = []
     with open(path, "r", encoding="utf-8") as f:
@@ -151,8 +162,8 @@ def _read_triples(path: Path) -> list[Triple]:
                     f"{path}:{line_no}: expected 3 tab-separated fields, got "
                     f"{len(parts)}"
                 )
-            h, t, r = parts  # on-disk order is (head, tail, relation)
-            triples.append((h, r, t))  # re-ordered to canonical (h, r, t)
+            h, r, t = parts  # assumed on-disk order: (head, relation, tail)
+            triples.append((h, r, t))
     return triples
 
 
@@ -162,8 +173,8 @@ def _build_id_maps(
     """Assign IDs in first-seen order, scanning train before valid/test.
 
     This anchors the vocabulary to the training graph. Any entities/relations
-    that only appear in valid/test (rare for WN18, but not guaranteed) are
-    appended afterwards, so every split can still be converted to valid IDs.
+    that only appear in valid/test (rare, but not guaranteed) are appended
+    afterwards, so every split can still be converted to valid IDs.
     """
     entity2id: dict[str, int] = {}
     relation2id: dict[str, int] = {}
@@ -179,11 +190,13 @@ def _build_id_maps(
     return entity2id, relation2id
 
 
-def load_wn18(raw_dir: str | Path, download_if_missing: bool = True) -> KGDataset:
-    """Load WN18 from `raw_dir`, downloading it first if requested/needed."""
+def load_fb15k237(
+    raw_dir: str | Path, download_if_missing: bool = True
+) -> KGDataset:
+    """Load FB15k-237 from `raw_dir`, downloading it first if needed."""
     raw_dir = Path(raw_dir)
     if download_if_missing:
-        download_wn18(raw_dir)
+        download_fb15k237(raw_dir)
 
     split_str_triples = {
         split: _read_triples(raw_dir / filename)
@@ -211,7 +224,7 @@ def load_synthetic_toy_graph(
     num_test: int = 20,
     seed: int = 0,
 ) -> KGDataset:
-    """Deterministic fake KG with the same contract as `load_wn18`.
+    """Deterministic fake KG with the same contract as `load_fb15k237`.
 
     Used only when the real dataset can't be obtained, to still smoke-test
     the ID-mapping / adjacency / leakage pipeline end to end. Never use this
@@ -265,14 +278,15 @@ def load_dataset(
     download_if_missing: bool = True,
     use_synthetic_fallback: bool = True,
 ) -> KGDataset:
-    """Try to load real WN18; optionally fall back to a synthetic toy graph.
+    """Try to load real FB15k-237; optionally fall back to a synthetic toy
+    graph.
 
     Set `use_synthetic_fallback=False` once you've confirmed the real
     dataset loads (e.g. in CI or a from-scratch Colab run) so a silent
     network failure can't be mistaken for a successful real-data run.
     """
     try:
-        return load_wn18(raw_dir, download_if_missing=download_if_missing)
+        return load_fb15k237(raw_dir, download_if_missing=download_if_missing)
     except RuntimeError as exc:
         if not use_synthetic_fallback:
             raise

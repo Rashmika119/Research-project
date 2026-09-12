@@ -2,7 +2,7 @@
 
 This samples real entities/relations (unlike `dataset.load_synthetic_toy_graph`,
 which fabricates a graph and is only used when no real dataset is available
-at all). Use this once WN18 has loaded successfully, to smoke-test model
+at all). Use this once FB15k-237 has loaded successfully, to smoke-test model
 code against real data shape and relation semantics without waiting on a
 full ~87k-triple training pass.
 """

@@ -58,22 +58,43 @@ them reproduces already-diagnosed bugs.
 5. **Keep a fixed learning rate for the duration of a single run.** Changes
    across runs must be explicit hyperparameter changes, not within-run
    switching, so comparisons stay attributable.
-6. **WN18 is this project's primary dataset, by explicit supervisor
-   direction — not WN18RR.** This is a deliberate deviation from the more
-   commonly cited modern benchmark: WN18 contains reversible/redundant
-   relations (e.g. `_hypernym`/`_hyponym` mirror pairs) that let a model score
-   well by exploiting inverse-relation shortcuts rather than learning real
-   structure — which is exactly why WN18RR was created in the first place.
-   Given that, when interpreting or reporting results:
-   - Don't compare our WN18 MRR/Hits@K numbers directly against published
-     WN18RR numbers in other papers — they're not the same task difficulty,
-     and a WN18 score will typically look better for reasons unrelated to
-     model quality.
-   - Note this WN18-vs-WN18RR choice explicitly wherever results are written
-     up, so it reads as a stated methodological decision, not an oversight.
-   - Don't silently swap datasets between comparable runs regardless — every
-     run in the validation table (README.md §12) should use the same
-     dataset unless the comparison is specifically about dataset choice.
+6. **FB15k-237 (Freebase-derived) is this project's primary dataset, by
+   explicit supervisor direction.** This decision has a history worth
+   knowing so it isn't re-litigated by accident:
+   - The original preliminary diagnostic experiment (README.md §15–17) used
+     **WN18RR**.
+   - Mid-project, the supervisor's WN18RR-vs-WN18 guidance (specific to that
+     diagnostic experiment, about inverse-relation shortcuts hiding subtle
+     effects) was generalized to make **WN18** the project's primary dataset.
+     Phase 0 was fully built and gate-verified against real WN18 on this
+     basis (40,943 entities / 18 relations / 141,442 / 5,000 / 5,000
+     train/valid/test — confirmed against published numbers).
+   - That was then superseded: the supervisor specified **Freebase**, and
+     the team's own reasoning converged on the same conclusion — this
+     project's core question is whether *textual* semantics help KG
+     embeddings, and WordNet-style entities (single words, one-line
+     dictionary definitions) give a language model far less real signal to
+     work with than Freebase-style entities (real-world things with
+     Wikipedia-length descriptions). **FB15k-237** is the standard
+     Freebase-derived KGC benchmark (not CoDEx-M, which is Wikidata-derived
+     — a teammate's exploratory notebook used both, but "Freebase" points to
+     FB15k-237 specifically) and is what most of the KG-LM literature this
+     project's own review cites (KEPLER, ERNIE, KG-BERT, JAKET) evaluates on.
+   - Phase 0 was rebuilt a second time for FB15k-237 (`preprocessing/dataset.py`,
+     `experiments/configs/phase0_fb15k237.yaml`) — **not yet re-verified in
+     Colab as of this writing**, unlike the WN18 build which was. Don't
+     assume it's gate-passed until `run_phase0_smoke_test.py` has actually
+     been run against it; watch for a repeat of the WN18 column-order bug
+     (the smoke test now checks loaded stats against FB15k-237's published
+     numbers — 14,541 entities / 237 relations / 272,115 / 17,535 / 20,466
+     — specifically to catch that class of bug early this time).
+   - When interpreting or reporting results: note the dataset choice and its
+     rationale explicitly wherever results are written up, don't silently
+     swap datasets between comparable runs (every run in the validation
+     table, README.md §12, should use the same dataset unless the
+     comparison is specifically about dataset choice), and don't directly
+     compare our FB15k-237 numbers against WN18/WN18RR numbers from the
+     preliminary experiment — different datasets, not a fair comparison.
 7. **Encode the graph once per optimizer step** and reuse representations for
    sampled positive/negative triples in that step — don't recompute the full
    graph encoding per triple.
@@ -192,26 +213,30 @@ for a handful of steps, checked for correct tensor shapes, finite/non-NaN
 loss, loss trending down, and no accidental val/test leakage — not a full
 training run. Full-dataset training only happens after the smoke test passes.
 
-1. **Phase 0 — Data & config scaffolding. ✅ Done — gate passed on real data.**
+1. **Phase 0 — Data & config scaffolding. ⚠️ Rebuilt for FB15k-237, gate
+   NOT yet re-run.**
    Entity/relation ID mapping, train/val/test split, adjacency structures
    built from *training triples only*, a config file holding the run
    settings, and a small connected toy subset for smoke testing later
    phases. See "Repository Map" below for the exact files.
-   *Gate:* `run_phase0_smoke_test.py` run in Colab on real WN18 and printed
-   PASSED, with correct dataset statistics confirmed against the published
-   numbers (40,943 entities, 18 relations, 141,442/5,000/5,000
-   train/valid/test). One real bug was caught and fixed in the process: WN18's
-   on-disk column order is `(head, tail, relation)`, not the more intuitive
-   `(head, relation, tail)` — the first run silently mis-parsed relations as
-   a ~41k-way field instead of 18, passing all leakage/consistency checks
-   anyway (those checks don't validate semantic correctness, only internal
-   consistency). Confirmed by inspecting raw file lines directly, then fixed
-   in `_read_triples` in `preprocessing/dataset.py`, which now re-orders
-   on-disk `(head, tail, relation)` into the project's canonical
-   `(head, relation, tail)` immediately on read — every other module always
-   sees the canonical order. Worth remembering if a *different* dataset is
-   ever added: don't assume its column order without inspecting a real file
-   first, the same way this one was verified.
+   *Status:* this was previously fully built and gate-verified against real
+   **WN18** (40,943 entities, 18 relations, 141,442/5,000/5,000
+   train/valid/test, matching published numbers) — see rule #6 above for
+   why the dataset then changed to **FB15k-237**. The code has been ported
+   to FB15k-237 but `run_phase0_smoke_test.py` has **not yet been re-run**
+   against it. **Do not start/resume Phase 1 model code until it has been
+   run in Colab and printed PASSED, with stats matching FB15k-237's
+   published numbers (14,541 entities / 237 relations / 272,115 / 17,535 /
+   20,466).**
+   *Known risk carried over from the WN18 experience:* WN18's on-disk
+   column order turned out to be `(head, tail, relation)`, not the more
+   intuitive `(head, relation, tail)` — the first WN18 run silently
+   mis-parsed relations as a ~41k-way field instead of 18, and every
+   leakage/consistency check still passed anyway (those checks validate
+   internal consistency, not semantic correctness). `run_phase0_smoke_test.py`
+   now prints a comparison against FB15k-237's published statistics
+   specifically to catch a repeat of this early — don't ignore a stats
+   mismatch warning even if every other check says PASSED.
 
 2. **Phase 1 — KG-only baseline (Encoder Phase 1 + scorer, no LM at all).**
    Implement the relation-aware encoder and DistMult scorer as a standalone
@@ -357,29 +382,35 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `requirements.txt` | Python packages needed across all phases (Colab-installable). |
 | `.gitignore` | Keeps downloaded data, checkpoints, and caches out of version control. |
 | `preprocessing/__init__.py` | Makes `preprocessing/` an importable package; just a module docstring. |
-| `preprocessing/dataset.py` | Reads WN18's raw text triples (primary dataset per rule #6 above, not WN18RR), assigns every entity/relation a consistent integer id (train-vocab-first, so ids are reproducible), and bundles train/valid/test into a `KGDataset`. Downloads the dataset if missing (verified working against real WN18 — 40,943 entities / 18 relations / 141,442 train triples, matching published numbers); falls back to a small fully-synthetic fake graph if every download mirror fails, purely so the id-mapping logic itself can still be tested offline. Correctly re-orders WN18's on-disk `(head, tail, relation)` column layout into the project's canonical `(head, relation, tail)`. |
+| `preprocessing/dataset.py` | Reads FB15k-237's raw text triples (primary dataset per rule #6 above), assigns every entity/relation a consistent integer id (train-vocab-first, so ids are reproducible), and bundles train/valid/test into a `KGDataset`. Downloads the dataset if missing — **not yet verified against real FB15k-237 data** (unlike the earlier WN18 build, which was); falls back to a small fully-synthetic fake graph if every download mirror fails, purely so the id-mapping logic itself can still be tested offline. Assumes on-disk column order `(head, relation, tail)` — unverified, watch for a repeat of WN18's non-obvious column-order bug (see rule #6 and the Phase 0 entry above). |
 | `preprocessing/graph_builder.py` | Builds the message-passing edge list from **training triples only** (never valid/test — this is non-negotiable rule #3), adding inverse edges for bidirectional message flow. `assert_no_leakage()` is a sanity check that fails loudly if validation/test data ever leaks into the graph or if any triple duplicates across splits. |
-| `preprocessing/toy_subset.py` | Carves a small, real, connected chunk (default 50 entities) out of the full training graph via breadth-first search, then remaps its entity ids to a fresh contiguous range so the subset is fully self-consistent. Exists so later phases can be smoke-tested in seconds instead of waiting on the full ~87k-triple dataset. |
-| `experiments/configs/phase0_wn18.yaml` | Run settings for Phase 0 (dataset location, download/fallback behavior, toy-subset size, seed) — kept out of code so they can change without editing Python. |
+| `preprocessing/toy_subset.py` | Carves a small, real, connected chunk (default 50 entities) out of the full training graph via breadth-first search, then remaps its entity ids to a fresh contiguous range so the subset is fully self-consistent. Exists so later phases can be smoke-tested in seconds instead of waiting on the full ~272k-triple FB15k-237 training set. |
+| `experiments/configs/phase0_fb15k237.yaml` | Run settings for Phase 0 (dataset location, download/fallback behavior, toy-subset size, seed) — kept out of code so they can change without editing Python. |
 | `run_phase0_smoke_test.py` | The Phase 0 gate script. Loads the config, loads the dataset, and runs every check above end-to-end, printing `PASSED` or a specific failure. **This is the file to actually run** before writing any Phase 1 model code. |
 | `data/raw/`, `data/processed/` | Empty, gitignored directories where the real dataset and any derived files land — not checked into version control. |
 
 ## Current stage / priority
 
 Intermediate report stage is complete. Phase 0 (this repo's own data
-scaffolding, distinct from the report's research-methodology phases) is
-**done — verified in Colab against real WN18**, gate passed. Next actual
-work, in order:
-1. Phase 1 — stable KG-only baseline (correct BCE-style objective, tuned
+scaffolding, distinct from the report's research-methodology phases) has
+been **rebuilt for FB15k-237** but **not yet re-verified in Colab** — the
+WN18 build was fully verified, then superseded per rule #6's dataset
+history. Next actual work, in order:
+1. Run `run_phase0_smoke_test.py` in Colab against FB15k-237 and confirm it
+   prints PASSED, with dataset statistics matching the published numbers
+   (14,541 entities / 237 relations / 272,115 / 17,535 / 20,466). Fix
+   anything it flags — including a stats-mismatch warning even if every
+   individual check still says "ok" — before moving on.
+2. Phase 1 — stable KG-only baseline (correct BCE-style objective, tuned
    hyperparameters), built and smoke-tested per the phased plan above.
    Build order within Phase 1: relation-aware encoder + DistMult on the toy
-   subset first (shapes/loss sanity), then the full WN18 training set,
+   subset first (shapes/loss sanity), then the full FB15k-237 training set,
    checkpointed as `kg_only_baseline.pt`.
-2. Full KG → LM → KG pipeline implementation per the build order above
+3. Full KG → LM → KG pipeline implementation per the build order above
    (Phases 2–5).
-3. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
+4. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
    proposed w/ ComplEx).
-4. Ablations (warm-up on/off, embedding dimension).
+5. Ablations (warm-up on/off, embedding dimension).
 
 Do not present WN18RR results from the preliminary experiment as evidence
 about the proposed architecture's viability — they predate loss-function and

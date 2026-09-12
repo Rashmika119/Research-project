@@ -9,9 +9,9 @@ In a Colab cell:
     !python run_phase0_smoke_test.py
 
 What this checks (mirrors the Phase 0 gate in CLAUDE.md):
-  1. The dataset loads — real WN18 if network access allows it, otherwise
-     a synthetic fallback graph — and produces train/valid/test ID-triples
-     with entity/relation maps that are internally consistent.
+  1. The dataset loads — real FB15k-237 if network access allows it,
+     otherwise a synthetic fallback graph — and produces train/valid/test
+     ID-triples with entity/relation maps that are internally consistent.
   2. No triple appears in both train and valid, or train and test.
   3. The training-only graph has exactly the expected number of edges
      (forward + inverse for every training triple, nothing extra).
@@ -34,7 +34,7 @@ from preprocessing.dataset import load_dataset
 from preprocessing.graph_builder import assert_no_leakage, build_train_graph
 from preprocessing.toy_subset import make_toy_subset
 
-CONFIG_PATH = Path("experiments/configs/phase0_wn18.yaml")
+CONFIG_PATH = Path("experiments/configs/phase0_fb15k237.yaml")
 
 
 def _check(condition: bool, message: str) -> None:
@@ -60,6 +60,45 @@ def main() -> None:
         f"train={len(dataset.train)} valid={len(dataset.valid)} "
         f"test={len(dataset.test)}"
     )
+
+    # Real FB15k-237 is well-known to be 14,541 entities / 237 relations /
+    # 272,115 train / 17,535 valid / 20,466 test. WN18's column order turned
+    # out to be non-obvious and silently produced a nonsense relation count
+    # that still passed every other check — so compare against the published
+    # numbers here too, as an early warning rather than a hard failure (the
+    # synthetic fallback graph, e.g. entities=40, is expected not to match).
+    if dataset.num_entities > 1000:  # skip this check for the synthetic fallback
+        expected = {
+            "entities": 14541,
+            "relations": 237,
+            "train": 272115,
+            "valid": 17535,
+            "test": 20466,
+        }
+        actual = {
+            "entities": dataset.num_entities,
+            "relations": dataset.num_relations,
+            "train": len(dataset.train),
+            "valid": len(dataset.valid),
+            "test": len(dataset.test),
+        }
+        mismatches = {
+            k: (actual[k], expected[k])
+            for k in expected
+            if actual[k] != expected[k]
+        }
+        if mismatches:
+            print(
+                "\n  [WARNING] Loaded numbers don't match published FB15k-237 "
+                "statistics — this is exactly the kind of mismatch that "
+                "flagged WN18's column-order bug. Inspect a raw downloaded "
+                "line (e.g. `head -n 3 " + ds_cfg["raw_dir"] + "/train.txt`) "
+                "before trusting this data:"
+            )
+            for k, (got, exp) in mismatches.items():
+                print(f"    {k}: got {got}, expected {exp}")
+        else:
+            print("  [ok] matches published FB15k-237 statistics exactly")
 
     print("\n--- Checks ---")
     _check(dataset.num_entities > 0, "at least one entity loaded")
