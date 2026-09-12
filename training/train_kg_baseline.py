@@ -73,6 +73,7 @@ def run(config: dict) -> dict:
         dim=model_cfg["dim"],
         num_layers=model_cfg.get("num_layers", 2),
         dropout=model_cfg.get("dropout", 0.2),
+        num_bases=model_cfg.get("num_bases"),
     ).to(device)
 
     train_cfg = config["training"]

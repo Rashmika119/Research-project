@@ -23,6 +23,7 @@ class KGOnlyBaseline(nn.Module):
         dim: int = 256,
         num_layers: int = 2,
         dropout: float = 0.2,
+        num_bases: int | None = None,
     ):
         super().__init__()
         self.num_relations = num_relations
@@ -38,6 +39,7 @@ class KGOnlyBaseline(nn.Module):
             num_message_relations=num_relations * 2,
             num_layers=num_layers,
             dropout=dropout,
+            num_bases=num_bases,
         )
         self.scorer = DistMultScorer(num_relations, dim)
 

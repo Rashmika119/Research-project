@@ -243,9 +243,9 @@ training run. Full-dataset training only happens after the smoke test passes.
    0.3214 → 0.3169) — this directly motivated adding best-checkpoint
    tracking (see below) before the real run, rather than just saving
    whatever the last epoch happens to produce.
-   *Real run, not yet executed:* `experiments/configs/phase1_full.yaml`
-   (real FB15k-237, no toy subset, dim=256, 100 epochs, `save_best: true`)
-   plus `run_phase1_full_training.py` to launch it — use this runner script
+   *Real run:* `experiments/configs/phase1_full.yaml` (real FB15k-237, no
+   toy subset, dim=256, 100 epochs, `save_best: true`) plus
+   `run_phase1_full_training.py` to launch it — use this runner script
    rather than `python training/train_kg_baseline.py ...` directly, since
    the latter breaks the package-relative imports (Python puts the script's
    own folder, not the repo root, on `sys.path` in that case). Needs a GPU
@@ -254,6 +254,22 @@ training run. Full-dataset training only happens after the smoke test passes.
    baseline" row in the validation table, not just a stepping stone.
    *Gate (for the real run):* stable training curve, reasonable filtered
    MRR/Hits@K, best-validation checkpoint saved and reloadable.
+   *First attempt hit a CUDA OOM* inside `RGCNConv.forward` (`h @
+   weight[i]`), on a T4-class GPU. Root cause: without basis decomposition,
+   PyG's `RGCNConv` allocates a full `[num_entities, dim] @ weight` matmul
+   **per message-passing relation** (237 relations × 2 for inverse edges =
+   474) and autograd keeps every one of those activations for backward —
+   at dim=256/14,541 entities that's the ~14GB observed. `num_bases` was
+   already a parameter on `RGCNEncoder` (`models/kg_encoder.py`) but was
+   never threaded through `KGOnlyBaseline` or the training config — fixed
+   by adding `num_bases` to `KGOnlyBaseline.__init__`/`train_kg_baseline.py`
+   and setting `model.num_bases: 30` in `phase1_full.yaml` (basis
+   decomposition shares 30 learned basis matrices across all 474 relations
+   instead of giving each its own, cutting that activation memory by
+   roughly 474/30 ≈ 16x). Batch size and embedding dim were *not* the
+   problem here — the graph is encoded once per optimizer step (rule #7)
+   regardless of batch size, so this OOM was independent of `batch_size`.
+   Not yet re-run with the fix.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
@@ -331,11 +347,21 @@ fresh Colab runtime. Right now that means `run_phase0_smoke_test.py`; later
 phases will follow the same pattern with their own entry-point script.
 
 **0. Pick the runtime type first** (Runtime → Change runtime type →
-Hardware accelerator): Phase 0 needs **no GPU/TPU at all** — it's plain
-Python (file I/O, dictionaries, a small graph search), so select **None
-(CPU)** and save your GPU quota. Switch to a GPU (T4 is what the report
-used) starting Phase 1, when actual model training begins, and keep it on
-for Phase 2 onward once the frozen language model is involved.
+Hardware accelerator): Phase 0 and Phase 1's *toy-subset* smoke test need
+**no GPU/TPU at all** (tiny data, tiny model) — select **None (CPU)** and
+save your GPU quota. Switch to a GPU (T4 is what the report used) once
+training on the *real, full* dataset (`run_phase1_full_training.py` onward),
+and keep it on for Phase 2 onward once the frozen language model is
+involved.
+
+**Changing the runtime type restarts the VM and wipes everything** that
+isn't in Google Drive — the cloned repo folder, every `pip install`ed
+package, all in-memory variables. So switching hardware accelerator
+mid-session (e.g. CPU → GPU right before the real Phase 1 run) means
+redoing steps 1–2 below from scratch, not just re-running step 3. If this
+back-and-forth gets annoying, mounting Google Drive and cloning the repo
+there instead of Colab's local disk makes the clone (though not the pip
+installs) survive a runtime restart.
 
 **1. Clone the repo:**
 ```

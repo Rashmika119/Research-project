@@ -23,6 +23,14 @@ model:
   dim: 256 # per README.md §3.1's practical starting dimension
   num_layers: 2
   dropout: 0.2
+  # Without this, RGCNConv allocates one full [num_entities, dim] @ weight
+  # matmul PER message-passing relation (237 * 2 for inverse edges = 474)
+  # and autograd keeps every one for backward -- that's what caused the
+  # CUDA OOM on the first real run (14.5GB+ used just for this). Basis
+  # decomposition shares num_bases learned basis matrices across all
+  # relations instead, cutting that activation memory by roughly
+  # num_message_relations / num_bases (~16x at this setting).
+  num_bases: 30
 
 training:
   lr: 0.001
