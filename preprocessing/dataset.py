@@ -1,9 +1,16 @@
 """Dataset loading and entity/relation ID mapping for WN18.
 
-Loads the standard WN18 train/valid/test triple files (tab-separated
-"head \\t relation \\t tail") and converts them into integer-ID triples plus
-entity2id / relation2id vocabularies built in train-first order, so IDs are
-reproducible and independent of how valid/test happen to be ordered on disk.
+Loads the standard WN18 train/valid/test triple files. On disk each line is
+tab-separated as "head \\t tail \\t relation" (the original WN18/wordnet-mlj12
+release's "e1, e2, rel" column order — confirmed by inspecting a real
+downloaded file; NOT "head, relation, tail" despite that being the more
+intuitive reading order, see `_read_triples` for exactly where this is
+handled). `_read_triples` re-orders these into the project's canonical
+`(head, relation, tail)` triple shape immediately on read, so every other
+module always sees the canonical order regardless of the file's on-disk
+column layout. Converts to integer-ID triples plus entity2id / relation2id
+vocabularies built in train-first order, so IDs are reproducible and
+independent of how valid/test happen to be ordered on disk.
 
 WN18 (not WN18RR) is used as the project's primary dataset per explicit
 supervisor direction — see CLAUDE.md non-negotiable rule #6 for why this
@@ -120,6 +127,18 @@ def download_wn18(raw_dir: str | Path) -> Path:
 
 
 def _read_triples(path: Path) -> list[Triple]:
+    """Read one WN18 split file and return canonical (head, relation, tail)
+    triples.
+
+    On disk, each line is "head \\t tail \\t relation" — confirmed by
+    inspecting a real downloaded file, e.g.:
+        03964744    04371774    _hyponym
+        00260881    00260622    _hypernym
+    That's WN18's original column order, not the more intuitive
+    (head, relation, tail) reading order. This function is the one place
+    that reordering happens, so every caller downstream always works with
+    canonical (head, relation, tail) triples regardless of file layout.
+    """
     triples: list[Triple] = []
     with open(path, "r", encoding="utf-8") as f:
         for line_no, line in enumerate(f, start=1):
@@ -132,8 +151,8 @@ def _read_triples(path: Path) -> list[Triple]:
                     f"{path}:{line_no}: expected 3 tab-separated fields, got "
                     f"{len(parts)}"
                 )
-            h, r, t = parts
-            triples.append((h, r, t))
+            h, t, r = parts  # on-disk order is (head, tail, relation)
+            triples.append((h, r, t))  # re-ordered to canonical (h, r, t)
     return triples
 
 
