@@ -58,11 +58,22 @@ them reproduces already-diagnosed bugs.
 5. **Keep a fixed learning rate for the duration of a single run.** Changes
    across runs must be explicit hyperparameter changes, not within-run
    switching, so comparisons stay attributable.
-6. **Pick the dataset deliberately.** WN18RR is the standard benchmark
-   (inverse-relation shortcuts removed) but can obscure subtle effects like
-   semantic-initialization benefit; WN18 was used for the corrected diagnostic
-   re-run specifically because of this. Don't silently swap datasets between
-   comparable runs.
+6. **WN18 is this project's primary dataset, by explicit supervisor
+   direction — not WN18RR.** This is a deliberate deviation from the more
+   commonly cited modern benchmark: WN18 contains reversible/redundant
+   relations (e.g. `_hypernym`/`_hyponym` mirror pairs) that let a model score
+   well by exploiting inverse-relation shortcuts rather than learning real
+   structure — which is exactly why WN18RR was created in the first place.
+   Given that, when interpreting or reporting results:
+   - Don't compare our WN18 MRR/Hits@K numbers directly against published
+     WN18RR numbers in other papers — they're not the same task difficulty,
+     and a WN18 score will typically look better for reasons unrelated to
+     model quality.
+   - Note this WN18-vs-WN18RR choice explicitly wherever results are written
+     up, so it reads as a stated methodological decision, not an oversight.
+   - Don't silently swap datasets between comparable runs regardless — every
+     run in the validation table (README.md §12) should use the same
+     dataset unless the comparison is specifically about dataset choice.
 7. **Encode the graph once per optimizer step** and reuse representations for
    sampled positive/negative triples in that step — don't recompute the full
    graph encoding per triple.
@@ -274,6 +285,53 @@ separate phase.
   notebook) and avoid anything requiring local-only setup (e.g. GPU-specific
   builds Colab doesn't ship) unless there's no alternative.
 
+## Running This Project in Google Colab
+
+This is the standard sequence for running any phase's script/notebook in a
+fresh Colab runtime. Right now that means `run_phase0_smoke_test.py`; later
+phases will follow the same pattern with their own entry-point script.
+
+**1. Clone the repo:**
+```
+!git clone https://github.com/Rashmika119/Research-project.git
+%cd Research-project
+```
+Use `%cd` (a Colab "magic" command), not `!cd` — `!cd` only changes directory
+inside that one throwaway subprocess and won't carry over to the next cell;
+`%cd` actually changes Colab's working directory going forward.
+
+If the repo is **private**, a plain `git clone` fails — Colab has no way to
+prompt for a GitHub login interactively. Either:
+- make the repo public on GitHub (Settings → Danger Zone → Change
+  visibility) if nothing sensitive is in it, or
+- clone with a Personal Access Token embedded in the URL:
+  `!git clone https://<github-username>:<token>@github.com/Rashmika119/Research-project.git`
+  (generate one under GitHub Settings → Developer settings → Fine-grained
+  tokens; don't leave it sitting in a notebook cell you share with others).
+
+**2. Install dependencies.**
+Only install what the phase you're running actually needs — don't wait on
+the full stack if you don't have to:
+- Phase 0 only needs `pyyaml` (`dataset.py`/`graph_builder.py`/`toy_subset.py`
+  are otherwise plain Python): `!pip install pyyaml`
+- For Phase 1 onward, install everything: `!pip install -r requirements.txt`
+  (this takes longer, and `torch-geometric` occasionally needs a
+  version-matched install command — see the comment in `requirements.txt`).
+
+**3. Run the phase's entry-point script**, e.g.:
+```
+!python run_phase0_smoke_test.py
+```
+It prints a step-by-step summary ending in either a `PASSED` message or a
+specific failure — paste whatever it prints back into the chat with Claude
+if something goes wrong, rather than trying to debug it blind.
+
+**If you hit a GitHub authentication error** unrelated to the above (e.g. a
+`403`/permission error on push, not clone), that's almost always a cached
+Git Credential Manager login for the wrong account on that machine — see the
+git-remote/auth troubleshooting in this project's chat history, or ask
+Claude to check `git remote -v` and `git config --global --list` first.
+
 ## Repository Map (what exists now, and why)
 
 Everything below is Phase 0 output — data plumbing only, no model code yet.
@@ -283,10 +341,10 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `requirements.txt` | Python packages needed across all phases (Colab-installable). |
 | `.gitignore` | Keeps downloaded data, checkpoints, and caches out of version control. |
 | `preprocessing/__init__.py` | Makes `preprocessing/` an importable package; just a module docstring. |
-| `preprocessing/dataset.py` | Reads WN18RR's raw text triples, assigns every entity/relation a consistent integer id (train-vocab-first, so ids are reproducible), and bundles train/valid/test into a `KGDataset`. Downloads the dataset if missing; falls back to a small fully-synthetic fake graph if there's no network, purely so the id-mapping logic itself can still be tested offline. |
+| `preprocessing/dataset.py` | Reads WN18's raw text triples (primary dataset per rule #6 above, not WN18RR), assigns every entity/relation a consistent integer id (train-vocab-first, so ids are reproducible), and bundles train/valid/test into a `KGDataset`. Downloads the dataset if missing (URL unverified — see in-file note); falls back to a small fully-synthetic fake graph if there's no network, purely so the id-mapping logic itself can still be tested offline. |
 | `preprocessing/graph_builder.py` | Builds the message-passing edge list from **training triples only** (never valid/test — this is non-negotiable rule #3), adding inverse edges for bidirectional message flow. `assert_no_leakage()` is a sanity check that fails loudly if validation/test data ever leaks into the graph or if any triple duplicates across splits. |
 | `preprocessing/toy_subset.py` | Carves a small, real, connected chunk (default 50 entities) out of the full training graph via breadth-first search, then remaps its entity ids to a fresh contiguous range so the subset is fully self-consistent. Exists so later phases can be smoke-tested in seconds instead of waiting on the full ~87k-triple dataset. |
-| `experiments/configs/phase0_wn18rr.yaml` | Run settings for Phase 0 (dataset location, download/fallback behavior, toy-subset size, seed) — kept out of code so they can change without editing Python. |
+| `experiments/configs/phase0_wn18.yaml` | Run settings for Phase 0 (dataset location, download/fallback behavior, toy-subset size, seed) — kept out of code so they can change without editing Python. |
 | `run_phase0_smoke_test.py` | The Phase 0 gate script. Loads the config, loads the dataset, and runs every check above end-to-end, printing `PASSED` or a specific failure. **This is the file to actually run** before writing any Phase 1 model code. |
 | `data/raw/`, `data/processed/` | Empty, gitignored directories where the real dataset and any derived files land — not checked into version control. |
 
