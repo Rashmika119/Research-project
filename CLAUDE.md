@@ -291,6 +291,13 @@ This is the standard sequence for running any phase's script/notebook in a
 fresh Colab runtime. Right now that means `run_phase0_smoke_test.py`; later
 phases will follow the same pattern with their own entry-point script.
 
+**0. Pick the runtime type first** (Runtime → Change runtime type →
+Hardware accelerator): Phase 0 needs **no GPU/TPU at all** — it's plain
+Python (file I/O, dictionaries, a small graph search), so select **None
+(CPU)** and save your GPU quota. Switch to a GPU (T4 is what the report
+used) starting Phase 1, when actual model training begins, and keep it on
+for Phase 2 onward once the frozen language model is involved.
+
 **1. Clone the repo:**
 ```
 !git clone https://github.com/Rashmika119/Research-project.git

@@ -1,11 +1,16 @@
-"""Dataset loading and entity/relation ID mapping for WN18RR.
+"""Dataset loading and entity/relation ID mapping for WN18.
 
-Loads the standard WN18RR train/valid/test triple files (tab-separated
+Loads the standard WN18 train/valid/test triple files (tab-separated
 "head \\t relation \\t tail") and converts them into integer-ID triples plus
 entity2id / relation2id vocabularies built in train-first order, so IDs are
 reproducible and independent of how valid/test happen to be ordered on disk.
 
-If the raw WN18RR files aren't present and can't be downloaded (no network,
+WN18 (not WN18RR) is used as the project's primary dataset per explicit
+supervisor direction — see CLAUDE.md non-negotiable rule #6 for why this
+differs from the more commonly cited WN18RR benchmark, and what that
+implies for interpreting results against other published KGE numbers.
+
+If the raw WN18 files aren't present and can't be downloaded (no network,
 blocked host, etc.), `load_synthetic_toy_graph` produces a small deterministic
 fake knowledge graph with the same shape/contract as a real `KGDataset`, so
 the rest of the Phase 0 pipeline (ID mapping, adjacency building, leakage
@@ -23,9 +28,16 @@ from pathlib import Path
 Triple = tuple[str, str, str]
 IdTriple = tuple[int, int, int]
 
-# Canonical WN18RR release used by ConvE and most subsequent KGE benchmarks.
-_WN18RR_BASE_URL = (
-    "https://raw.githubusercontent.com/TimDettmers/ConvE/master/data/WN18RR/"
+# WN18 mirror in the same tab-separated train/valid/test.txt layout used by
+# most KGE codebases (the same layout WN18RR, FB15k-237, etc. also use).
+# NOTE: this URL has not been verified from this dev machine (no network
+# access here) — if it 404s when you run the Phase 0 smoke test in Colab,
+# either swap in a working mirror or place train.txt/valid.txt/test.txt in
+# `raw_dir` manually; `load_dataset(..., use_synthetic_fallback=True)` will
+# still let you smoke-test the rest of the pipeline in the meantime.
+_WN18_BASE_URL = (
+    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/"
+    "master/WN18/"
 )
 _SPLIT_FILES = {"train": "train.txt", "valid": "valid.txt", "test": "test.txt"}
 
@@ -49,8 +61,8 @@ class KGDataset:
         return len(self.relation2id)
 
 
-def download_wn18rr(raw_dir: str | Path) -> Path:
-    """Download WN18RR train/valid/test files into `raw_dir` if missing.
+def download_wn18(raw_dir: str | Path) -> Path:
+    """Download WN18 train/valid/test files into `raw_dir` if missing.
 
     Returns the directory containing the three .txt files. Raises
     `RuntimeError` if any file is missing after the attempt — callers should
@@ -63,7 +75,7 @@ def download_wn18rr(raw_dir: str | Path) -> Path:
         dest = raw_dir / filename
         if dest.exists():
             continue
-        url = _WN18RR_BASE_URL + filename
+        url = _WN18_BASE_URL + filename
         try:
             urllib.request.urlretrieve(url, dest)
         except Exception as exc:  # network unavailable, blocked, DNS, etc.
@@ -76,7 +88,7 @@ def download_wn18rr(raw_dir: str | Path) -> Path:
 
     missing = [f for f in _SPLIT_FILES.values() if not (raw_dir / f).exists()]
     if missing:
-        raise RuntimeError(f"Missing WN18RR files after download attempt: {missing}")
+        raise RuntimeError(f"Missing WN18 files after download attempt: {missing}")
     return raw_dir
 
 
@@ -104,7 +116,7 @@ def _build_id_maps(
     """Assign IDs in first-seen order, scanning train before valid/test.
 
     This anchors the vocabulary to the training graph. Any entities/relations
-    that only appear in valid/test (rare for WN18RR, but not guaranteed) are
+    that only appear in valid/test (rare for WN18, but not guaranteed) are
     appended afterwards, so every split can still be converted to valid IDs.
     """
     entity2id: dict[str, int] = {}
@@ -121,11 +133,11 @@ def _build_id_maps(
     return entity2id, relation2id
 
 
-def load_wn18rr(raw_dir: str | Path, download_if_missing: bool = True) -> KGDataset:
-    """Load WN18RR from `raw_dir`, downloading it first if requested/needed."""
+def load_wn18(raw_dir: str | Path, download_if_missing: bool = True) -> KGDataset:
+    """Load WN18 from `raw_dir`, downloading it first if requested/needed."""
     raw_dir = Path(raw_dir)
     if download_if_missing:
-        download_wn18rr(raw_dir)
+        download_wn18(raw_dir)
 
     split_str_triples = {
         split: _read_triples(raw_dir / filename)
@@ -153,7 +165,7 @@ def load_synthetic_toy_graph(
     num_test: int = 20,
     seed: int = 0,
 ) -> KGDataset:
-    """Deterministic fake KG with the same contract as `load_wn18rr`.
+    """Deterministic fake KG with the same contract as `load_wn18`.
 
     Used only when the real dataset can't be obtained, to still smoke-test
     the ID-mapping / adjacency / leakage pipeline end to end. Never use this
@@ -207,14 +219,14 @@ def load_dataset(
     download_if_missing: bool = True,
     use_synthetic_fallback: bool = True,
 ) -> KGDataset:
-    """Try to load real WN18RR; optionally fall back to a synthetic toy graph.
+    """Try to load real WN18; optionally fall back to a synthetic toy graph.
 
     Set `use_synthetic_fallback=False` once you've confirmed the real
     dataset loads (e.g. in CI or a from-scratch Colab run) so a silent
     network failure can't be mistaken for a successful real-data run.
     """
     try:
-        return load_wn18rr(raw_dir, download_if_missing=download_if_missing)
+        return load_wn18(raw_dir, download_if_missing=download_if_missing)
     except RuntimeError as exc:
         if not use_synthetic_fallback:
             raise

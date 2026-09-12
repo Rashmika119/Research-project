@@ -9,7 +9,7 @@ In a Colab cell:
     !python run_phase0_smoke_test.py
 
 What this checks (mirrors the Phase 0 gate in CLAUDE.md):
-  1. The dataset loads — real WN18RR if network access allows it, otherwise
+  1. The dataset loads — real WN18 if network access allows it, otherwise
      a synthetic fallback graph — and produces train/valid/test ID-triples
      with entity/relation maps that are internally consistent.
   2. No triple appears in both train and valid, or train and test.
@@ -34,7 +34,7 @@ from preprocessing.dataset import load_dataset
 from preprocessing.graph_builder import assert_no_leakage, build_train_graph
 from preprocessing.toy_subset import make_toy_subset
 
-CONFIG_PATH = Path("experiments/configs/phase0_wn18rr.yaml")
+CONFIG_PATH = Path("experiments/configs/phase0_wn18.yaml")
 
 
 def _check(condition: bool, message: str) -> None:
