@@ -192,17 +192,26 @@ for a handful of steps, checked for correct tensor shapes, finite/non-NaN
 loss, loss trending down, and no accidental val/test leakage — not a full
 training run. Full-dataset training only happens after the smoke test passes.
 
-1. **Phase 0 — Data & config scaffolding. ✅ Implemented, gate not yet run.**
+1. **Phase 0 — Data & config scaffolding. ✅ Done — gate passed on real data.**
    Entity/relation ID mapping, train/val/test split, adjacency structures
    built from *training triples only*, a config file holding the run
    settings, and a small connected toy subset for smoke testing later
    phases. See "Repository Map" below for the exact files.
-   *Gate:* splits don't overlap, adjacency has no val/test edges, config
-   loads and round-trips — checked by `run_phase0_smoke_test.py`, which
-   has been written but not yet executed (no local Python interpreter in
-   this dev environment; needs to be run in Colab or any machine with
-   Python + `requirements.txt` installed). **Do not start Phase 1 model
-   code until this has actually been run and printed PASSED.**
+   *Gate:* `run_phase0_smoke_test.py` run in Colab on real WN18 and printed
+   PASSED, with correct dataset statistics confirmed against the published
+   numbers (40,943 entities, 18 relations, 141,442/5,000/5,000
+   train/valid/test). One real bug was caught and fixed in the process: WN18's
+   on-disk column order is `(head, tail, relation)`, not the more intuitive
+   `(head, relation, tail)` — the first run silently mis-parsed relations as
+   a ~41k-way field instead of 18, passing all leakage/consistency checks
+   anyway (those checks don't validate semantic correctness, only internal
+   consistency). Confirmed by inspecting raw file lines directly, then fixed
+   in `_read_triples` in `preprocessing/dataset.py`, which now re-orders
+   on-disk `(head, tail, relation)` into the project's canonical
+   `(head, relation, tail)` immediately on read — every other module always
+   sees the canonical order. Worth remembering if a *different* dataset is
+   ever added: don't assume its column order without inspecting a real file
+   first, the same way this one was verified.
 
 2. **Phase 1 — KG-only baseline (Encoder Phase 1 + scorer, no LM at all).**
    Implement the relation-aware encoder and DistMult scorer as a standalone
@@ -348,7 +357,7 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `requirements.txt` | Python packages needed across all phases (Colab-installable). |
 | `.gitignore` | Keeps downloaded data, checkpoints, and caches out of version control. |
 | `preprocessing/__init__.py` | Makes `preprocessing/` an importable package; just a module docstring. |
-| `preprocessing/dataset.py` | Reads WN18's raw text triples (primary dataset per rule #6 above, not WN18RR), assigns every entity/relation a consistent integer id (train-vocab-first, so ids are reproducible), and bundles train/valid/test into a `KGDataset`. Downloads the dataset if missing (URL unverified — see in-file note); falls back to a small fully-synthetic fake graph if there's no network, purely so the id-mapping logic itself can still be tested offline. |
+| `preprocessing/dataset.py` | Reads WN18's raw text triples (primary dataset per rule #6 above, not WN18RR), assigns every entity/relation a consistent integer id (train-vocab-first, so ids are reproducible), and bundles train/valid/test into a `KGDataset`. Downloads the dataset if missing (verified working against real WN18 — 40,943 entities / 18 relations / 141,442 train triples, matching published numbers); falls back to a small fully-synthetic fake graph if every download mirror fails, purely so the id-mapping logic itself can still be tested offline. Correctly re-orders WN18's on-disk `(head, tail, relation)` column layout into the project's canonical `(head, relation, tail)`. |
 | `preprocessing/graph_builder.py` | Builds the message-passing edge list from **training triples only** (never valid/test — this is non-negotiable rule #3), adding inverse edges for bidirectional message flow. `assert_no_leakage()` is a sanity check that fails loudly if validation/test data ever leaks into the graph or if any triple duplicates across splits. |
 | `preprocessing/toy_subset.py` | Carves a small, real, connected chunk (default 50 entities) out of the full training graph via breadth-first search, then remaps its entity ids to a fresh contiguous range so the subset is fully self-consistent. Exists so later phases can be smoke-tested in seconds instead of waiting on the full ~87k-triple dataset. |
 | `experiments/configs/phase0_wn18.yaml` | Run settings for Phase 0 (dataset location, download/fallback behavior, toy-subset size, seed) — kept out of code so they can change without editing Python. |
@@ -359,16 +368,18 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 
 Intermediate report stage is complete. Phase 0 (this repo's own data
 scaffolding, distinct from the report's research-methodology phases) is
-implemented but **not yet verified** — `run_phase0_smoke_test.py` has not
-been executed anywhere yet. Next actual work, in order:
-1. Run `run_phase0_smoke_test.py` (in Colab or any Python environment) and
-   confirm it prints PASSED. Fix anything it flags before moving on.
-2. Phase 1 — stable KG-only baseline (correct BCE-style objective, tuned
+**done — verified in Colab against real WN18**, gate passed. Next actual
+work, in order:
+1. Phase 1 — stable KG-only baseline (correct BCE-style objective, tuned
    hyperparameters), built and smoke-tested per the phased plan above.
-3. Full KG → LM → KG pipeline implementation per the build order above.
-4. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
+   Build order within Phase 1: relation-aware encoder + DistMult on the toy
+   subset first (shapes/loss sanity), then the full WN18 training set,
+   checkpointed as `kg_only_baseline.pt`.
+2. Full KG → LM → KG pipeline implementation per the build order above
+   (Phases 2–5).
+3. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
    proposed w/ ComplEx).
-5. Ablations (warm-up on/off, embedding dimension).
+4. Ablations (warm-up on/off, embedding dimension).
 
 Do not present WN18RR results from the preliminary experiment as evidence
 about the proposed architecture's viability — they predate loss-function and
