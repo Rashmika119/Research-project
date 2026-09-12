@@ -21,6 +21,8 @@ for real results — only for exercising the data-handling code.
 from __future__ import annotations
 
 import random
+import shutil
+import tempfile
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,17 +30,20 @@ from pathlib import Path
 Triple = tuple[str, str, str]
 IdTriple = tuple[int, int, int]
 
-# WN18 mirror in the same tab-separated train/valid/test.txt layout used by
+# WN18 mirrors in the same tab-separated train/valid/test.txt layout used by
 # most KGE codebases (the same layout WN18RR, FB15k-237, etc. also use).
-# NOTE: this URL has not been verified from this dev machine (no network
-# access here) — if it 404s when you run the Phase 0 smoke test in Colab,
-# either swap in a working mirror or place train.txt/valid.txt/test.txt in
-# `raw_dir` manually; `load_dataset(..., use_synthetic_fallback=True)` will
-# still let you smoke-test the rest of the pipeline in the meantime.
-_WN18_BASE_URL = (
-    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/"
-    "master/WN18/"
-)
+# Tried in order, first one that serves all three files wins. NONE of these
+# have been verified from this dev machine (no network access here) — the
+# first entry already 404'd once in practice. If every candidate below fails
+# when you run the Phase 0 smoke test in Colab, either add another working
+# mirror here or place train.txt/valid.txt/test.txt in `raw_dir` manually;
+# `load_dataset(..., use_synthetic_fallback=True)` will still let you
+# smoke-test the rest of the pipeline in the meantime.
+_WN18_URL_CANDIDATES = [
+    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/master/WN18/",
+    "https://raw.githubusercontent.com/villmow/datasets_knowledge_embedding/main/WN18/",
+    "https://raw.githubusercontent.com/ZhenfengLei/KGDatasets/master/WN18/",
+]
 _SPLIT_FILES = {"train": "train.txt", "valid": "valid.txt", "test": "test.txt"}
 
 
@@ -61,30 +66,52 @@ class KGDataset:
         return len(self.relation2id)
 
 
+def _download_split_files(base_url: str, dest_dir: Path) -> None:
+    """Download all three split files from one mirror, all-or-nothing.
+
+    Downloads into a temporary directory first and only moves the files
+    into `dest_dir` once every one of them has succeeded — so a mirror that
+    serves e.g. train.txt but 404s on valid.txt can't leave `dest_dir` with
+    files mixed from two different mirrors.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        for filename in _SPLIT_FILES.values():
+            urllib.request.urlretrieve(base_url + filename, tmp_dir / filename)
+        for filename in _SPLIT_FILES.values():
+            shutil.move(str(tmp_dir / filename), str(dest_dir / filename))
+
+
 def download_wn18(raw_dir: str | Path) -> Path:
     """Download WN18 train/valid/test files into `raw_dir` if missing.
 
-    Returns the directory containing the three .txt files. Raises
-    `RuntimeError` if any file is missing after the attempt — callers should
-    catch this and fall back to `load_synthetic_toy_graph` when offline.
+    Tries each mirror in `_WN18_URL_CANDIDATES` in order; the first one that
+    serves all three files wins. Returns the directory containing them.
+    Raises `RuntimeError` (listing every mirror that failed and why) if none
+    of them work — callers should catch this and fall back to
+    `load_synthetic_toy_graph` when offline.
     """
     raw_dir = Path(raw_dir)
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    for filename in _SPLIT_FILES.values():
-        dest = raw_dir / filename
-        if dest.exists():
-            continue
-        url = _WN18_BASE_URL + filename
+    if all((raw_dir / f).exists() for f in _SPLIT_FILES.values()):
+        return raw_dir  # already downloaded, nothing to do
+
+    errors: list[str] = []
+    for base_url in _WN18_URL_CANDIDATES:
         try:
-            urllib.request.urlretrieve(url, dest)
-        except Exception as exc:  # network unavailable, blocked, DNS, etc.
-            raise RuntimeError(
-                f"Could not download {url} -> {dest}: {exc}. "
-                "Place train.txt/valid.txt/test.txt in raw_dir manually, or "
-                "call load_dataset(..., use_synthetic_fallback=True) for an "
-                "offline smoke test."
-            ) from exc
+            _download_split_files(base_url, raw_dir)
+            break
+        except Exception as exc:  # network unavailable, 404, blocked, etc.
+            errors.append(f"{base_url} -> {exc}")
+    else:
+        raise RuntimeError(
+            "Could not download WN18 from any known mirror:\n  "
+            + "\n  ".join(errors)
+            + "\nPlace train.txt/valid.txt/test.txt in raw_dir manually, or "
+            "call load_dataset(..., use_synthetic_fallback=True) for an "
+            "offline smoke test."
+        )
 
     missing = [f for f in _SPLIT_FILES.values() if not (raw_dir / f).exists()]
     if missing:
