@@ -255,21 +255,27 @@ training run. Full-dataset training only happens after the smoke test passes.
    *Gate (for the real run):* stable training curve, reasonable filtered
    MRR/Hits@K, best-validation checkpoint saved and reloadable.
    *First attempt hit a CUDA OOM* inside `RGCNConv.forward` (`h @
-   weight[i]`), on a T4-class GPU. Root cause: without basis decomposition,
-   PyG's `RGCNConv` allocates a full `[num_entities, dim] @ weight` matmul
-   **per message-passing relation** (237 relations × 2 for inverse edges =
-   474) and autograd keeps every one of those activations for backward —
-   at dim=256/14,541 entities that's the ~14GB observed. `num_bases` was
-   already a parameter on `RGCNEncoder` (`models/kg_encoder.py`) but was
-   never threaded through `KGOnlyBaseline` or the training config — fixed
-   by adding `num_bases` to `KGOnlyBaseline.__init__`/`train_kg_baseline.py`
-   and setting `model.num_bases: 30` in `phase1_full.yaml` (basis
-   decomposition shares 30 learned basis matrices across all 474 relations
-   instead of giving each its own, cutting that activation memory by
-   roughly 474/30 ≈ 16x). Batch size and embedding dim were *not* the
-   problem here — the graph is encoded once per optimizer step (rule #7)
-   regardless of batch size, so this OOM was independent of `batch_size`.
-   Not yet re-run with the fix.
+   weight[i]`), on a T4-class GPU (~13GB used at OOM). Root cause: PyG's
+   `RGCNConv`, for each of the 474 message-passing relations (237 × 2 for
+   inverse edges) in turn, runs a full graph-propagate step that produces
+   a dense `[num_entities, dim]` tensor, then multiplies it by that
+   relation's weight — and autograd has to keep **all 474** of those
+   per-relation `[14541, dim]` tensors alive simultaneously for backward.
+   That memory scales with `dim`, not with parameter count.
+   *First fix attempt (num_bases) was insufficient* — added `num_bases: 30`
+   (basis decomposition) expecting it to fix this, but it doesn't: basis
+   decomposition only shrinks the *weight* tensors (474 separate `[dim,
+   dim]` matrices → 30 shared ones), not the 474 per-relation activation
+   tensors described above, which are the actual bulk of the memory. Confirmed
+   by a second Colab run that hit the identical OOM (same ~13GB, same free-memory
+   figures) even with `num_bases` set — proof the fix had no real effect.
+   *Actual fix:* dropped `model.dim` from 256 to 128 in `phase1_full.yaml`
+   (halves the size of every one of those 474 per-relation tensors); kept
+   `num_bases: 30` too since it's still a real, if secondary, memory saving
+   on the weight tensors themselves. Drop to 64 if 128 still OOMs. Batch
+   size was never the cause — the graph is encoded once per optimizer step
+   (rule #7) regardless of batch size, so this OOM was independent of it.
+   Not yet re-run with this fix.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and

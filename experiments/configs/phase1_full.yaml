@@ -20,16 +20,18 @@ dataset:
 use_toy_subset: false
 
 model:
-  dim: 256 # per README.md §3.1's practical starting dimension
+  # Dropped from 256 (README.md §3.1's practical starting dimension) after
+  # a real CUDA OOM at dim=256, even with num_bases set (see CLAUDE.md
+  # Phase 1 notes: num_bases only shrinks the weight tensors, not the real
+  # memory cost here, which is dominated by per-relation activation
+  # tensors that scale linearly with dim). 128 should use roughly half the
+  # memory dim=256 did; drop to 64 if this still OOMs.
+  dim: 128
   num_layers: 2
   dropout: 0.2
-  # Without this, RGCNConv allocates one full [num_entities, dim] @ weight
-  # matmul PER message-passing relation (237 * 2 for inverse edges = 474)
-  # and autograd keeps every one for backward -- that's what caused the
-  # CUDA OOM on the first real run (14.5GB+ used just for this). Basis
-  # decomposition shares num_bases learned basis matrices across all
-  # relations instead, cutting that activation memory by roughly
-  # num_message_relations / num_bases (~16x at this setting).
+  # Shrinks the R-GCN weight tensors (474 message-passing relations each
+  # get their own [dim, dim] matrix by default) -- a real but secondary
+  # memory saving compared to the `dim` reduction above.
   num_bases: 30
 
 training:
