@@ -225,7 +225,7 @@ training run. Full-dataset training only happens after the smoke test passes.
    train/valid/test).
 
 2. **Phase 1 — KG-only baseline (Encoder Phase 1 + scorer, no LM at all).
-   ✅ Toy-subset gate PASSED in Colab; full-scale training not yet run.**
+   ✅ Done — both toy-subset and full-scale gates PASSED in Colab.**
    Relation-aware R-GCN encoder + DistMult scorer, built as a standalone
    trainable model (`models/kg_encoder.py`, `models/scorer.py`,
    `models/kg_only_baseline.py`), trained via a config-driven loop
@@ -244,7 +244,8 @@ training run. Full-dataset training only happens after the smoke test passes.
    tracking (see below) before the real run, rather than just saving
    whatever the last epoch happens to produce.
    *Real run:* `experiments/configs/phase1_full.yaml` (real FB15k-237, no
-   toy subset, dim=256, 100 epochs, `save_best: true`) plus
+   toy subset, dim=128 — see below for why this was lowered from the
+   originally-planned 256 — 100 epochs, `save_best: true`) plus
    `run_phase1_full_training.py` to launch it — use this runner script
    rather than `python training/train_kg_baseline.py ...` directly, since
    the latter breaks the package-relative imports (Python puts the script's
@@ -290,8 +291,24 @@ training run. Full-dataset training only happens after the smoke test passes.
    original R-GCN paper), if still slow. If epoch time is *still* high
    after this, the next suspect is `training/negative_sampling.py`'s
    pure-Python per-triple rejection-sampling loop (unrelated to batch
-   size — same total work either way) — not yet investigated since the
-   batch-size fix hasn't been tried yet.
+   size — same total work either way).
+   *Result: the `batch_size: 32768` fix worked and the run completed in
+   Colab.* Full 100-epoch training curve was stable throughout — loss fell
+   monotonically (1.3855 → 0.0948), no NaNs/spikes. Validation MRR rose
+   0.0511 (epoch 5) → 0.1842 (epoch 100) and Hits@10 rose 0.1096 → 0.3409,
+   with the best-checkpoint tracking correctly identifying epoch 100 itself
+   as the best (val_MRR was still climbing at the end, not yet plateaued —
+   loss was too, so more epochs would likely improve this further, noted
+   here rather than acted on since it's a hyperparameter-investment
+   decision, not a gate-blocking bug). Checkpoint saved to
+   `experiments/checkpoints/kg_only_baseline.pt`. This is somewhat below
+   fully-tuned published DistMult/R-GCN numbers on FB15k-237 (papers:
+   roughly 0.24–0.31 MRR) — expected given `dim=128` (halved from the
+   originally-intended 256 for GPU memory, see above) and only
+   `num_negatives: 4` (papers typically use far more), not a sign of a
+   bug. Gate considered passed: training was stable, metrics were far
+   above random-guessing level and moved consistently in the right
+   direction, and the checkpoint saved successfully.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
@@ -477,23 +494,25 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 
 Intermediate report stage is complete. Phase 0 is **done — verified in
 Colab against real FB15k-237**, gate passed (see rule #6 for the WN18RR →
-WN18 → FB15k-237 dataset history). Phase 1's toy-subset smoke test is
-**done — passed in Colab** (loss finite and improving, validation metrics
-computed, checkpoint round-tripped); the real, full-dataset training run is
-**built but not yet executed**. Next actual work, in order:
-1. Run `run_phase1_full_training.py` in Colab (GPU runtime) using
-   `experiments/configs/phase1_full.yaml`, and confirm it produces a stable
-   training curve and plausible filtered MRR/Hits@K on real FB15k-237. This
-   produces `experiments/checkpoints/kg_only_baseline.pt` — the real
-   "KG-only baseline" row in the validation table, not just a smoke-test
-   artifact.
-2. Full KG → LM → KG pipeline implementation per the build order above
-   (Phases 2–5) — starting with Phase 2 (LM module in isolation), only
-   after step 1 above gives us a trustworthy Phase 1 checkpoint to
-   eventually feed into it.
-3. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
+WN18 → FB15k-237 dataset history). Phase 1 is **done — both toy-subset and
+full-dataset gates passed in Colab**: the real 100-epoch run on FB15k-237
+completed with a stable loss curve and validation MRR/Hits@10 rising
+throughout (final val_MRR=0.1842, val_Hits@10=0.3409 — see Phase 1's "Real
+run" notes above for the full curve and honest context on how this compares
+to published numbers), checkpoint saved to
+`experiments/checkpoints/kg_only_baseline.pt`. This is the real "KG-only
+baseline" row for the validation table — not just a smoke-test artifact.
+Note metrics were still improving at epoch 100 (not plateaued), so more
+epochs / tuning (num_negatives, dim back up to 256 now that the OOM and
+speed issues are understood) could strengthen this baseline later if
+desired — optional, not a blocker. Next actual work, in order:
+1. Full KG → LM → KG pipeline implementation per the build order above
+   (Phases 2–5) — starting with Phase 2 (LM module in isolation), now that
+   step above gives us a trustworthy Phase 1 checkpoint to eventually feed
+   into it.
+2. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
    proposed w/ ComplEx).
-4. Ablations (warm-up on/off, embedding dimension).
+3. Ablations (warm-up on/off, embedding dimension).
 
 Do not present WN18RR results from the preliminary experiment as evidence
 about the proposed architecture's viability — they predate loss-function and
