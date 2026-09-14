@@ -275,7 +275,23 @@ training run. Full-dataset training only happens after the smoke test passes.
    on the weight tensors themselves. Drop to 64 if 128 still OOMs. Batch
    size was never the cause — the graph is encoded once per optimizer step
    (rule #7) regardless of batch size, so this OOM was independent of it.
-   Not yet re-run with this fix.
+   *Second issue, after the OOM fix: ~1hr for 4 epochs on a T4* — not a
+   hardware problem, a batch-size/architecture mismatch. The encoder
+   re-runs a full graph pass (all 14,541 entities, ~544k message-passing
+   edges, looping internally over all 474 relation types) **once per
+   batch**, correctly per rule #7 — but at `batch_size: 512` that's
+   272115/512 ≈ 532 of those expensive full-graph passes every single
+   epoch, each ~950 relation-loop operations (474 relations × 2 layers),
+   which is what actually eats the time — scoring a batch's triples with
+   the resulting embeddings is comparatively cheap. Fixed by raising
+   `batch_size` to 32768 (~9 full-graph passes/epoch instead of 532, ~59x
+   fewer) — go even higher, or to `batch_size >= len(train)` for one
+   encode per epoch (standard for full-batch R-GCN training in the
+   original R-GCN paper), if still slow. If epoch time is *still* high
+   after this, the next suspect is `training/negative_sampling.py`'s
+   pure-Python per-triple rejection-sampling loop (unrelated to batch
+   size — same total work either way) — not yet investigated since the
+   batch-size fix hasn't been tried yet.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
@@ -386,6 +402,25 @@ prompt for a GitHub login interactively. Either:
   `!git clone https://<github-username>:<token>@github.com/Rashmika119/Research-project.git`
   (generate one under GitHub Settings → Developer settings → Fine-grained
   tokens; don't leave it sitting in a notebook cell you share with others).
+
+**Running a feature branch instead of `main`:** everything above defaults to
+`main`. To run a different branch (e.g. a teammate's in-progress work, or
+your own experiment branch):
+- Create + push it once, from wherever you edit (not Colab):
+  ```
+  git checkout -b feature/my-change
+  # ... commit your changes ...
+  git push -u origin feature/my-change
+  ```
+- Then in Colab, either clone it directly —
+  `!git clone -b feature/my-change https://github.com/Rashmika119/Research-project.git` —
+  or, if you already cloned `main` in that session, switch without
+  re-cloning: `!git fetch origin` then `!git checkout feature/my-change`
+  (run from inside the `Research-project` folder).
+- Switching branches this way does **not** wipe pip installs or GPU state
+  the way a runtime-type change does (see step 0 above) — it only changes
+  which files are on disk. Only reinstall `requirements.txt` if the branch
+  actually changed dependencies.
 
 **2. Install dependencies.**
 Only install what the phase you're running actually needs — don't wait on

@@ -38,7 +38,16 @@ training:
   lr: 0.001
   weight_decay: 0.00001
   epochs: 100 # starting point; increase later if validation MRR is still improving
-  batch_size: 512
+  # Raised from 512 -- the encoder re-runs a full graph pass (all 14,541
+  # entities, all ~544k message-passing edges, looping over 474 relation
+  # types internally) once per batch, not once per epoch. At batch_size=512
+  # that's 272115/512 ~= 532 of those expensive full-graph passes per
+  # epoch, which is what made 4 epochs take ~1hr on a T4. At 32768 it's
+  # only ~9 per epoch (~59x fewer) -- scoring more triples per step is
+  # cheap on GPU, the graph encode is what's expensive, so this should cut
+  # epoch time by roughly the same ~59x. Go higher (or even batch_size >=
+  # the full training set, i.e. one encode per epoch) if still slow.
+  batch_size: 32768
   num_negatives: 4
   eval_every: 5
   grad_clip_norm: 1.0
