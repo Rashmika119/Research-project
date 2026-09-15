@@ -309,6 +309,27 @@ training run. Full-dataset training only happens after the smoke test passes.
    bug. Gate considered passed: training was stable, metrics were far
    above random-guessing level and moved consistently in the right
    direction, and the checkpoint saved successfully.
+   *RGAT variant (added alongside, not a replacement):* by explicit user
+   decision, a second Phase 1 encoder — `models/kg_encoder_rgat.py`
+   (`RGATEncoder`, using PyTorch Geometric's `RGATConv`) and
+   `models/kg_only_baseline_rgat.py` (`KGOnlyBaselineRGAT`) — was built
+   alongside R-GCN rather than replacing it, so both exist as separate
+   checkpoints/configs for a later encoder comparison. Selected via
+   `model.encoder_type: rgat` in a config, resolved by the new
+   `training/model_factory.py` (shared by `train_kg_baseline.py` and both
+   smoke-test scripts so they can't disagree on how a config becomes a
+   model). R-GCN stays the primary/default baseline — nothing about its
+   config or checkpoint changed. Has its own toy config
+   (`experiments/configs/phase1_rgat_toy.yaml`) and gate script
+   (`run_phase1_rgat_smoke_test.py`), mirroring the R-GCN toy gate exactly
+   (same phased-build discipline: toy smoke test before any real run).
+   **Not yet run** — `run_phase1_rgat_smoke_test.py` needs to pass in
+   Colab (CPU is fine, same as the R-GCN toy gate) before a real
+   full-dataset RGAT run is attempted. RGAT is *at least* as likely as
+   R-GCN was to hit GPU memory/speed issues at full scale (attention adds
+   more per-relation state on top of R-GCN's already-expensive per-relation
+   loop) — expect to revisit `dim`/`batch_size`/`num_bases` again for it
+   specifically, don't assume the R-GCN full-run config's values transfer.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
@@ -477,18 +498,23 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `experiments/configs/phase0_fb15k237.yaml` | Run settings for Phase 0 (dataset location, download/fallback behavior, toy-subset size, seed) — kept out of code so they can change without editing Python. |
 | `run_phase0_smoke_test.py` | The Phase 0 gate script. Loads the config, loads the dataset, and runs every check above end-to-end, printing `PASSED` or a specific failure. |
 | `data/raw/`, `data/processed/` | Empty, gitignored directories where the real dataset and any derived files land — not checked into version control. |
-| `models/kg_encoder.py` | `RGCNEncoder` — a stack of PyTorch Geometric `RGCNConv` layers (R-GCN chosen as the simplest relation-aware encoder to debug, per the Phase 1 plan). Takes entity features + edge_index + edge_type, returns structure-aware entity embeddings. |
+| `models/kg_encoder.py` | `RGCNEncoder` — a stack of PyTorch Geometric `RGCNConv` layers (R-GCN chosen as the simplest relation-aware encoder to debug, per the Phase 1 plan; this is the project's primary Phase 1 encoder). Takes entity features + edge_index + edge_type, returns structure-aware entity embeddings. |
+| `models/kg_encoder_rgat.py` | `RGATEncoder` — a second Phase 1 encoder variant, a stack of PyTorch Geometric `RGATConv` layers (relation-aware attention on top of R-GCN's per-relation weight matrices). Same shape contract/interface as `RGCNEncoder` — a drop-in swap. Built for a later encoder comparison, not as a replacement (see Phase 1 notes below). **Not yet smoke-tested.** |
 | `models/scorer.py` | `DistMultScorer` — the KGE scoring layer (DistMult first, per rule #5/README §3.1). Scores single triples and, for evaluation, scores one triple against every entity at once (`score_all_tails`/`score_all_heads`). |
 | `models/kg_only_baseline.py` | `KGOnlyBaseline` — composes an entity embedding table + `RGCNEncoder` + `DistMultScorer` into the actual Phase 1 model. This is also the literal "KG-only baseline" row in the final validation table (README.md §12), not just a stepping stone. |
+| `models/kg_only_baseline_rgat.py` | `KGOnlyBaselineRGAT` — same composition as `KGOnlyBaseline` but with `RGATEncoder` instead of `RGCNEncoder`. Selected via `model.encoder_type: rgat` in a config (see `training/model_factory.py`), not used by default. |
+| `training/model_factory.py` | `build_model()` — the one place that maps a config's `model.encoder_type` (`"rgcn"` default, or `"rgat"`) to the right model class. Used by both `training/train_kg_baseline.py` and the Phase 1 smoke-test scripts so they can't drift out of sync on how a config becomes a model. |
 | `training/losses.py` | `bce_loss` — BCE/logistic loss matched to DistMult's bilinear scorer (non-negotiable rule #2 — never margin-based ranking loss here). |
 | `training/negative_sampling.py` | `sample_negatives` — corrupts head or tail per positive triple, filtered against **training-only** known-true triples (a narrower set than evaluation's filter index — see the module docstring for why the two must not be conflated). |
 | `evaluation/metrics.py` | `build_filter_index` + `evaluate_filtered` — standard filtered-ranking MRR/Hits@1/3/10, filtering built from all splits combined (used only for ranking, never as training signal). |
-| `training/train_kg_baseline.py` | The Phase 1 training loop. Config-driven so the same code runs the toy-subset smoke test and (later) the full FB15k-237 run — encodes the whole graph once per optimizer step and reuses it for every positive/negative triple in that step (rule #7), rather than recomputing per triple. |
-| `experiments/configs/phase1_toy.yaml` | Phase 1 toy-subset run settings (dim=32, 20 epochs — deliberately tiny/fast). **Verified in Colab — gate passed.** |
-| `run_phase1_smoke_test.py` | The Phase 1 toy-subset gate script, mirroring `run_phase0_smoke_test.py`'s pattern: trains on the toy subset and checks loss is finite and improves, validation metrics compute without error, and the saved checkpoint reloads with identical parameters. **Passed in Colab.** |
-| `experiments/configs/phase1_full.yaml` | Real FB15k-237 training settings (dim=256, 100 epochs, `save_best: true`, `use_synthetic_fallback: false` since a silent fallback here would be misleading). **Not yet run** — needs a GPU Colab runtime. |
+| `training/train_kg_baseline.py` | The Phase 1 training loop. Config-driven so the same code runs the toy-subset smoke test and the full FB15k-237 run for *either* encoder variant (via `training/model_factory.py`) — encodes the whole graph once per optimizer step and reuses it for every positive/negative triple in that step (rule #7), rather than recomputing per triple. |
+| `experiments/configs/phase1_toy.yaml` | Phase 1 toy-subset run settings, R-GCN (dim=32, 20 epochs — deliberately tiny/fast). **Verified in Colab — gate passed.** |
+| `experiments/configs/phase1_rgat_toy.yaml` | Same toy-subset settings as `phase1_toy.yaml`, but `model.encoder_type: rgat`. **Not yet run.** |
+| `run_phase1_smoke_test.py` | The Phase 1 toy-subset gate script for R-GCN (its default config), mirroring `run_phase0_smoke_test.py`'s pattern: trains on the toy subset and checks loss is finite and improves, validation metrics compute without error, and the saved checkpoint reloads with identical parameters. Now accepts an optional config-path argument to `main()`, reused by the RGAT variant below. **Passed in Colab (R-GCN).** |
+| `run_phase1_rgat_smoke_test.py` | Same checks as `run_phase1_smoke_test.py` (imports and reuses its `main()`), pointed at `phase1_rgat_toy.yaml` instead — its own entry point so the RGAT variant has the same one-command gate. **Not yet run.** |
+| `experiments/configs/phase1_full.yaml` | Real FB15k-237 training settings, R-GCN (dim=128 — see Phase 1 notes below for why this was lowered from the originally-planned 256 — 100 epochs, `batch_size: 32768`, `save_best: true`, `use_synthetic_fallback: false` since a silent fallback here would be misleading). **Run in Colab — completed successfully** (see Phase 1 notes below for the full result). |
 | `run_phase1_full_training.py` | Launches the real Phase 1 training run using `phase1_full.yaml`. Use this rather than invoking `training/train_kg_baseline.py` directly — running that file as a bare script puts its own folder, not the repo root, on `sys.path`, breaking its `models`/`evaluation`/`preprocessing` imports (see this script's own docstring). Produces `experiments/checkpoints/kg_only_baseline.pt`. |
-| `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints land (`phase1_toy.pt` already produced there; `kg_only_baseline.pt` once the real run completes). |
+| `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints land (`phase1_toy.pt` and `kg_only_baseline.pt` already produced there; `phase1_rgat_toy.pt` once the RGAT toy gate is run). |
 
 ## Current stage / priority
 
@@ -505,14 +531,23 @@ baseline" row for the validation table — not just a smoke-test artifact.
 Note metrics were still improving at epoch 100 (not plateaued), so more
 epochs / tuning (num_negatives, dim back up to 256 now that the OOM and
 speed issues are understood) could strengthen this baseline later if
-desired — optional, not a blocker. Next actual work, in order:
-1. Full KG → LM → KG pipeline implementation per the build order above
+desired — optional, not a blocker. An RGAT encoder variant
+(`models/kg_encoder_rgat.py`, `models/kg_only_baseline_rgat.py`) was also
+built alongside R-GCN, by explicit user decision, for a later encoder
+comparison — R-GCN remains the primary baseline; RGAT's own toy-subset gate
+(`run_phase1_rgat_smoke_test.py`) has **not yet been run**. Next actual
+work, in order:
+1. Run `run_phase1_rgat_smoke_test.py` in Colab (CPU is fine) to gate-test
+   the new RGAT variant, same phased-build discipline as everything else —
+   toy smoke test before any real run.
+2. Full KG → LM → KG pipeline implementation per the build order above
    (Phases 2–5) — starting with Phase 2 (LM module in isolation), now that
-   step above gives us a trustworthy Phase 1 checkpoint to eventually feed
-   into it.
-2. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
-   proposed w/ ComplEx).
-3. Ablations (warm-up on/off, embedding dimension).
+   the R-GCN baseline gives us a trustworthy Phase 1 checkpoint to
+   eventually feed into it. (Not blocked on step 1 above — the RGAT
+   variant is a parallel comparison track, not a prerequisite for Phase 2.)
+3. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
+   proposed w/ ComplEx) — and, informally, R-GCN vs RGAT as encoders.
+4. Ablations (warm-up on/off, embedding dimension).
 
 Do not present WN18RR results from the preliminary experiment as evidence
 about the proposed architecture's viability — they predate loss-function and

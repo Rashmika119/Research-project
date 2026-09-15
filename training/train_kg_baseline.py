@@ -20,11 +20,11 @@ import torch
 import yaml
 
 from evaluation.metrics import build_filter_index, evaluate_filtered
-from models.kg_only_baseline import KGOnlyBaseline
 from preprocessing.dataset import load_dataset
 from preprocessing.graph_builder import build_train_graph
 from preprocessing.toy_subset import make_toy_subset
 from training.losses import bce_loss
+from training.model_factory import build_model
 from training.negative_sampling import sample_negatives
 
 
@@ -67,13 +67,9 @@ def run(config: dict) -> dict:
     edge_index, edge_type = _edge_tensors(graph, device)
 
     model_cfg = config["model"]
-    model = KGOnlyBaseline(
-        num_entities=dataset.num_entities,
-        num_relations=dataset.num_relations,
-        dim=model_cfg["dim"],
-        num_layers=model_cfg.get("num_layers", 2),
-        dropout=model_cfg.get("dropout", 0.2),
-        num_bases=model_cfg.get("num_bases"),
+    print(f"Encoder: {model_cfg.get('encoder_type', 'rgcn')}")
+    model = build_model(
+        model_cfg, dataset.num_entities, dataset.num_relations
     ).to(device)
 
     train_cfg = config["training"]

@@ -27,7 +27,7 @@ from pathlib import Path
 import torch
 import yaml
 
-from models.kg_only_baseline import KGOnlyBaseline
+from training.model_factory import build_model
 from training.train_kg_baseline import run
 
 CONFIG_PATH = Path("experiments/configs/phase1_toy.yaml")
@@ -39,8 +39,8 @@ def _check(condition: bool, message: str) -> None:
     print(f"  [ok] {message}")
 
 
-def main() -> None:
-    with open(CONFIG_PATH, "r") as f:
+def main(config_path: Path = CONFIG_PATH) -> None:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
     print("--- Training on toy subset ---")
@@ -68,12 +68,8 @@ def main() -> None:
     # Checkpoint round-trip: a freshly constructed model loaded from the
     # saved checkpoint must reproduce identical parameters.
     checkpoint = torch.load(config["checkpoint_path"], map_location="cpu")
-    reloaded = KGOnlyBaseline(
-        num_entities=checkpoint["num_entities"],
-        num_relations=checkpoint["num_relations"],
-        dim=config["model"]["dim"],
-        num_layers=config["model"].get("num_layers", 2),
-        dropout=config["model"].get("dropout", 0.2),
+    reloaded = build_model(
+        config["model"], checkpoint["num_entities"], checkpoint["num_relations"]
     )
     reloaded.load_state_dict(checkpoint["model_state"])
 
