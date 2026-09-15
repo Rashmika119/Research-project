@@ -330,6 +330,31 @@ training run. Full-dataset training only happens after the smoke test passes.
    more per-relation state on top of R-GCN's already-expensive per-relation
    loop) — expect to revisit `dim`/`batch_size`/`num_bases` again for it
    specifically, don't assume the R-GCN full-run config's values transfer.
+   *RGAT toy gate, first attempt: training passed, checkpoint-reload check
+   FAILED* — loss finite/improving and validation metrics computed
+   correctly, but `encoder.layers.0.l2` and `encoder.layers.1.l2` (shape
+   `(dim, dim)`) came back with `max abs diff=nan` between the trained
+   model and the reloaded one. This surfaced a real latent bug in the
+   smoke test's comparison itself: it compared parameters by **position**
+   (`zip(a.values(), b.values())`) instead of by name, so a mismatch could
+   never be more specific than a single opaque pass/fail — fixed in
+   `run_phase1_smoke_test.py` to compare by key and report the exact
+   mismatched name(s) and max diff (this fix is unconditionally better and
+   applies to the R-GCN gate too, not just RGAT's). That's what surfaced
+   `l2` specifically instead of a bare failure. Root cause (confirmed by
+   reading PyTorch Geometric's actual `RGATConv` source, not guessed):
+   `RGATConv` always allocates four parameters — `l1`, `b1`, `l2`, `b2` —
+   for an optional `mod="scaled"` attention variant, even when that mode
+   isn't used. We never pass `mod`, so these are dead weight in our
+   forward pass regardless. They're supposed to get a harmless constant
+   init (`l2` filled with `1/out_channels`) either way, but that
+   apparently isn't landing cleanly as finite on whatever PyTorch Geometric
+   version Colab installed. *Fix:* `models/kg_encoder_rgat.py` now zeroes
+   out and freezes (`requires_grad_(False)`) these four dead parameters
+   itself right after constructing each `RGATConv` layer, rather than
+   depending on upstream's initialization for a code path this project
+   never exercises — guarantees every parameter is finite and reproducible
+   regardless of installed PyG version. Not yet re-run with this fix.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and

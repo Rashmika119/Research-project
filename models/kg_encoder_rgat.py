@@ -15,6 +15,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import RGATConv
 
+# `RGATConv` always allocates these four parameters for its optional
+# `mod="scaled"` attention variant, even when unused -- we never pass `mod`,
+# so they're dead weight in our forward pass regardless. They're *supposed*
+# to get a harmless constant init either way, but that was observed to leave
+# `l2` non-finite (NaN) on at least one installed PyTorch Geometric version
+# (caught by the Phase 1 RGAT toy smoke test's checkpoint-reload check —
+# see CLAUDE.md's Phase 1 notes). Rather than depend on upstream's init for
+# a code path we don't use, zero them out and freeze them ourselves so every
+# parameter is guaranteed finite and reproducible no matter which PyG
+# version ends up installed.
+_DEAD_RGAT_SCALED_MOD_PARAMS = ("l1", "b1", "l2", "b2")
+
+
+def _neutralize_dead_scaled_mod_params(layer: RGATConv) -> None:
+    for name in _DEAD_RGAT_SCALED_MOD_PARAMS:
+        param = getattr(layer, name, None)
+        if isinstance(param, nn.Parameter):
+            nn.init.zeros_(param)
+            param.requires_grad_(False)
+
 
 class RGATEncoder(nn.Module):
     """Stack of RGAT layers producing structure-aware entity embeddings.
@@ -54,6 +74,8 @@ class RGATEncoder(nn.Module):
                 for _ in range(num_layers)
             ]
         )
+        for layer in self.layers:
+            _neutralize_dead_scaled_mod_params(layer)
         self.dropout = nn.Dropout(dropout)
 
     def forward(
