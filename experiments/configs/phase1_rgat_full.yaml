@@ -1,0 +1,48 @@
+# Phase 1 (real run): RGAT variant, on the full FB15k-237 training set.
+# Only run this after run_phase1_rgat_smoke_test.py has printed PASSED —
+# this config trains the RGAT comparison artifact, not a quick sanity check.
+#
+# Needs a GPU runtime in Colab (Runtime -> Change runtime type -> T4 or
+# better) — unlike the RGAT toy smoke test, which ran fine on CPU.
+#
+# Starting point for dim/batch_size/num_bases is copied from
+# experiments/configs/phase1_full.yaml (R-GCN's real-run config) rather than
+# guessed from scratch, since RGAT hits the exact same "encode the whole
+# graph once per relation type" memory/speed pattern R-GCN did (see
+# CLAUDE.md's Phase 1 notes for the OOM and slow-epoch investigations) --
+# attention adds *more* per-relation state on top of that, so these values
+# are a reasonable starting point, not a guarantee. If this OOMs or is very
+# slow, drop `dim` further (e.g. 64) and/or raise `batch_size` further,
+# the same way the R-GCN config was tuned.
+
+seed: 0
+
+dataset:
+  raw_dir: data/raw/fb15k237
+  download_if_missing: true
+  # False on purpose (unlike the toy config): a download failure during a
+  # real run must be a loud error, not a silent fallback to a 40-entity
+  # fake graph that could be mistaken for a real result.
+  use_synthetic_fallback: false
+
+use_toy_subset: false
+
+model:
+  encoder_type: rgat
+  dim: 128
+  num_layers: 2
+  dropout: 0.2
+  num_bases: 30
+  heads: 2
+
+training:
+  lr: 0.001
+  weight_decay: 0.00001
+  epochs: 100 # starting point; increase later if validation MRR is still improving
+  batch_size: 32768
+  num_negatives: 4
+  eval_every: 5
+  grad_clip_norm: 1.0
+  save_best: true # keep the best-validation-MRR checkpoint, not just the last epoch
+
+checkpoint_path: experiments/checkpoints/kg_only_baseline_rgat.pt

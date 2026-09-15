@@ -17,6 +17,8 @@ script instead sidesteps that entirely, the same way run_phase0/1_smoke_test.py 
 
 from __future__ import annotations
 
+import sys
+
 import yaml
 
 from training.train_kg_baseline import run
@@ -24,6 +26,7 @@ from training.train_kg_baseline import run
 CONFIG_PATH = "experiments/configs/phase1_full.yaml"
 
 if __name__ == "__main__":
-    with open(CONFIG_PATH, "r") as f:
+    config_path = sys.argv[1] if len(sys.argv) > 1 else CONFIG_PATH
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     run(config)
