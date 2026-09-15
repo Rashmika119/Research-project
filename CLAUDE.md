@@ -360,9 +360,30 @@ training run. Full-dataset training only happens after the smoke test passes.
    now verified identical (the `l2` mismatch is gone — confirms the fix
    worked, not just moved the problem). Checkpoint saved to
    `experiments/checkpoints/phase1_rgat_toy.pt`. RGAT is cleared for a real
-   full-dataset run — not yet attempted, and per the note above, expect to
-   tune `dim`/`batch_size`/`num_bases` for it independently rather than
-   reusing R-GCN's full-run config values as-is.
+   full-dataset run.
+   *RGAT real run, first attempt (dim=128, heads=2, copied from R-GCN's
+   tuned config) hit a CUDA OOM* trying to allocate **66.44 GiB** in
+   `RGATConv.message()`'s `torch.index_select(w, 0, edge_type)` — that line
+   builds one dense tensor holding a separate weight matrix for *every
+   message-passing edge at once*, shape `[num_edges, dim, heads*dim]`. With
+   ~544k edges (272,115 triples × 2 for inverse) this is
+   `num_edges * heads * dim^2 * 4 bytes`, a fundamentally worse scaling
+   than R-GCN's OOM (which scaled with `relations * nodes`, not
+   `edges * dim^2`, and was fixable with a modest `dim` cut). `num_bases`
+   does **not** help here — it only shrinks the per-relation weight table
+   *before* this per-edge expansion happens, not the expansion itself.
+   *Fix:* `phase1_rgat_full.yaml` now uses `dim: 32` (not 64 or 128) and
+   `heads: 1`, both of which scale this specific tensor down directly.
+   **Honest caveat, not swept under the rug:** this leaves RGAT's real run
+   at meaningfully lower capacity than R-GCN's `dim=128` baseline — any
+   performance gap between them could partly reflect "less capacity" rather
+   than purely "different architecture," and this should be stated
+   explicitly if/when comparing their results. Unlike R-GCN, there wasn't a
+   "keep full capacity, tune something else instead" option available here
+   — the only other real fix would be implementing edge/neighbor
+   mini-batching inside `RGATEncoder` itself (an actual code change, not a
+   config one), which hasn't been attempted. Not yet re-run with the
+   dim=32/heads=1 fix.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
@@ -547,7 +568,7 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `run_phase1_rgat_smoke_test.py` | Same checks as `run_phase1_smoke_test.py` (imports and reuses its `main()`), pointed at `phase1_rgat_toy.yaml` instead — its own entry point so the RGAT variant has the same one-command gate. **Passed in Colab.** |
 | `experiments/configs/phase1_full.yaml` | Real FB15k-237 training settings, R-GCN (dim=128 — see Phase 1 notes below for why this was lowered from the originally-planned 256 — 100 epochs, `batch_size: 32768`, `save_best: true`, `use_synthetic_fallback: false` since a silent fallback here would be misleading). **Run in Colab — completed successfully** (see Phase 1 notes below for the full result). |
 | `run_phase1_full_training.py` | Launches the real Phase 1 training run using `phase1_full.yaml` by default, or another config path passed as `sys.argv[1]`. Use this rather than invoking `training/train_kg_baseline.py` directly — running that file as a bare script puts its own folder, not the repo root, on `sys.path`, breaking its `models`/`evaluation`/`preprocessing` imports (see this script's own docstring). Produces `experiments/checkpoints/kg_only_baseline.pt`. |
-| `experiments/configs/phase1_rgat_full.yaml` | Real FB15k-237 training settings, RGAT — starting `dim`/`batch_size`/`num_bases` copied from `phase1_full.yaml` as an evidence-informed starting point (RGAT hits the same per-relation memory/speed pattern R-GCN did, plus attention overhead on top — not guaranteed to need no further tuning). **Not yet run.** |
+| `experiments/configs/phase1_rgat_full.yaml` | Real FB15k-237 training settings, RGAT — `dim: 32`, `heads: 1` (dropped from a first attempt at `dim=128`/`heads=2` copied from R-GCN, which hit a 66.44 GiB CUDA OOM in `RGATConv`'s per-edge weight gather — see Phase 1 notes below for why this scales completely differently from R-GCN's OOM and can't just reuse R-GCN's fix). **Not yet run with the fixed config.** |
 | `run_phase1_rgat_full_training.py` | Same as `run_phase1_full_training.py` but defaults to `phase1_rgat_full.yaml`, producing `experiments/checkpoints/kg_only_baseline_rgat.pt`. **Not yet run.** |
 | `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints land (`phase1_toy.pt`, `kg_only_baseline.pt`, and `phase1_rgat_toy.pt` already produced there; `kg_only_baseline_rgat.pt` once the RGAT full run completes). |
 

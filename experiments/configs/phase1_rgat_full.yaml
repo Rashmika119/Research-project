@@ -5,15 +5,33 @@
 # Needs a GPU runtime in Colab (Runtime -> Change runtime type -> T4 or
 # better) — unlike the RGAT toy smoke test, which ran fine on CPU.
 #
-# Starting point for dim/batch_size/num_bases is copied from
-# experiments/configs/phase1_full.yaml (R-GCN's real-run config) rather than
-# guessed from scratch, since RGAT hits the exact same "encode the whole
-# graph once per relation type" memory/speed pattern R-GCN did (see
-# CLAUDE.md's Phase 1 notes for the OOM and slow-epoch investigations) --
-# attention adds *more* per-relation state on top of that, so these values
-# are a reasonable starting point, not a guarantee. If this OOMs or is very
-# slow, drop `dim` further (e.g. 64) and/or raise `batch_size` further,
-# the same way the R-GCN config was tuned.
+# First attempt copied R-GCN's tuned dim=128/heads=2 and hit a CUDA OOM
+# trying to allocate 66.44 GiB in RGATConv.message()'s
+# `torch.index_select(w, 0, edge_type)` -- that line builds ONE dense
+# tensor holding a separate weight matrix for every message-passing edge
+# at once: shape [num_edges, dim, heads*dim]. With ~544k edges this is
+# num_edges * heads * dim^2 * 4 bytes -- a fundamentally worse scaling than
+# R-GCN's OOM (which scaled with relations * nodes, not edges * dim^2, and
+# was fixable with a modest dim cut). num_bases does NOT help here: it only
+# shrinks the per-relation weight table before this per-edge expansion
+# happens, not the expansion itself. Fix: dim cut to 32 (not just 64/128)
+# and heads cut to 1, both of which scale this specific tensor down
+# directly. Honest caveat: this leaves RGAT's real run at meaningfully
+# lower capacity than R-GCN's dim=128 baseline -- note this when comparing
+# their results, a difference could partly be "less capacity" rather than
+# purely "different architecture". If this still OOMs, dim has to go lower
+# still; there isn't a "fixed capacity, tune something else" option here
+# the way there was for R-GCN, short of implementing edge/neighbor
+# mini-batching in RGATEncoder itself (a real code change, not a config one).
+#
+# dim=32 was picked over less-drastic options after estimating the size of
+# that one tensor at each candidate (num_edges * heads * dim^2 * 4 bytes,
+# summed across both layers, since both layers' copies are retained
+# simultaneously for backward): dim=64/heads=1 -> ~16.6GB (already over
+# budget before anything else); dim=48/heads=1 -> ~9.3GB (probably fits,
+# ~5GB headroom, but not risk-free); dim=32/heads=1 -> ~4.2GB (comfortable
+# margin). Chose the safest option to avoid a third failed Colab run over
+# squeezing out more capacity -- explicit user decision, not just a default.
 
 seed: 0
 
@@ -29,11 +47,15 @@ use_toy_subset: false
 
 model:
   encoder_type: rgat
-  dim: 128
+  dim: 32
   num_layers: 2
   dropout: 0.2
-  num_bases: 30
-  heads: 2
+  # Not set: at dim=32 the per-relation weight table is already tiny
+  # (474 x 32 x 32 x 4 bytes ~= 1.9MB) -- num_bases would save nothing
+  # meaningful here, and it never helped with the actual OOM anyway (see
+  # note above).
+  num_bases: null
+  heads: 1
 
 training:
   lr: 0.001
