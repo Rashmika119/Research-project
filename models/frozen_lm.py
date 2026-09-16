@@ -1,7 +1,7 @@
 """Frozen language-model wrapper with KG soft-prompt injection.
 
 A projected KG vector is inserted as an additional continuous prompt token
-before the token embeddings of an entity description.
+before the token embeddings of a KG item description.
 
 Flow:
 
@@ -75,7 +75,7 @@ class FrozenLM(nn.Module):
                 [batch_size, hidden_size]
 
         input_ids:
-            Tokenized entity descriptions:
+            Tokenized KG item descriptions:
 
                 [batch_size, seq_len]
 

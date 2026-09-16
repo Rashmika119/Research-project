@@ -1,6 +1,6 @@
 """KG -> LM projection for Phase 2.
 
-Maps structure-aware KG entity vectors from KG embedding space into the
+Maps structure-aware KG vectors from KG embedding space into the
 hidden space expected by the frozen language model.
 
 Current contract:

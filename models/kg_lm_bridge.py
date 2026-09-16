@@ -10,7 +10,7 @@ Flow:
     soft prompt
     [batch, lm_dim]
           ↓
-    Frozen language model + entity description
+   Frozen language model + KG item description
           ↓
     contextualized semantic representation
     [batch, lm_dim]
@@ -83,7 +83,7 @@ class KGLMBridge(nn.Module):
                 [batch_size, kg_dim]
 
         input_ids:
-            Tokenized entity descriptions:
+            Tokenized KG item descriptions:
 
                 [batch_size, seq_len]
 
@@ -105,7 +105,7 @@ class KGLMBridge(nn.Module):
             kg_vectors
         )
 
-        # 2. Combine the projected KG vector with entity text and let the
+        # 2. Combine the projected KG vector with description text and let the
         # frozen LM contextualize it.
         semantic_lm_vector = self.lm(
             soft_prompt=soft_prompt,
