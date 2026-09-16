@@ -8,7 +8,7 @@
 seed: 0
 
 model:
-  kg_dim: 128
+  kg_dim: 32
   lm_name: bert-base-uncased
   projection_dropout: 0.1
 

@@ -5,7 +5,7 @@ into the KG embedding space.
 
 Current contract:
     BERT hidden dimension = 768
-    KG dimension = 128
+    KG dimension = 32
 
 This projection is trainable while the language model itself remains frozen.
 """
@@ -29,7 +29,7 @@ class LMKGProjection(nn.Module):
     def __init__(
         self,
         lm_dim: int = 768,
-        kg_dim: int = 128,
+        kg_dim: int = 32,
         dropout: float = 0.1,
     ):
         super().__init__()

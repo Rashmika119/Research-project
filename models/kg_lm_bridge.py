@@ -38,7 +38,7 @@ class KGLMBridge(nn.Module):
 
     def __init__(
         self,
-        kg_dim: int = 128,
+        kg_dim: int = 32,
         model_name: str = "bert-base-uncased",
         projection_dropout: float = 0.1,
     ):

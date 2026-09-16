@@ -36,7 +36,7 @@ TEXT_DIR = "data/text/fb15k237"
 
 MODEL_NAME = "bert-base-uncased"
 
-KG_DIM = 128
+KG_DIM = 32
 BATCH_SIZE = 4
 MAX_LENGTH = 64
 

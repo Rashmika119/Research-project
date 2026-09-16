@@ -4,7 +4,7 @@ Maps structure-aware KG entity vectors from KG embedding space into the
 hidden space expected by the frozen language model.
 
 Current contract:
-    KG dimension = 128
+    KG dimension = 32
     BERT hidden dimension = 768
 
 The projection itself is trainable even though the language model is frozen.
@@ -28,7 +28,7 @@ class KGLMProjection(nn.Module):
 
     def __init__(
         self,
-        kg_dim: int = 128,
+        kg_dim: int = 32,
         lm_dim: int = 768,
         dropout: float = 0.1,
     ):
