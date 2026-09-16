@@ -11,12 +11,12 @@ Flow:
                 ↓
     [soft prompt | description tokens]
                 ↓
-           frozen BERT
+           frozen RoBERT
                 ↓
     contextualized soft-prompt representation [batch, lm_dim]
 
-BERT parameters remain frozen, but gradients are still allowed to flow
-through BERT operations back to the trainable KG -> LM projection.
+RoBERTa parameters remain frozen, but gradients are still allowed to flow
+through RoBERT operations back to the trainable KG -> LM projection.
 """
 
 from __future__ import annotations
@@ -27,33 +27,33 @@ from transformers import AutoModel
 
 
 class FrozenLM(nn.Module):
-    """Frozen BERT encoder used by the Phase 2 KG-LM bridge."""
+    """Frozen RoBERT encoder used by the Phase 2 KG-LM bridge."""
 
     def __init__(
         self,
-        model_name: str = "bert-base-uncased",
+        model_name: str = "roberta-base",
     ):
         super().__init__()
 
         self.model_name = model_name
         self.lm = AutoModel.from_pretrained(model_name)
 
-        # Freeze all BERT parameters.
+        # Freeze all RoBERTa parameters.
         for param in self.lm.parameters():
             param.requires_grad = False
 
-        # Keep BERT in evaluation mode so its dropout layers remain disabled.
+        # Keep RoBERT in evaluation mode so its dropout layers remain disabled.
         self.lm.eval()
 
         self.hidden_size = self.lm.config.hidden_size
 
     def train(self, mode: bool = True):
-        """Allow the wrapper to enter train mode while BERT stays in eval mode."""
+        """Allow the wrapper to enter train mode while RoBERT stays in eval mode."""
 
         super().train(mode)
 
         # `model.train()` would normally switch every child module,
-        # including BERT, into training mode. We deliberately keep the
+        # including RoBERT, into training mode. We deliberately keep the
         # frozen LM in evaluation mode.
         self.lm.eval()
 
@@ -80,7 +80,7 @@ class FrozenLM(nn.Module):
                 [batch_size, seq_len]
 
         attention_mask:
-            BERT attention mask:
+            LM attention mask:
 
                 [batch_size, seq_len]
 
@@ -118,7 +118,7 @@ class FrozenLM(nn.Module):
                 "soft_prompt and input_ids must have the same batch size"
             )
 
-        # Convert normal text token IDs into BERT token embeddings.
+        # Convert normal text token IDs into RoBERT token embeddings.
         token_embeddings = self.lm.get_input_embeddings()(input_ids)
 
         # Convert:
@@ -138,7 +138,7 @@ class FrozenLM(nn.Module):
             dim=1,
         )
 
-        # The new prompt token must also be visible to BERT attention.
+        # The new prompt token must also be visible to RoBERTa attention.
         prompt_mask = torch.ones(
             (
                 attention_mask.size(0),
@@ -156,7 +156,7 @@ class FrozenLM(nn.Module):
         # IMPORTANT:
         # Do NOT wrap this in torch.no_grad().
         #
-        # BERT parameters are frozen, but the computation graph must remain
+        # LM parameters are frozen, but the computation graph must remain
         # available so gradients can flow back into the trainable KG -> LM
         # projection through the soft prompt.
         outputs = self.lm(

@@ -39,7 +39,7 @@ class KGLMBridge(nn.Module):
     def __init__(
         self,
         kg_dim: int = 32,
-        model_name: str = "bert-base-uncased",
+        model_name: str = "roberta-base",
         projection_dropout: float = 0.1,
     ):
         super().__init__()

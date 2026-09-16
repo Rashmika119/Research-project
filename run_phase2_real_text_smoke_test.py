@@ -10,7 +10,7 @@ What is real in this test:
     - long descriptions
     - short-text fallback
     - tokenizer input
-    - frozen BERT bridge
+    - frozen RoBERT bridge
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ SEED = 0
 DATA_DIR = "data/raw/fb15k237"
 TEXT_DIR = "data/text/fb15k237"
 
-MODEL_NAME = "bert-base-uncased"
+MODEL_NAME = "roberta-base"
 
 KG_DIM = 32
 BATCH_SIZE = 4
@@ -319,7 +319,7 @@ def main() -> None:
         p.grad is not None
         for p in model.lm.lm.parameters()
     ), (
-        "Frozen BERT unexpectedly received "
+        "Frozen RoBERTa unexpectedly received "
         "parameter gradients"
     )
 
@@ -354,7 +354,7 @@ def main() -> None:
     )
 
     print(
-        "[ok] frozen BERT receives no parameter gradients"
+       "[ok] frozen RoBERTa receives no parameter gradients"
     )
 
     print(

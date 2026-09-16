@@ -4,7 +4,7 @@ Maps semantic representations produced by the frozen language model back
 into the KG embedding space.
 
 Current contract:
-    BERT hidden dimension = 768
+    LM hidden dimension = 768
     KG dimension = 32
 
 This projection is trainable while the language model itself remains frozen.

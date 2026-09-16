@@ -5,7 +5,7 @@ hidden space expected by the frozen language model.
 
 Current contract:
     KG dimension = 32
-    BERT hidden dimension = 768
+    LM hidden dimension = 768
 
 The projection itself is trainable even though the language model is frozen.
 """
