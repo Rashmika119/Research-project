@@ -1,0 +1,19 @@
+# Phase 2 standalone smoke-test configuration.
+#
+# This phase tests only the KG -> LM -> KG semantic bridge.
+# It does NOT require a trained Phase 1 RGAT checkpoint yet.
+#
+# Dummy KG vectors are used to imitate Phase 1 RGAT outputs.
+
+seed: 0
+
+model:
+  kg_dim: 32
+  lm_name: roberta-base
+  projection_dropout: 0.1
+
+text:
+  max_length: 64
+
+smoke_test:
+  batch_size: 4
