@@ -416,13 +416,20 @@ LM → KG projection
         ↓
 32-D semantic KG representation
 ```
-
-5. **Phase 4 — Add KG Encoder Phase 2 (LM → KG refinement).**
+4. **Phase 3 — Integrate Phase 1 → Phase 2 (KG → LM).**
+   Feed real Phase 1 embeddings (loaded from the Phase 1 checkpoint) into the
+   now-validated LM module. Run a small forward/backward smoke test and
+   confirm gradients flow into Encoder Phase 1 and the projection layers but
+   not into the frozen LM.
+   *Gate:* integrated forward/backward runs cleanly on the toy subset with no
+   shape or gradient-flow surprises.
+   
+6. **Phase 4 — Add KG Encoder Phase 2 (LM → KG refinement).**
    Build Encoder Phase 2 standalone first (dummy LM-shaped input vectors),
    then wire it onto the real output from Phase 3.
    *Gate:* standalone smoke test passes, then integrated smoke test passes.
 
-6. **Phase 5 — Full pipeline + scorer + training loop.**
+7. **Phase 5 — Full pipeline + scorer + training loop.**
    Assemble KG Encoder 1 → LM → KG Encoder 2 → DistMult end-to-end. Smoke
    test on the toy subset, then run on the real dataset. Compare against the
    Phase 1 checkpoint (KG-only baseline) using the same eval protocol.
@@ -431,7 +438,7 @@ LM → KG projection
    result, not a bug — but NaNs, collapsed embeddings, or wildly
    out-of-range metrics mean something's broken).
 
-7. **Phase 6 — Ablations & ComplEx.**
+8. **Phase 6 — Ablations & ComplEx.**
    Only after Phase 5 is stable: swap in ComplEx, run the no-warm-up
    ablation, run the embedding-dimension ablation ({128, 200, 256}).
 
