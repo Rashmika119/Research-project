@@ -391,38 +391,18 @@ training run. Full-dataset training only happens after the smoke test passes.
 
 **Status: Completed and GPU-verified**
 
-Phase 2 enriches KG structural representations with textual semantics using
-a frozen `roberta-base` language model.
+Phase 2 implements and validates the language-model semantic bridge independently
+from Phase 1.
+
+The module enriches 32-dimensional KG structural representations with textual
+semantics using a frozen `roberta-base` language model.
 
 The same semantic bridge is used for both entities and relations.
-
-### Final Verification Status
-
-```text
-RoBERTa-base                         ✅
-KG dimension: 32                    ✅
-LM hidden dimension: 768            ✅
-KG → LM projection                  ✅
-Frozen LM bridge                    ✅
-LM → KG projection                  ✅
-
-Entity descriptions                 ✅
-Entity alignment: 14,541 / 14,541   ✅
-Entity text coverage: 100%          ✅
-
-Relation descriptions               ✅
-Relation alignment: 237 / 237       ✅
-Relation text coverage: 100%        ✅
-
-Local validation                    ✅
-Google Colab T4 validation          ✅
-Gradient-flow validation            ✅
-Frozen LM validation                ✅
 
 ### Architecture
 
 ```text
-32-D KG representation
+32-D KG structural representation
         +
 Entity or relation description
         ↓
@@ -435,14 +415,7 @@ LM → KG projection
 768 → 32
         ↓
 32-D semantic KG representation
-
-4. **Phase 3 — Integrate Phase 1 → Phase 2 (KG → LM).**
-   Feed real Phase 1 embeddings (loaded from the Phase 1 checkpoint) into the
-   now-validated LM module. Run a small forward/backward smoke test and
-   confirm gradients flow into Encoder Phase 1 and the projection layers but
-   not into the frozen LM.
-   *Gate:* integrated forward/backward runs cleanly on the toy subset with no
-   shape or gradient-flow surprises.
+```
 
 5. **Phase 4 — Add KG Encoder Phase 2 (LM → KG refinement).**
    Build Encoder Phase 2 standalone first (dummy LM-shaped input vectors),
