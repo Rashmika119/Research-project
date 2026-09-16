@@ -386,15 +386,32 @@ training run. Full-dataset training only happens after the smoke test passes.
    dim=32/heads=1 fix.
 
 3. **Phase 2 — LM module in isolation.**
-   Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
-   LM→KG projection as their own standalone module — tested with *random/dummy*
-   KG vectors, not real Phase 1 output yet. Verify: projected shapes are
-   correct at both boundaries (e.g. 256→768 and 768→256), the LM's parameters
-   truly have no gradient after a backward pass, a forward pass fits in Colab
-   GPU memory at the intended batch size, and output is deterministic for a
-   fixed input/seed.
-   *Gate:* shape assertions pass, confirmed zero gradient on frozen LM params,
-   memory profile acceptable.
+
+## Phase 2 — KG ↔ LM Semantic Bridge
+
+**Status: Completed and GPU-verified**
+
+Phase 2 enriches KG structural representations with textual semantics using
+a frozen `roberta-base` language model.
+
+The same semantic bridge is used for both entities and relations.
+
+### Architecture
+
+```text
+32-D KG representation
+        +
+Entity or relation description
+        ↓
+KG → LM projection
+32 → 768
+        ↓
+Frozen RoBERTa-base
+        ↓
+LM → KG projection
+768 → 32
+        ↓
+32-D semantic KG representation
 
 4. **Phase 3 — Integrate Phase 1 → Phase 2 (KG → LM).**
    Feed real Phase 1 embeddings (loaded from the Phase 1 checkpoint) into the
