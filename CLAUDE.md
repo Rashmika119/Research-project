@@ -396,6 +396,29 @@ a frozen `roberta-base` language model.
 
 The same semantic bridge is used for both entities and relations.
 
+### Final Verification Status
+
+```text
+RoBERTa-base                         ✅
+KG dimension: 32                    ✅
+LM hidden dimension: 768            ✅
+KG → LM projection                  ✅
+Frozen LM bridge                    ✅
+LM → KG projection                  ✅
+
+Entity descriptions                 ✅
+Entity alignment: 14,541 / 14,541   ✅
+Entity text coverage: 100%          ✅
+
+Relation descriptions               ✅
+Relation alignment: 237 / 237       ✅
+Relation text coverage: 100%        ✅
+
+Local validation                    ✅
+Google Colab T4 validation          ✅
+Gradient-flow validation            ✅
+Frozen LM validation                ✅
+
 ### Architecture
 
 ```text
