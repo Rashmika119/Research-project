@@ -323,13 +323,67 @@ training run. Full-dataset training only happens after the smoke test passes.
    (`experiments/configs/phase1_rgat_toy.yaml`) and gate script
    (`run_phase1_rgat_smoke_test.py`), mirroring the R-GCN toy gate exactly
    (same phased-build discipline: toy smoke test before any real run).
-   **Not yet run** — `run_phase1_rgat_smoke_test.py` needs to pass in
-   Colab (CPU is fine, same as the R-GCN toy gate) before a real
-   full-dataset RGAT run is attempted. RGAT is *at least* as likely as
+   RGAT is *at least* as likely as
    R-GCN was to hit GPU memory/speed issues at full scale (attention adds
    more per-relation state on top of R-GCN's already-expensive per-relation
    loop) — expect to revisit `dim`/`batch_size`/`num_bases` again for it
    specifically, don't assume the R-GCN full-run config's values transfer.
+   *RGAT toy gate, first attempt: training passed, checkpoint-reload check
+   FAILED* — loss finite/improving and validation metrics computed
+   correctly, but `encoder.layers.0.l2` and `encoder.layers.1.l2` (shape
+   `(dim, dim)`) came back with `max abs diff=nan` between the trained
+   model and the reloaded one. This surfaced a real latent bug in the
+   smoke test's comparison itself: it compared parameters by **position**
+   (`zip(a.values(), b.values())`) instead of by name, so a mismatch could
+   never be more specific than a single opaque pass/fail — fixed in
+   `run_phase1_smoke_test.py` to compare by key and report the exact
+   mismatched name(s) and max diff (this fix is unconditionally better and
+   applies to the R-GCN gate too, not just RGAT's). That's what surfaced
+   `l2` specifically instead of a bare failure. Root cause (confirmed by
+   reading PyTorch Geometric's actual `RGATConv` source, not guessed):
+   `RGATConv` always allocates four parameters — `l1`, `b1`, `l2`, `b2` —
+   for an optional `mod="scaled"` attention variant, even when that mode
+   isn't used. We never pass `mod`, so these are dead weight in our
+   forward pass regardless. They're supposed to get a harmless constant
+   init (`l2` filled with `1/out_channels`) either way, but that
+   apparently isn't landing cleanly as finite on whatever PyTorch Geometric
+   version Colab installed. *Fix:* `models/kg_encoder_rgat.py` now zeroes
+   out and freezes (`requires_grad_(False)`) these four dead parameters
+   itself right after constructing each `RGATConv` layer, rather than
+   depending on upstream's initialization for a code path this project
+   never exercises — guarantees every parameter is finite and reproducible
+   regardless of installed PyG version.
+   *RGAT toy gate: ✅ PASSED in Colab after the fix.* Loss finite throughout
+   and improved (early avg 1.1134 → late avg 0.1142 — a 50-entity toy set
+   like R-GCN's, so this is expected memorization, not a meaningful
+   result), validation metrics computed without error, checkpoint reload
+   now verified identical (the `l2` mismatch is gone — confirms the fix
+   worked, not just moved the problem). Checkpoint saved to
+   `experiments/checkpoints/phase1_rgat_toy.pt`. RGAT is cleared for a real
+   full-dataset run.
+   *RGAT real run, first attempt (dim=128, heads=2, copied from R-GCN's
+   tuned config) hit a CUDA OOM* trying to allocate **66.44 GiB** in
+   `RGATConv.message()`'s `torch.index_select(w, 0, edge_type)` — that line
+   builds one dense tensor holding a separate weight matrix for *every
+   message-passing edge at once*, shape `[num_edges, dim, heads*dim]`. With
+   ~544k edges (272,115 triples × 2 for inverse) this is
+   `num_edges * heads * dim^2 * 4 bytes`, a fundamentally worse scaling
+   than R-GCN's OOM (which scaled with `relations * nodes`, not
+   `edges * dim^2`, and was fixable with a modest `dim` cut). `num_bases`
+   does **not** help here — it only shrinks the per-relation weight table
+   *before* this per-edge expansion happens, not the expansion itself.
+   *Fix:* `phase1_rgat_full.yaml` now uses `dim: 32` (not 64 or 128) and
+   `heads: 1`, both of which scale this specific tensor down directly.
+   **Honest caveat, not swept under the rug:** this leaves RGAT's real run
+   at meaningfully lower capacity than R-GCN's `dim=128` baseline — any
+   performance gap between them could partly reflect "less capacity" rather
+   than purely "different architecture," and this should be stated
+   explicitly if/when comparing their results. Unlike R-GCN, there wasn't a
+   "keep full capacity, tune something else instead" option available here
+   — the only other real fix would be implementing edge/neighbor
+   mini-batching inside `RGATEncoder` itself (an actual code change, not a
+   config one), which hasn't been attempted. Not yet re-run with the
+   dim=32/heads=1 fix.
 
 3. **Phase 2 — LM module in isolation.**
    Build the KG→LM projection, frozen-LM wrapper, soft-prompt injection, and
@@ -509,12 +563,14 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `evaluation/metrics.py` | `build_filter_index` + `evaluate_filtered` — standard filtered-ranking MRR/Hits@1/3/10, filtering built from all splits combined (used only for ranking, never as training signal). |
 | `training/train_kg_baseline.py` | The Phase 1 training loop. Config-driven so the same code runs the toy-subset smoke test and the full FB15k-237 run for *either* encoder variant (via `training/model_factory.py`) — encodes the whole graph once per optimizer step and reuses it for every positive/negative triple in that step (rule #7), rather than recomputing per triple. |
 | `experiments/configs/phase1_toy.yaml` | Phase 1 toy-subset run settings, R-GCN (dim=32, 20 epochs — deliberately tiny/fast). **Verified in Colab — gate passed.** |
-| `experiments/configs/phase1_rgat_toy.yaml` | Same toy-subset settings as `phase1_toy.yaml`, but `model.encoder_type: rgat`. **Not yet run.** |
-| `run_phase1_smoke_test.py` | The Phase 1 toy-subset gate script for R-GCN (its default config), mirroring `run_phase0_smoke_test.py`'s pattern: trains on the toy subset and checks loss is finite and improves, validation metrics compute without error, and the saved checkpoint reloads with identical parameters. Now accepts an optional config-path argument to `main()`, reused by the RGAT variant below. **Passed in Colab (R-GCN).** |
-| `run_phase1_rgat_smoke_test.py` | Same checks as `run_phase1_smoke_test.py` (imports and reuses its `main()`), pointed at `phase1_rgat_toy.yaml` instead — its own entry point so the RGAT variant has the same one-command gate. **Not yet run.** |
+| `experiments/configs/phase1_rgat_toy.yaml` | Same toy-subset settings as `phase1_toy.yaml`, but `model.encoder_type: rgat`. **Verified in Colab — gate passed.** |
+| `run_phase1_smoke_test.py` | The Phase 1 toy-subset gate script for R-GCN (its default config), mirroring `run_phase0_smoke_test.py`'s pattern: trains on the toy subset and checks loss is finite and improves, validation metrics compute without error, and the saved checkpoint reloads with identical parameters (compared by parameter *name*, not position — reports the exact mismatched name(s)/diff if this ever fails, per the RGAT `l2` bug this caught). Now accepts an optional config-path argument to `main()`, reused by the RGAT variant below. **Passed in Colab (R-GCN).** |
+| `run_phase1_rgat_smoke_test.py` | Same checks as `run_phase1_smoke_test.py` (imports and reuses its `main()`), pointed at `phase1_rgat_toy.yaml` instead — its own entry point so the RGAT variant has the same one-command gate. **Passed in Colab.** |
 | `experiments/configs/phase1_full.yaml` | Real FB15k-237 training settings, R-GCN (dim=128 — see Phase 1 notes below for why this was lowered from the originally-planned 256 — 100 epochs, `batch_size: 32768`, `save_best: true`, `use_synthetic_fallback: false` since a silent fallback here would be misleading). **Run in Colab — completed successfully** (see Phase 1 notes below for the full result). |
-| `run_phase1_full_training.py` | Launches the real Phase 1 training run using `phase1_full.yaml`. Use this rather than invoking `training/train_kg_baseline.py` directly — running that file as a bare script puts its own folder, not the repo root, on `sys.path`, breaking its `models`/`evaluation`/`preprocessing` imports (see this script's own docstring). Produces `experiments/checkpoints/kg_only_baseline.pt`. |
-| `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints land (`phase1_toy.pt` and `kg_only_baseline.pt` already produced there; `phase1_rgat_toy.pt` once the RGAT toy gate is run). |
+| `run_phase1_full_training.py` | Launches the real Phase 1 training run using `phase1_full.yaml` by default, or another config path passed as `sys.argv[1]`. Use this rather than invoking `training/train_kg_baseline.py` directly — running that file as a bare script puts its own folder, not the repo root, on `sys.path`, breaking its `models`/`evaluation`/`preprocessing` imports (see this script's own docstring). Produces `experiments/checkpoints/kg_only_baseline.pt`. |
+| `experiments/configs/phase1_rgat_full.yaml` | Real FB15k-237 training settings, RGAT — `dim: 32`, `heads: 1` (dropped from a first attempt at `dim=128`/`heads=2` copied from R-GCN, which hit a 66.44 GiB CUDA OOM in `RGATConv`'s per-edge weight gather — see Phase 1 notes below for why this scales completely differently from R-GCN's OOM and can't just reuse R-GCN's fix). **Not yet run with the fixed config.** |
+| `run_phase1_rgat_full_training.py` | Same as `run_phase1_full_training.py` but defaults to `phase1_rgat_full.yaml`, producing `experiments/checkpoints/kg_only_baseline_rgat.pt`. **Not yet run.** |
+| `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints land (`phase1_toy.pt`, `kg_only_baseline.pt`, and `phase1_rgat_toy.pt` already produced there; `kg_only_baseline_rgat.pt` once the RGAT full run completes). |
 
 ## Current stage / priority
 
@@ -534,17 +590,25 @@ speed issues are understood) could strengthen this baseline later if
 desired — optional, not a blocker. An RGAT encoder variant
 (`models/kg_encoder_rgat.py`, `models/kg_only_baseline_rgat.py`) was also
 built alongside R-GCN, by explicit user decision, for a later encoder
-comparison — R-GCN remains the primary baseline; RGAT's own toy-subset gate
-(`run_phase1_rgat_smoke_test.py`) has **not yet been run**. Next actual
-work, in order:
-1. Run `run_phase1_rgat_smoke_test.py` in Colab (CPU is fine) to gate-test
-   the new RGAT variant, same phased-build discipline as everything else —
-   toy smoke test before any real run.
+comparison — R-GCN remains the primary baseline. RGAT's toy-subset gate
+(`run_phase1_rgat_smoke_test.py`) **passed in Colab** after fixing a real
+bug it caught (upstream `RGATConv` leaving a dead parameter, `l2`,
+non-finite on the installed PyG version — see Phase 1 notes above; also
+fixed the smoke test itself to compare checkpoints by parameter name
+instead of position, which is what let this be diagnosed precisely instead
+of just "failed"). By explicit user decision, next up is the RGAT real
+full-dataset run *before* Phase 2 (not blocking it — a parallel comparison
+track that was prioritized first). Next actual work, in order:
+1. Run `run_phase1_rgat_full_training.py` in Colab (GPU runtime) using
+   `experiments/configs/phase1_rgat_full.yaml` — starting `dim`/
+   `batch_size`/`num_bases` copied from R-GCN's tuned real-run config as an
+   evidence-informed starting point (see that config's own comments), not
+   a guarantee it won't need further tuning given attention's extra
+   per-relation overhead. Produces
+   `experiments/checkpoints/kg_only_baseline_rgat.pt`.
 2. Full KG → LM → KG pipeline implementation per the build order above
-   (Phases 2–5) — starting with Phase 2 (LM module in isolation), now that
-   the R-GCN baseline gives us a trustworthy Phase 1 checkpoint to
-   eventually feed into it. (Not blocked on step 1 above — the RGAT
-   variant is a parallel comparison track, not a prerequisite for Phase 2.)
+   (Phases 2–5) — starting with Phase 2 (LM module in isolation), using
+   the R-GCN baseline checkpoint (already trustworthy and available now).
 3. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
    proposed w/ ComplEx) — and, informally, R-GCN vs RGAT as encoders.
 4. Ablations (warm-up on/off, embedding dimension).

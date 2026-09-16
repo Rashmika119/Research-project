@@ -66,21 +66,34 @@ def main(config_path: Path = CONFIG_PATH) -> None:
     _check(len(val_rows) > 0, "validation metrics were computed at least once")
 
     # Checkpoint round-trip: a freshly constructed model loaded from the
-    # saved checkpoint must reproduce identical parameters.
+    # saved checkpoint must reproduce identical parameters. Compared by
+    # NAME (not position) so a mismatch reports exactly which parameter
+    # differs, rather than a single opaque pass/fail.
     checkpoint = torch.load(config["checkpoint_path"], map_location="cpu")
     reloaded = build_model(
         config["model"], checkpoint["num_entities"], checkpoint["num_relations"]
     )
     reloaded.load_state_dict(checkpoint["model_state"])
 
-    model_cpu = model.to("cpu")
-    same = all(
-        torch.equal(p1, p2)
-        for p1, p2 in zip(
-            model_cpu.state_dict().values(), reloaded.state_dict().values()
-        )
+    model_sd = model.to("cpu").state_dict()
+    reloaded_sd = reloaded.state_dict()
+    _check(
+        set(model_sd.keys()) == set(reloaded_sd.keys()),
+        f"checkpoint and reloaded model have the same parameter names "
+        f"(only in trained model: {set(model_sd) - set(reloaded_sd)}, "
+        f"only in reloaded: {set(reloaded_sd) - set(model_sd)})",
     )
-    _check(same, "checkpoint reloads into a fresh model with identical parameters")
+    mismatches = [
+        f"{name} (max abs diff={float((model_sd[name] - reloaded_sd[name]).abs().max()):.3g}, "
+        f"shape={tuple(model_sd[name].shape)})"
+        for name in model_sd
+        if not torch.equal(model_sd[name], reloaded_sd[name])
+    ]
+    _check(
+        not mismatches,
+        "checkpoint reloads into a fresh model with identical parameters"
+        + (f" -- MISMATCHED: {mismatches}" if mismatches else ""),
+    )
 
     print("\nPhase 1 smoke test PASSED. Ready to train on the full FB15k-237 set.")
 
