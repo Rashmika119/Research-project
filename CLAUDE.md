@@ -385,37 +385,328 @@ training run. Full-dataset training only happens after the smoke test passes.
    config one), which hasn't been attempted. Not yet re-run with the
    dim=32/heads=1 fix.
 
-3. **Phase 2 — LM module in isolation.**
+3. **Phase 2 — KG ↔ LM semantic bridge (KG → LM projection + frozen
+   RoBERTa + LM → KG projection, developed and tested independently before
+   connecting real Phase 1 embeddings).
+   ✅ Done — the standalone semantic bridge for both entity and relation text
+   passed locally and on a Colab T4 GPU.**
 
-## Phase 2 — KG ↔ LM Semantic Bridge
+   Phase 2 was started only after the structural KG side had been established
+   in Phase 1. The purpose of this phase was not yet to train the complete
+   KG → LM → KG architecture or to evaluate link-prediction performance.
+   Instead, Phase 2 focused specifically on building and validating the middle
+   semantic bridge of the architecture. The main question at this stage was:
+   can a structural KG representation be taken from the 32-dimensional KG
+   embedding space, converted into the 768-dimensional representation space
+   used by a pretrained Language Model, combined with real textual information,
+   processed by a frozen Language Model, and then converted back into the
+   original 32-dimensional KG space without breaking the gradient path that
+   will later be required for end-to-end training? To answer this question
+   clearly, Phase 2 was developed independently from the real Phase 1 encoder.
+   Dummy structural vectors with the correct dimensionality were used during
+   the Phase 2 smoke tests so that any error could be identified as a Phase 2
+   problem instead of being mixed with Phase 1 encoder behaviour.
 
-**Status: Completed and GPU-verified**
+   The first component implemented for Phase 2 was the KG-to-LM projection in
+   `models/kg_lm_projection.py`. The structural representations produced by
+   the KG side and the hidden representations expected by the Language Model
+   do not have the same dimensionality. The feasible Phase 1 RGAT configuration
+   finally operates with KG vectors of dimension 32, while `roberta-base`
+   operates with hidden representations of dimension 768. Therefore, a raw
+   32-dimensional KG vector cannot be supplied directly as a RoBERTa embedding.
+   To solve this, `KGLMProjection` was implemented as a trainable projection
+   module that maps each structural representation from 32 dimensions to
+   768 dimensions. The transformation uses a linear projection followed by
+   normalization, GELU activation, and dropout. The important idea is that
+   this projection is not a manually defined conversion. Its weights are
+   trainable so that, once the complete model is integrated, the
+   link-prediction objective can teach the projection how structural graph
+   information should be represented inside the Language Model's embedding
+   space.
 
-Phase 2 implements and validates the language-model semantic bridge independently
-from Phase 1.
+   The projected 768-dimensional KG vector is then treated as a **soft prompt**.
+   We do not convert the KG embedding into a sentence, and we do not try to
+   assign the vector to an existing RoBERTa vocabulary token. Instead, the
+   projected KG representation itself is inserted directly as an additional
+   continuous embedding at the beginning of the Language Model input sequence.
+   This gives the Language Model direct access to the structural information
+   learned on the KG side. At the same time, the textual description of the
+   corresponding entity or relation is tokenized normally using the RoBERTa
+   tokenizer. RoBERTa's normal token embeddings are obtained for those text
+   tokens, and the KG-derived soft prompt is prepended before them. Conceptually,
+   the transformer therefore receives a sequence containing the KG structural
+   prompt first and the textual description tokens after it. This is the main
+   point where the structural KG representation and textual semantics are
+   allowed to interact.
 
-The module enriches 32-dimensional KG structural representations with textual
-semantics using a frozen `roberta-base` language model.
+   The Language Model wrapper was implemented in `models/frozen_lm.py`. The
+   first prototype of the bridge was used to verify that the general mechanism
+   of inserting a projected KG representation into a pretrained transformer
+   was workable. The final Phase 2 implementation was then standardized on
+   `roberta-base`, whose hidden size is 768. RoBERTa is used as a pretrained
+   semantic transformation module rather than a model that we fine-tune.
+   Consequently, all RoBERTa parameters are frozen by setting their
+   `requires_grad` values to `False`. This means that the pretrained RoBERTa
+   weights remain unchanged when the complete KG model is later trained.
+   However, an important technical requirement discovered and verified during
+   Phase 2 is that freezing RoBERTa is not the same as wrapping the complete
+   RoBERTa forward pass inside `torch.no_grad()`. If `torch.no_grad()` were
+   used around the transformer computation, the computational graph would be
+   broken and the final task loss would not be able to propagate gradients
+   backward through the Language Model operations to the trainable KG-to-LM
+   projection or to the upstream KG components. Therefore, the implementation
+   freezes only the RoBERTa parameters while allowing autograd to track the
+   operations performed on the trainable input embeddings. In this design,
+   gradients are allowed to pass through RoBERTa, but RoBERTa's own parameters
+   do not receive trainable gradients and are never updated.
 
-The same semantic bridge is used for both entities and relations.
+   RoBERTa is also intentionally kept in evaluation mode even when the
+   surrounding bridge is placed into training mode. This was done because the
+   Language Model is supposed to behave as a fixed pretrained semantic module.
+   Keeping it in evaluation mode disables training-time behaviour such as
+   dropout inside RoBERTa and gives a stable transformation for the same input.
+   The surrounding projection layers remain trainable, while the internal
+   Language Model remains frozen and deterministic. This behaviour was not
+   assumed; it was explicitly checked during the Phase 2 smoke tests.
 
-### Architecture
+   Because a custom KG soft prompt is inserted before the normal text-token
+   embeddings, the attention mask produced by the tokenizer also has to be
+   modified. The original mask contains positions only for the textual tokens,
+   while the actual embedding sequence now contains one additional position
+   for the KG prompt. Phase 2 therefore extends the attention mask by one
+   active position so that the prompt participates correctly in the
+   transformer computation. The combined embeddings are supplied to RoBERTa
+   through `inputs_embeds`, allowing the manually created KG soft prompt to
+   appear in the same sequence as the standard RoBERTa token embeddings.
 
-```text
-32-D KG structural representation
-        +
-Entity or relation description
-        ↓
-KG → LM projection
-32 → 768
-        ↓
-Frozen RoBERTa-base
-        ↓
-LM → KG projection
-768 → 32
-        ↓
-32-D semantic KG representation
-```
+   After this combined sequence passes through RoBERTa, the transformer returns
+   contextual hidden representations for all positions in the sequence. Phase 2
+   uses the contextual representation corresponding to the inserted soft-prompt
+   position as the Language Model output for the KG item. Before entering
+   RoBERTa, that position contains only the projected structural representation.
+   After passing through the transformer, its representation has been
+   contextualized through attention to the entity or relation description.
+   This gives a 768-dimensional semantic representation that has been influenced
+   by both the original graph structure and the textual context.
+
+   The next component implemented was the LM-to-KG projection in
+   `models/lm_kg_projection.py`. The contextual representation returned by
+   RoBERTa still has dimension 768, but the KG architecture operates in a
+   32-dimensional embedding space. `LMKGProjection` therefore performs the
+   reverse mapping from 768 dimensions back to 32 dimensions. Like the first
+   projection, this is a trainable transformation using a linear layer,
+   normalization, GELU activation, and dropout. The output of this module is
+   therefore once again compatible with the KG side of the architecture.
+   This is important to the research design because the Language Model is not
+   intended to become the final representation space. The architecture starts
+   in KG space, temporarily moves into LM space to introduce textual semantics,
+   and then deliberately returns to KG space so that graph refinement and
+   link-prediction scoring can continue afterwards.
+
+   The KG-to-LM projection, frozen Language Model, and LM-to-KG projection were
+   then combined into the reusable `KGLMBridge` implemented in
+   `models/kg_lm_bridge.py`. This wrapper provides the complete Phase 2
+   transformation. A 32-dimensional structural vector and the associated text
+   are supplied to the bridge, the structural vector is projected to 768
+   dimensions and inserted as a soft prompt, RoBERTa processes the soft prompt
+   together with the textual tokens, the prompt-position contextual
+   representation is extracted, and that 768-dimensional representation is
+   projected back to 32 dimensions. Therefore the overall dimensional flow of
+   Phase 2 is `32 → 768 → RoBERTa → 768 → 32`. The bridge was deliberately
+   written generically rather than as an entity-only implementation because
+   the same mechanism is required for relations as well.
+
+   Before real FB15k-237 descriptions were introduced, a generic Phase 2 smoke
+   test was created to verify that the bridge itself worked. The smoke test
+   supplied dummy 32-dimensional structural representations and passed them
+   through the complete semantic bridge. It checked that the input and output
+   shapes were correct, that no NaN or infinite values were produced, that
+   RoBERTa remained frozen and in evaluation mode, that the trainable
+   projection modules received gradients, and that a gradient could also
+   propagate back to the original structural input. At the same time, the test
+   verified that none of RoBERTa's own parameters received gradients. A small
+   artificial loss such as `output.pow(2).mean()` was used only so that
+   `.backward()` could be called and the gradient path could be inspected.
+   This loss is not the research training objective, is not BCE, and has
+   nothing to do with link-prediction quality. Its only purpose was to prove
+   that the bridge remained differentiable in exactly the places where later
+   end-to-end training will require differentiation.
+
+   During the development of Phase 1 RGAT, GPU-memory behaviour forced the
+   full-scale RGAT configuration to use `dim: 32` and `heads: 1`. Phase 2 was
+   therefore aligned with this final feasible structural dimension. This was
+   necessary because there would be little value in validating a semantic
+   bridge for a KG dimensionality that the real RGAT configuration could not
+   actually produce at full scale. The final Phase 2 interface is consequently
+   fixed around a 32-dimensional KG space and a 768-dimensional RoBERTa space.
+   The Phase 2 bridge therefore accepts `[batch, 32]` structural vectors,
+   creates `[batch, 768]` soft prompts, and returns `[batch, 32]` enriched KG
+   representations.
+
+   After the generic bridge behaviour was established, the next major task was
+   to replace placeholder text with real entity textual information. Entity
+   text preprocessing was implemented in `preprocessing/entity_text.py`. The
+   textual information is not generated by our model. Instead, existing
+   external text resources corresponding to the same Freebase entities used by
+   FB15k-237 are loaded and aligned with the dataset. Two forms of entity text
+   are supported. Richer long descriptions are preferred when available, and
+   shorter entity text is used as a fallback for entities that do not have a
+   long description. The short text comes from the KG-BERT-style
+   `entity2text.txt` resource, while longer Freebase descriptions are obtained
+   from the `FB15k_mid2description.txt` resource. The purpose of using the
+   long-description-first strategy is to provide RoBERTa with richer semantic
+   context wherever possible while still guaranteeing that no entity is lost
+   because a long description happens to be unavailable.
+
+   A critical part of this preprocessing was preserving the original
+   FB15k-237 entity mapping. Phase 2 does not create a new entity-ID order from
+   the text files. The `entity2id` mapping already created by the KG data
+   pipeline remains the single source of truth. Every description is mapped
+   back to that existing ID so that the structural vector at entity index `i`
+   and the textual description at entity index `i` always refer to exactly the
+   same entity. This alignment step is important because an incorrectly aligned
+   dataset could still produce tensors with valid dimensions and therefore
+   pass simple shape tests while silently combining one entity's structural
+   embedding with another entity's description. The text preprocessing code
+   also cleans formatting artefacts such as `@en` markers, quotation
+   formatting, literal or real newline characters, and unnecessary whitespace
+   before the descriptions are passed to the tokenizer.
+
+   The entity-text alignment was checked explicitly rather than assuming that
+   all FB15k-237 entities had descriptions. The final result was full coverage
+   across all 14,541 FB15k-237 entities. Long descriptions were found for
+   14,515 entities and the remaining 26 entities were successfully covered
+   using the short-text fallback. As a result, there were zero missing entity
+   descriptions and the final alignment coverage was 14,541 out of 14,541,
+   or 100%. The associated validation scripts include the entity-text
+   alignment check, long-text alignment check, and the real-text Phase 2 smoke
+   test.
+
+   Once entity-text alignment had been verified, a second level of Phase 2
+   testing was performed using real FB15k-237 descriptions. The structural
+   side was still intentionally represented by dummy 32-dimensional vectors
+   because real Phase 1 integration was not part of this phase yet. The test
+   therefore exercised the actual semantic path: a correctly shaped KG vector
+   was projected into RoBERTa space, a real aligned entity description was
+   tokenized, the structural vector was inserted as a soft prompt before the
+   token embeddings, the combined sequence was processed by frozen RoBERTa,
+   and the contextual prompt representation was projected back to a
+   32-dimensional KG vector. The test again confirmed valid shapes, finite
+   outputs, correct gradient flow through both projections, and the absence of
+   gradients on RoBERTa parameters. The entity-side bridge passed in the local
+   environment and was then independently run successfully on the Colab T4 GPU
+   environment.
+
+   After the entity path was working, relation semantics were added because the
+   final KGE model cannot rely only on semantically enriched entities. Relations
+   also participate directly in triple scoring, so the architecture requires a
+   textual-semantic path for relation representations as well. Relation text
+   preprocessing was therefore implemented in
+   `preprocessing/relation_text.py`. As with entities, the existing
+   `relation2id` mapping is preserved and no new independent relation ordering
+   is introduced. Textual forms for the 237 FB15k-237 relations are loaded from
+   the corresponding relation-text resource. The preprocessing can also convert
+   a Freebase-style relation identifier into a readable phrase when necessary;
+   for example, a relation path such as
+   `/location/country/form_of_government` can be converted to text similar to
+   `location country form of government`. This conversion changes only the
+   textual representation supplied to the Language Model and does not change
+   the original relation identity used by the KG.
+
+   The relation-text alignment was also explicitly validated. All 237 original
+   FB15k-237 relations were successfully matched to textual representations,
+   leaving zero missing relation descriptions and giving 237 out of 237, or
+   100%, relation-text coverage. A dedicated relation-text smoke test was then
+   run using real relation text together with dummy 32-dimensional structural
+   relation vectors. These vectors passed through the same `KGLMBridge` used
+   for entities. This verified that the bridge was not accidentally dependent
+   on entity-specific assumptions and could process relations through the same
+   `32 → 768 → RoBERTa → 768 → 32` path. The relation-side test verified valid
+   tokenization, correct structural and output dimensions, finite outputs,
+   gradients for the trainable projection modules, and no gradients for the
+   frozen RoBERTa parameters. This relation-side gate also passed both locally
+   and on the Colab T4 GPU.
+
+   One important integration detail identified during Phase 2 concerns where
+   the real structural relation vectors will come from. The Phase 1 RGAT
+   encoder directly produces structural entity representations, but it does
+   not independently output a simple `[237, 32]` final relation representation
+   matrix in the same way. The KGE scorer, however, contains trainable relation
+   embeddings. These learned relation embeddings are therefore the intended
+   structural relation input to the semantic bridge once the phases are
+   integrated. During Phase 2 this real connection was deliberately not made;
+   dummy 32-dimensional relation vectors were sufficient to validate that the
+   semantic bridge itself works for relation inputs. Connecting the actual
+   learned relation embeddings to their aligned descriptions belongs to the
+   integration phase that follows Phase 2.
+
+   By the end of Phase 2, the complete standalone semantic mechanism had
+   therefore been implemented and verified. For entities, a 32-dimensional
+   structural vector can be projected into RoBERTa's 768-dimensional space,
+   combined with a correctly aligned real entity description, processed
+   through the frozen transformer, and returned as an enriched
+   32-dimensional KG representation. The same mechanism has also been verified
+   for relations using real relation text. Entity-text alignment reached
+   14,541 out of 14,541 entities, relation-text alignment reached 237 out of
+   237 relations, both sides have 100% textual coverage, the trainable
+   projections receive gradients, RoBERTa remains frozen, and the complete
+   standalone path works both locally and on the target Colab T4 environment.
+
+   The forward flow established by Phase 2 can therefore be summarized as:
+
+   ```text
+   structural KG vector [32]
+            ↓
+   KG → LM projection
+          32 → 768
+            ↓
+   KG-derived soft prompt [768]
+            +
+   aligned entity/relation description
+            ↓
+   RoBERTa token embeddings
+            ↓
+   soft prompt prepended to text sequence
+            ↓
+   frozen roberta-base
+            ↓
+   contextual prompt representation [768]
+            ↓
+   LM → KG projection
+          768 → 32
+            ↓
+   semantically enriched KG representation [32]
+
+   The final Phase 2 data flow is:
+
+   ```text
+   KG structural representation [32]
+                   ↓
+          KG → LM Projection
+               32 → 768
+                   ↓
+          KG-derived Soft Prompt
+                [768]
+                   +
+        Entity / Relation Text
+                   ↓
+            RoBERTa Tokenizer
+                   ↓
+        Text Token Embeddings
+                [768]
+                   ↓
+   [KG Soft Prompt + Text Token Embeddings]
+                   ↓
+          Frozen roberta-base
+                   ↓
+     Contextual Prompt Representation
+                [768]
+                   ↓
+          LM → KG Projection
+               768 → 32
+                   ↓
+      Semantically Enriched KG Vector
+                 [32]
 4. **Phase 3 — Integrate Phase 1 → Phase 2 (KG → LM).**
    Feed real Phase 1 embeddings (loaded from the Phase 1 checkpoint) into the
    now-validated LM module. Run a small forward/backward smoke test and
