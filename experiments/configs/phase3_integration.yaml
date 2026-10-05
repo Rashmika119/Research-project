@@ -1,6 +1,6 @@
 # Selected Phase 3 integration contract (2026-10-05).
-# The Phase 3 runner is not implemented yet; this is its agreed configuration,
-# not a runnable training config. Historical Phase 1/2 configs stay unchanged.
+# Run: python run_phase3_smoke_test.py
+# This checks integration, not training. Historical Phase 1/2 configs stay unchanged.
 seed: 0
 
 dataset:
@@ -11,6 +11,9 @@ dataset:
 phase1:
   config_path: experiments/configs/phase1_full.yaml
   checkpoint_path: experiments/checkpoints/kg_only_baseline.pt
+  # Legacy saves lack ID maps. Supply a verified sidecar for that original run
+  # (checkpoint_sha256, entity2id, relation2id), or use a new save with maps.
+  id_map_path: null
   # Input weights only. Do not overwrite them with an integration artifact.
   # Missing/incompatible weights must fail the checkpoint-backed gate rather
   # than silently substituting random initialization or a different encoder.
@@ -31,7 +34,14 @@ bridge:
 
 text:
   max_length: 64
+  text_dir: data/text/fb15k237
 
-# Small text batch for the future integration gate, not a training batch size.
+# Sample only training edges, and transfer weights by entity key to toy IDs.
+toy_subset:
+  max_entities: 50
+
+# Small text batch for the integration gate, not a training batch size.
 smoke_test:
   batch_size: 4
+
+report_dir: experiments/logs/phase3

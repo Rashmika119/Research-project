@@ -193,6 +193,9 @@ def run(config: dict) -> dict:
             "config": config,
             "num_entities": dataset.num_entities,
             "num_relations": dataset.num_relations,
+            # Preserve embedding-row identity for later checkpoint integration.
+            "entity2id": dataset.entity2id,
+            "relation2id": dataset.relation2id,
             "best_val_mrr": best_val_mrr if save_best else None,
         },
         checkpoint_path,

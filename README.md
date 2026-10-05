@@ -3,6 +3,8 @@
 BSc (Hons) Software Engineering research project, University of Kelaniya.
 
 **Current status: Phase 2 complete; Phase 3 next.**
+The Phase 3 gate is implemented and offline-tested; its real-checkpoint /
+pretrained-RoBERTa pass remains pending recovery of the baseline artifact.
 Record reconciled on **2026-10-05 (Asia/Colombo)** against `4b694a2`.
 
 ## Record provenance
@@ -81,8 +83,8 @@ dimension in that config.
 This choice preserves the baseline's capacity and uses the encoder with a
 recorded successful full run. RGAT remains a separate comparison track; its
 unverified full run is not a prerequisite for R-GCN integration. Historical
-32-dimensional Phase 2 configs and results remain unchanged. The new config
-records the integration contract; a Phase 3 runner has not yet been implemented.
+32-dimensional Phase 2 configs and results remain unchanged. Run the selected
+config with `python run_phase3_smoke_test.py`; prerequisites are described below.
 
 ## Phase status
 
@@ -91,7 +93,7 @@ records the integration contract; a Phase 3 runner has not yet been implemented.
 | 0: data scaffolding | Implemented; real FB15k-237 gate reported passed in Colab. |
 | 1: KG-only baseline | R-GCN toy and full runs reported passed; RGAT toy run reported passed. Revised RGAT full run remains unverified. |
 | 2: semantic bridge | Complete as a standalone component; entity and relation paths reported passed locally and on T4. |
-| 3: integrate encoder 1 and bridge | Next; real learned entity/relation vectors have not been connected to the bridge in this branch. |
+| 3: integrate encoder 1 and bridge | Gate implemented for restored encoder outputs and learned relation vectors. Offline tests pass; historical checkpoint / pretrained-LM verification pending. |
 | 4: second graph encoder | Pending assembly and standalone/integrated validation. |
 | 5: full model training | Pending end-to-end DistMult training and full-data evaluation. |
 | 6: comparisons and ablations | Pending text-enhanced baseline, proposed-model comparisons, ComplEx and ablations. |
@@ -142,12 +144,13 @@ end of a run; a Colab disconnect can lose its in-memory best weights.
 |---|---|
 | `preprocessing/` | Dataset loading, training graph, toy subset and text alignment. |
 | `models/` | R-GCN/RGAT KG-only models, DistMult and standalone KG-LM bridge. |
-| `training/` | KG-only training, model factory, BCE and negative sampling. |
+| `training/` | KG-only training, model factory, BCE, negative sampling and checkpoint/gradient helpers for Phase 3. |
 | `evaluation/` | Filtered head/tail ranking. |
 | `experiments/configs/` | Phase 0/1 configs, generic Phase 2 smoke config, and selected Phase 3 integration contract. |
 | [experiments/RUNS.md](experiments/RUNS.md) | Historical results, settings, revision provenance and recovery inventory. |
 | `run_*.py` | Phase gates, alignment checks and Phase 1 full-training entry points. |
-| `notebooks/`, `tests/` | No tracked notebook or test source files in this revision; smoke scripts live at the root. |
+| `tests/test_phase3_gate.py` | Offline Phase 3 regression tests using trained fixture weights and tiny random RoBERTa. |
+| `notebooks/` | No notebook source files supplied; smoke scripts live at the root. |
 
 Data, model weights and logs are runtime artifacts, not supplied with this
 checkout. Expected checkpoint paths in the register are not evidence that files
@@ -182,15 +185,68 @@ new training result as a recovered historical checkpoint.
 
 ## Next milestone: Phase 3
 
-Recover and validate `experiments/checkpoints/kg_only_baseline.pt` for the
-selected R-GCN/128 configuration, then feed actual encoder entity outputs and
-learned scorer relation vectors through aligned descriptions. The checkpoint
-is still missing locally. Its encoder settings and ID mapping must be verified;
-a 32-dimensional toy or RGAT checkpoint is not a compatible substitute.
-Keep toy/full ID mappings explicit.
-The gate must show finite outputs and finite, nonzero gradients into the KG
-encoder, relation embeddings and projections, with no LM parameter gradients.
-Adding the second encoder and full-model training belong to later phases.
+The implementation is [run_phase3_smoke_test.py](run_phase3_smoke_test.py),
+using [training/phase3_gate.py](training/phase3_gate.py). Run from the repo root:
+
+```bash
+python run_phase3_smoke_test.py
+# Optional config or device override:
+python run_phase3_smoke_test.py experiments/configs/phase3_integration.yaml --device cuda
+```
+
+Recover `experiments/checkpoints/kg_only_baseline.pt` first. The runner fails
+before downloading data or LM weights if the checkpoint or its identity
+metadata is missing. It strictly verifies encoder settings, tensor shapes,
+finite weights, entity/relation counts and exact ID maps. It never substitutes
+random weights or writes over the source checkpoint.
+
+New Phase 1 saves include `entity2id` and `relation2id`. Legacy saves need a
+verified JSON sidecar, referenced by `phase1.id_map_path`, with this structure:
+
+```json
+{
+  "checkpoint_sha256": "SHA-256 of the original checkpoint file",
+  "entity2id": {"original_entity_key": 0},
+  "relation2id": {"original_relation_key": 0}
+}
+```
+
+The illustrated maps are placeholders: supply the complete maps from the
+original training run. Do not invent a mapping from today's dataset and assume
+it belongs to an old checkpoint. Without original mapping evidence, use a new
+recorded Phase 1 run with embedded maps. See the [recovery inventory](experiments/RUNS.md#checkpoint-recovery-inventory).
+
+The gate samples at most 50 entities from training edges, preserves full relation
+IDs, and copies entity embedding rows by original entity key into toy ID order.
+It copies encoder and scorer weights unchanged. It recomputes encoder outputs
+on the toy graph; these are not claimed to equal full-graph outputs. Text is
+aligned to those same keys, with four entities and up to four observed relations
+passed through the shared bridge in separate forwards/backwards.
+
+Each branch must have finite output and finite, nonzero input and projection
+gradients. The entity branch also checks encoder/entity-table gradients; the
+relation branch checks the scorer table and every selected relation row.
+RoBERTa must remain frozen, in eval mode, and have no parameter gradients.
+The squared-output loss is a differentiability diagnostic: there are no optimizer
+steps, benchmark metrics, second encoder or integrated triple scoring yet.
+
+A successful run saves a uniquely named JSON report under
+`experiments/logs/phase3/`, including config, checkpoint hash, source revision,
+dirty state, package versions, text hashes, toy/full IDs and gradient norms.
+Keep the report in persistent storage when using Colab. Missing checkpoints or
+failed checks never produce a success report.
+
+Offline regression checks require installed dependencies but no network:
+
+```bash
+python -m unittest discover -s tests -p "test_phase3_gate.py" -v
+```
+
+These use a small trained synthetic R-GCN checkpoint and a one-layer randomly
+initialized RoBERTa (hidden size 32), with deterministic fixture token IDs.
+They verify wiring, remapping, failure detection and unchanged LM weights;
+they do not replace the real FB15k-237 / pretrained `roberta-base` gate.
+That gate remains pending because the historical checkpoint is missing locally.
 
 For future runs record the exact Git revision and dirty state, config, dataset
 and text fingerprints, ID maps, seeds, dependency versions, device, metrics by

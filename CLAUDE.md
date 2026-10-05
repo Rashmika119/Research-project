@@ -28,8 +28,9 @@ unverified. Phase 3 integration is the next implementation milestone, with
 [experiments/configs/phase3_integration.yaml](experiments/configs/phase3_integration.yaml).
 Use two layers, 30 bases and graph dropout 0.2 to match the full baseline;
 the semantic bridge maps 128 -> 768 -> frozen RoBERTa -> 768 -> 128.
-RGAT remains a separate comparison track. The Phase 3 config is a contract for
-the future runner, not evidence that integration or checkpoint recovery passed.
+RGAT remains a separate comparison track. `run_phase3_smoke_test.py` implements
+the gate using this config; offline regression tests pass. The historical
+checkpoint / pretrained-RoBERTa gate remains pending artifact recovery.
 
 ## Core idea (one paragraph)
 
@@ -691,6 +692,7 @@ training run. Full-dataset training only happens after the smoke test passes.
    ```
 
 4. **Phase 3 — Integrate Phase 1 → Phase 2 (KG → LM).**
+   **Implemented; offline-tested. Real-checkpoint/pretrained-LM gate pending.**
    Use the selected R-GCN/128 contract in `phase3_integration.yaml`, matching
    `phase1_full.yaml`. Recover and validate `kg_only_baseline.pt` first; it is
    not present locally. Feed real entity outputs and scorer relation embeddings
@@ -700,6 +702,11 @@ training run. Full-dataset training only happens after the smoke test passes.
    not into the frozen LM.
    *Gate:* integrated forward/backward runs cleanly on the toy subset with no
    shape or gradient-flow surprises.
+   Run `python run_phase3_smoke_test.py`. It restores full checkpoint weights,
+   transfers entity rows by original key to the toy graph, and checks entity
+   and relation paths independently. Historical saves without ID maps require
+   a verified SHA-256-bound sidecar; new Phase 1 saves include the maps.
+   See README.md for requirements and experiments/RUNS.md for evidence.
    
 5. **Phase 4 — Add KG Encoder Phase 2 (LM → KG refinement).**
    Build Encoder Phase 2 standalone first (dummy projected KG-space vectors),
@@ -873,7 +880,9 @@ locations. Historical verification claims are detailed in experiments/RUNS.md.
 | `models/frozen_lm.py`, `models/kg_lm_bridge.py` | Frozen RoBERTa soft-prompt conditioning and complete standalone KG-to-LM-to-KG bridge. |
 | `preprocessing/entity_text.py`, `preprocessing/relation_text.py` | Text acquisition, cleaning, fallback and alignment to existing KG IDs. |
 | `experiments/configs/phase2_lm_toy.yaml`, `run_phase2_smoke_test.py` | Generic standalone bridge gate with dummy KG vectors. |
-| `experiments/configs/phase3_integration.yaml` | Selected R-GCN/128 integration contract, matching the full baseline with a 128-dimensional bridge. Phase 3 runner and checkpoint-backed gate remain pending. |
+| `experiments/configs/phase3_integration.yaml` | R-GCN/128 gate config: checkpoint/optional legacy ID sidecar, toy subset, text settings and report directory. |
+| `run_phase3_smoke_test.py`, `training/phase3_gate.py` | Checkpoint-backed integration gate with strict identity/config validation, separate entity/relation gradient checks and JSON reports. Real artifact verification pending. |
+| `tests/test_phase3_gate.py` | Offline regression suite with trained fixture weights and a tiny random RoBERTa; not a pretrained-LM benchmark. |
 | `run_phase2_real_text_smoke_test.py`, `run_phase2_relation_text_smoke_test.py` | Real-text entity/relation gates with dummy KG vectors; local/T4 passes reported. Settings are currently constants in each script. |
 | `run_entity_text_alignment_check.py`, `run_long_text_alignment_check.py`, `run_relation_text_alignment_check.py` | Entity and relation text alignment diagnostics. |
 | `experiments/RUNS.md` | Evidence-aware run register and checkpoint recovery inventory. |
@@ -899,11 +908,12 @@ locations. Historical verification claims are detailed in experiments/RUNS.md.
 
 The encoder/dimension decision is complete: **R-GCN, dimension 128**, with two
 layers, 30 bases and dropout 0.2, matching the reported full baseline.
-Next implementation work is Phase 3: recover/validate `kg_only_baseline.pt`
-and integrate real entity and relation embeddings with their aligned text
-bridge at dimension 128. Check finite, nonzero upstream gradients while keeping
-the LM frozen. The historical dimension-32 smoke tests remain separate evidence;
-the selected 128-dimensional checkpoint-backed integration gate is still pending.
+The Phase 3 gate is implemented and offline-tested. Recover/validate
+`kg_only_baseline.pt` and its original ID maps, then run `run_phase3_smoke_test.py`
+with real text and pretrained RoBERTa. It checks finite, nonzero upstream
+gradients while keeping the LM frozen. The historical dimension-32 smoke tests
+and new offline fixtures remain separate evidence; the selected real-data,
+pretrained-LM checkpoint-backed integration gate is still pending.
 
 Then add graph encoder 2 (Phase 4), assemble full DistMult training/evaluation
 (Phase 5), and run comparisons, ComplEx and ablations (Phase 6). A standalone

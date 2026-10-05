@@ -147,7 +147,8 @@ Search performed on 2026-10-05:
    237 relations and dimension 128. Toy checkpoints need their toy ID mapping.
 5. Verify dataset ordering and ID maps against the original dataset/run
    evidence before using weights. Counts alone do not establish ID alignment;
-   current checkpoints do not embed maps or dataset fingerprints.
+   historical checkpoints do not embed maps or dataset fingerprints. New Phase 1
+   saves now embed both ID maps; dataset fingerprints remain future work.
 6. If data and environment are available, re-evaluate validation with the
    original protocol and compare with the recorded result. Record any
    discrepancy. Do not infer the original Git revision from a matching score.
@@ -155,10 +156,39 @@ Search performed on 2026-10-05:
    retrain as a **new run** with its own timestamp, exact revision, config,
    metrics, durable checkpoint and logs. A rerun is not historical recovery.
 
-The checkpoint schema lacks optimizer state, RNG state, epoch and ID maps, so
-recovering weights alone does not enable exact training resumption. Periodic
-resumable checkpointing remains implementation work; this documentation update
-does not change training behavior.
+Historical checkpoints lack optimizer state, RNG state, epoch and ID maps.
+The Phase 3 implementation adds ID maps to new Phase 1 saves; legacy files
+require verified external maps bound to the checkpoint SHA-256. Recovering
+weights alone still does not enable exact training resumption. Periodic
+resumable checkpointing remains implementation work.
+
+## Phase 3 implementation verification (2026-10-05)
+
+- Code: working-tree changes based on `97754fc`; an exact committed revision
+  for these changes is not assigned yet.
+- Configuration: [phase3_integration.yaml](configs/phase3_integration.yaml),
+  R-GCN/128, two layers, 30 bases; pretrained `roberta-base` selected for the
+  real gate. Source checkpoint and recovery status remain unchanged above.
+- Entry point: `python run_phase3_smoke_test.py`. It fails before downloads if
+  the checkpoint or original ID maps are unavailable. It restores trained
+  weights, remaps entity rows by original key, and checks the two text branches
+  independently. Success reports go to `experiments/logs/phase3/phase3_<UTC>.json`;
+  no model weights are saved or overwritten.
+- Offline verification: `python -m unittest discover -s tests -p
+  "test_phase3_gate.py" -v` — **12 tests passed**. The suite uses trained synthetic R-GCN fixture
+  checkpoints and a tiny randomly initialized RoBERTa (one layer, hidden size
+  32), plus deterministic fixture token IDs, on CPU. It checks gradients,
+  unchanged frozen LM weights, nontrivial ID remapping and text alignment,
+  checkpoint/config rejection, detached paths, zero/non-finite gradients,
+  missing text, legacy sidecar binding, new ID-map saves, and report creation.
+  Temporary fixture artifacts are removed after testing.
+- These are software checks, not research metrics. The real FB15k-237,
+  historical-checkpoint, pretrained-RoBERTa gate remains **pending** because
+  `kg_only_baseline.pt` has not been recovered locally. Phase 3 must not be
+  reported as empirically complete on that basis.
+- Default command checked locally with `--device cpu`: exited with status 1
+  and an actionable missing-checkpoint error before any downloads; no real-gate
+  success report or replacement checkpoint was produced.
 
 ## Inspecting historical evidence
 
