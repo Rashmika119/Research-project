@@ -8,15 +8,22 @@ Research codebase for a BSc (Hons) Software Engineering intermediate research
 project at the University of Kelaniya: **"Integrating Structural and Textual
 Semantics for Ontology-Enriched Knowledge Graph Representation Learning."**
 
-Full narrative context (research questions, literature review, methodology,
-diagnostic experiment results, limitations) lives in [README.md](README.md) —
-read it before making architectural decisions. This file only covers the
-implementation rules Claude needs when writing or editing code here.
+**Current status: Phase 2 complete; Phase 3 next.** Reconciled on 2026-10-05
+(Asia/Colombo) against source revision `4b694a2`.
 
-Phase 0 (data scaffolding) is implemented — see "Repository Map" below for
-what exists and why. `models/`, `training/`, and `evaluation/` don't exist
-yet; those start in Phase 1. Check with Glob before assuming structure beyond
-what's listed here, in case it's changed since this file was last updated.
+Read [README.md](README.md) for the reconstructed research overview and
+[experiments/RUNS.md](experiments/RUNS.md) for run settings, metrics, revision
+provenance and checkpoint recovery. The original long research README was not
+found; historical numbered README references below refer to that unavailable
+document, not to sections in the reconstructed README.
+
+Phase 0, the Phase 1 KG-only models, and the standalone Phase 2 semantic bridge
+are implemented. Phase 1 R-GCN full training and Phase 2 local/T4 gates are
+reported passed in the retained notes. No historical checkpoint or original
+run log has been recovered in this checkout; exact executed revisions are
+unknown. Historical "saved"/"passed" statements below are reports, not claims
+of present local artifact availability. Revised full RGAT training remains
+unverified. Phase 3 integration is the next implementation milestone.
 
 ## Core idea (one paragraph)
 
@@ -410,8 +417,8 @@ training run. Full-dataset training only happens after the smoke test passes.
    The first component implemented for Phase 2 was the KG-to-LM projection in
    `models/kg_lm_projection.py`. The structural representations produced by
    the KG side and the hidden representations expected by the Language Model
-   do not have the same dimensionality. The feasible Phase 1 RGAT configuration
-   finally operates with KG vectors of dimension 32, while `roberta-base`
+   do not have the same dimensionality. The revised Phase 1 RGAT configuration
+   specifies KG vectors of dimension 32, while `roberta-base`
    operates with hidden representations of dimension 768. Therefore, a raw
    32-dimensional KG vector cannot be supplied directly as a RoBERTa embedding.
    To solve this, `KGLMProjection` was implemented as a trainable projection
@@ -533,15 +540,14 @@ training run. Full-dataset training only happens after the smoke test passes.
    end-to-end training will require differentiation.
 
    During the development of Phase 1 RGAT, GPU-memory behaviour forced the
-   full-scale RGAT configuration to use `dim: 32` and `heads: 1`. Phase 2 was
-   therefore aligned with this final feasible structural dimension. This was
-   necessary because there would be little value in validating a semantic
-   bridge for a KG dimensionality that the real RGAT configuration could not
-   actually produce at full scale. The final Phase 2 interface is consequently
-   fixed around a 32-dimensional KG space and a 768-dimensional RoBERTa space.
-   The Phase 2 bridge therefore accepts `[batch, 32]` structural vectors,
-   creates `[batch, 768]` soft prompts, and returns `[batch, 32]` enriched KG
-   representations.
+   full-scale RGAT configuration to use `dim: 32` and `heads: 1`. Phase 2's
+   smoke tests were aligned with this intended dimension. Successful full-scale
+   RGAT training with that config has not been recorded, so feasibility remains
+   unverified. The tested bridge path accepts `[batch, 32]`, creates
+   `[batch, 768]` soft prompts, and returns `[batch, 32]`. `KGLMBridge` accepts
+   a configurable `kg_dim`; these test settings do not fix the architecture to
+   32 or settle the Phase 3 encoder choice. The reported full R-GCN baseline
+   uses dimension 128.
 
    After the generic bridge behaviour was established, the next major task was
    to replace placeholder text with real entity textual information. Entity
@@ -676,37 +682,8 @@ training run. Full-dataset training only happens after the smoke test passes.
           768 → 32
             ↓
    semantically enriched KG representation [32]
+   ```
 
-   The final Phase 2 data flow is:
-
-   ```text
-   KG structural representation [32]
-                   ↓
-          KG → LM Projection
-               32 → 768
-                   ↓
-          KG-derived Soft Prompt
-                [768]
-                   +
-        Entity / Relation Text
-                   ↓
-            RoBERTa Tokenizer
-                   ↓
-        Text Token Embeddings
-                [768]
-                   ↓
-   [KG Soft Prompt + Text Token Embeddings]
-                   ↓
-          Frozen roberta-base
-                   ↓
-     Contextual Prompt Representation
-                [768]
-                   ↓
-          LM → KG Projection
-               768 → 32
-                   ↓
-      Semantically Enriched KG Vector
-                 [32]
 4. **Phase 3 — Integrate Phase 1 → Phase 2 (KG → LM).**
    Feed real Phase 1 embeddings (loaded from the Phase 1 checkpoint) into the
    now-validated LM module. Run a small forward/backward smoke test and
@@ -715,12 +692,12 @@ training run. Full-dataset training only happens after the smoke test passes.
    *Gate:* integrated forward/backward runs cleanly on the toy subset with no
    shape or gradient-flow surprises.
    
-6. **Phase 4 — Add KG Encoder Phase 2 (LM → KG refinement).**
-   Build Encoder Phase 2 standalone first (dummy LM-shaped input vectors),
+5. **Phase 4 — Add KG Encoder Phase 2 (LM → KG refinement).**
+   Build Encoder Phase 2 standalone first (dummy projected KG-space vectors),
    then wire it onto the real output from Phase 3.
    *Gate:* standalone smoke test passes, then integrated smoke test passes.
 
-7. **Phase 5 — Full pipeline + scorer + training loop.**
+6. **Phase 5 — Full pipeline + scorer + training loop.**
    Assemble KG Encoder 1 → LM → KG Encoder 2 → DistMult end-to-end. Smoke
    test on the toy subset, then run on the real dataset. Compare against the
    Phase 1 checkpoint (KG-only baseline) using the same eval protocol.
@@ -729,7 +706,7 @@ training run. Full-dataset training only happens after the smoke test passes.
    result, not a bug — but NaNs, collapsed embeddings, or wildly
    out-of-range metrics mean something's broken).
 
-8. **Phase 6 — Ablations & ComplEx.**
+7. **Phase 6 — Ablations & ComplEx.**
    Only after Phase 5 is stable: swap in ComplEx, run the no-warm-up
    ablation, run the embedding-dimension ablation ({128, 200, 256}).
 
@@ -767,9 +744,9 @@ separate phase.
 
 ## Running This Project in Google Colab
 
-This is the standard sequence for running any phase's script/notebook in a
-fresh Colab runtime. Right now that means `run_phase0_smoke_test.py`; later
-phases will follow the same pattern with their own entry-point script.
+This is the standard sequence for running the existing Phase 0, Phase 1 and
+Phase 2 entry-point scripts in a fresh Colab runtime. See README.md for the
+current gate commands and experiments/RUNS.md for expected artifacts.
 
 **0. Pick the runtime type first** (Runtime → Change runtime type →
 Hardware accelerator): Phase 0 and Phase 1's *toy-subset* smoke test need
@@ -850,7 +827,9 @@ Claude to check `git remote -v` and `git config --global --list` first.
 
 ## Repository Map (what exists now, and why)
 
-Everything below is Phase 0 output — data plumbing only, no model code yet.
+The map covers the implemented Phase 0–2 components. Runtime data, checkpoints
+and logs are not present in this checkout; paths below describe their intended
+locations. Historical verification claims are detailed in experiments/RUNS.md.
 
 | File | Purpose |
 |---|---|
@@ -864,7 +843,7 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `run_phase0_smoke_test.py` | The Phase 0 gate script. Loads the config, loads the dataset, and runs every check above end-to-end, printing `PASSED` or a specific failure. |
 | `data/raw/`, `data/processed/` | Empty, gitignored directories where the real dataset and any derived files land — not checked into version control. |
 | `models/kg_encoder.py` | `RGCNEncoder` — a stack of PyTorch Geometric `RGCNConv` layers (R-GCN chosen as the simplest relation-aware encoder to debug, per the Phase 1 plan; this is the project's primary Phase 1 encoder). Takes entity features + edge_index + edge_type, returns structure-aware entity embeddings. |
-| `models/kg_encoder_rgat.py` | `RGATEncoder` — a second Phase 1 encoder variant, a stack of PyTorch Geometric `RGATConv` layers (relation-aware attention on top of R-GCN's per-relation weight matrices). Same shape contract/interface as `RGCNEncoder` — a drop-in swap. Built for a later encoder comparison, not as a replacement (see Phase 1 notes below). **Not yet smoke-tested.** |
+| `models/kg_encoder_rgat.py` | `RGATEncoder` — a second Phase 1 encoder variant with the same shape contract as `RGCNEncoder`. Toy gate reported passed after the dead-parameter fix; revised full-dataset run remains unverified. |
 | `models/scorer.py` | `DistMultScorer` — the KGE scoring layer (DistMult first, per rule #5/README §3.1). Scores single triples and, for evaluation, scores one triple against every entity at once (`score_all_tails`/`score_all_heads`). |
 | `models/kg_only_baseline.py` | `KGOnlyBaseline` — composes an entity embedding table + `RGCNEncoder` + `DistMultScorer` into the actual Phase 1 model. This is also the literal "KG-only baseline" row in the final validation table (README.md §12), not just a stepping stone. |
 | `models/kg_only_baseline_rgat.py` | `KGOnlyBaselineRGAT` — same composition as `KGOnlyBaseline` but with `RGATEncoder` instead of `RGCNEncoder`. Selected via `model.encoder_type: rgat` in a config (see `training/model_factory.py`), not used by default. |
@@ -880,50 +859,45 @@ Everything below is Phase 0 output — data plumbing only, no model code yet.
 | `experiments/configs/phase1_full.yaml` | Real FB15k-237 training settings, R-GCN (dim=128 — see Phase 1 notes below for why this was lowered from the originally-planned 256 — 100 epochs, `batch_size: 32768`, `save_best: true`, `use_synthetic_fallback: false` since a silent fallback here would be misleading). **Run in Colab — completed successfully** (see Phase 1 notes below for the full result). |
 | `run_phase1_full_training.py` | Launches the real Phase 1 training run using `phase1_full.yaml` by default, or another config path passed as `sys.argv[1]`. Use this rather than invoking `training/train_kg_baseline.py` directly — running that file as a bare script puts its own folder, not the repo root, on `sys.path`, breaking its `models`/`evaluation`/`preprocessing` imports (see this script's own docstring). Produces `experiments/checkpoints/kg_only_baseline.pt`. |
 | `experiments/configs/phase1_rgat_full.yaml` | Real FB15k-237 training settings, RGAT — `dim: 32`, `heads: 1` (dropped from a first attempt at `dim=128`/`heads=2` copied from R-GCN, which hit a 66.44 GiB CUDA OOM in `RGATConv`'s per-edge weight gather — see Phase 1 notes below for why this scales completely differently from R-GCN's OOM and can't just reuse R-GCN's fix). **Not yet run with the fixed config.** |
-| `run_phase1_rgat_full_training.py` | Same as `run_phase1_full_training.py` but defaults to `phase1_rgat_full.yaml`, producing `experiments/checkpoints/kg_only_baseline_rgat.pt`. **Not yet run.** |
-| `experiments/checkpoints/` | Empty, gitignored directory where trained model checkpoints land (`phase1_toy.pt`, `kg_only_baseline.pt`, and `phase1_rgat_toy.pt` already produced there; `kg_only_baseline_rgat.pt` once the RGAT full run completes). |
+| `run_phase1_rgat_full_training.py` | Defaults to `phase1_rgat_full.yaml`, targeting `experiments/checkpoints/kg_only_baseline_rgat.pt`. Initial full attempt failed; revised-config completion is not recorded. |
+| `models/kg_lm_projection.py`, `models/lm_kg_projection.py` | Trainable projections using Linear, LayerNorm, GELU and Dropout; configurable KG dimension. |
+| `models/frozen_lm.py`, `models/kg_lm_bridge.py` | Frozen RoBERTa soft-prompt conditioning and complete standalone KG-to-LM-to-KG bridge. |
+| `preprocessing/entity_text.py`, `preprocessing/relation_text.py` | Text acquisition, cleaning, fallback and alignment to existing KG IDs. |
+| `experiments/configs/phase2_lm_toy.yaml`, `run_phase2_smoke_test.py` | Generic standalone bridge gate with dummy KG vectors. |
+| `run_phase2_real_text_smoke_test.py`, `run_phase2_relation_text_smoke_test.py` | Real-text entity/relation gates with dummy KG vectors; local/T4 passes reported. Settings are currently constants in each script. |
+| `run_entity_text_alignment_check.py`, `run_long_text_alignment_check.py`, `run_relation_text_alignment_check.py` | Entity and relation text alignment diagnostics. |
+| `experiments/RUNS.md` | Evidence-aware run register and checkpoint recovery inventory. |
+| `experiments/checkpoints/` | Gitignored intended output directory; no historical weights recovered locally. Phase 1 save claims and missing-source details are recorded in experiments/RUNS.md. |
 
 ## Current stage / priority
 
-Intermediate report stage is complete. Phase 0 is **done — verified in
-Colab against real FB15k-237**, gate passed (see rule #6 for the WN18RR →
-WN18 → FB15k-237 dataset history). Phase 1 is **done — both toy-subset and
-full-dataset gates passed in Colab**: the real 100-epoch run on FB15k-237
-completed with a stable loss curve and validation MRR/Hits@10 rising
-throughout (final val_MRR=0.1842, val_Hits@10=0.3409 — see Phase 1's "Real
-run" notes above for the full curve and honest context on how this compares
-to published numbers), checkpoint saved to
-`experiments/checkpoints/kg_only_baseline.pt`. This is the real "KG-only
-baseline" row for the validation table — not just a smoke-test artifact.
-Note metrics were still improving at epoch 100 (not plateaued), so more
-epochs / tuning (num_negatives, dim back up to 256 now that the OOM and
-speed issues are understood) could strengthen this baseline later if
-desired — optional, not a blocker. An RGAT encoder variant
-(`models/kg_encoder_rgat.py`, `models/kg_only_baseline_rgat.py`) was also
-built alongside R-GCN, by explicit user decision, for a later encoder
-comparison — R-GCN remains the primary baseline. RGAT's toy-subset gate
-(`run_phase1_rgat_smoke_test.py`) **passed in Colab** after fixing a real
-bug it caught (upstream `RGATConv` leaving a dead parameter, `l2`,
-non-finite on the installed PyG version — see Phase 1 notes above; also
-fixed the smoke test itself to compare checkpoints by parameter name
-instead of position, which is what let this be diagnosed precisely instead
-of just "failed"). By explicit user decision, next up is the RGAT real
-full-dataset run *before* Phase 2 (not blocking it — a parallel comparison
-track that was prioritized first). Next actual work, in order:
-1. Run `run_phase1_rgat_full_training.py` in Colab (GPU runtime) using
-   `experiments/configs/phase1_rgat_full.yaml` — starting `dim`/
-   `batch_size`/`num_bases` copied from R-GCN's tuned real-run config as an
-   evidence-informed starting point (see that config's own comments), not
-   a guarantee it won't need further tuning given attention's extra
-   per-relation overhead. Produces
-   `experiments/checkpoints/kg_only_baseline_rgat.pt`.
-2. Full KG → LM → KG pipeline implementation per the build order above
-   (Phases 2–5) — starting with Phase 2 (LM module in isolation), using
-   the R-GCN baseline checkpoint (already trustworthy and available now).
-3. Baseline comparison (KG-only vs text-enhanced vs proposed w/ DistMult vs
-   proposed w/ ComplEx) — and, informally, R-GCN vs RGAT as encoders.
-4. Ablations (warm-up on/off, embedding dimension).
+**Phase 2 complete; Phase 3 next.** This is the current project status as of
+2026-10-05, superseding older planning text that placed Phase 2 in the future.
 
-Do not present WN18RR results from the preliminary experiment as evidence
-about the proposed architecture's viability — they predate loss-function and
-dataset corrections and are diagnostic only (README.md §31).
+- Phase 0: real FB15k-237 data gate reported passed in Colab.
+- Phase 1: R-GCN toy/full and RGAT toy gates reported passed. The R-GCN full
+  run reports validation MRR 0.1842 and Hits@10 0.3409 at epoch 100; these are
+  not test results. The revised RGAT full config (dimension 32, one head) has
+  no recorded successful full run.
+- Phase 2: standalone entity/relation semantic bridge implemented; local/T4
+  passes and full text alignment coverage reported. Inputs are still dummy
+  structural vectors, not connected Phase 1 outputs.
+- Artifacts: historical checkpoints and original logs have not been recovered
+  locally. Consult [the recovery inventory](experiments/RUNS.md#checkpoint-recovery-inventory)
+  before treating a configured checkpoint path as available. Exact historical
+  run revisions and external storage locations remain unknown.
+
+Next implementation work is Phase 3: recover/validate the chosen Phase 1
+checkpoint, resolve the encoder and dimension, and integrate real entity and
+relation embeddings with their aligned text bridge. Check finite, nonzero
+upstream gradients while keeping the LM frozen. R-GCN remains the established
+baseline; the bridge's dimension-32 smoke tests do not mandate RGAT or rule out
+R-GCN at dimension 128. This record update does not choose a new architecture.
+
+Then add graph encoder 2 (Phase 4), assemble full DistMult training/evaluation
+(Phase 5), and run comparisons, ComplEx and ablations (Phase 6). A standalone
+bridge smoke-test pass is not evidence of improved link prediction.
+
+The earlier WN18RR diagnostic results remain excluded from valid comparisons
+because they predate the project's dataset and loss corrections. See
+[README.md](README.md#diagnostic-history-and-limitations).
