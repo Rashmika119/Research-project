@@ -1,0 +1,37 @@
+# Selected Phase 3 integration contract (2026-10-05).
+# The Phase 3 runner is not implemented yet; this is its agreed configuration,
+# not a runnable training config. Historical Phase 1/2 configs stay unchanged.
+seed: 0
+
+dataset:
+  raw_dir: data/raw/fb15k237
+  download_if_missing: true
+  use_synthetic_fallback: false
+
+phase1:
+  config_path: experiments/configs/phase1_full.yaml
+  checkpoint_path: experiments/checkpoints/kg_only_baseline.pt
+  # Input weights only. Do not overwrite them with an integration artifact.
+  # Missing/incompatible weights must fail the checkpoint-backed gate rather
+  # than silently substituting random initialization or a different encoder.
+
+# Matches the full R-GCN baseline; compatible with training.model_factory.
+model:
+  encoder_type: rgcn
+  dim: &kg_dim 128
+  num_layers: 2
+  dropout: 0.2
+  num_bases: 30
+
+# Arguments for KGLMBridge; one KG dimension shared by encoder and bridge.
+bridge:
+  kg_dim: *kg_dim
+  model_name: roberta-base
+  projection_dropout: 0.1
+
+text:
+  max_length: 64
+
+# Small text batch for the future integration gate, not a training batch size.
+smoke_test:
+  batch_size: 4

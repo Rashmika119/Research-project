@@ -3,9 +3,10 @@
 Maps semantic representations produced by the frozen language model back
 into the KG embedding space.
 
-Current contract:
-    LM hidden dimension = 768
-    KG dimension = 32
+Configurable dimensions:
+    LM hidden dimension = lm_dim (768 for roberta-base)
+    KG dimension = kg_dim (default 32 for historical Phase 2 smoke tests;
+                           selected Phase 3 integration passes 128 explicitly)
 
 This projection is trainable while the language model itself remains frozen.
 """

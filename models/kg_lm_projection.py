@@ -3,9 +3,10 @@
 Maps structure-aware KG vectors from KG embedding space into the
 hidden space expected by the frozen language model.
 
-Current contract:
-    KG dimension = 32
-    LM hidden dimension = 768
+Configurable dimensions:
+    KG dimension = kg_dim (default 32 for historical Phase 2 smoke tests;
+                           selected Phase 3 integration passes 128 explicitly)
+    LM hidden dimension = lm_dim (768 for roberta-base)
 
 The projection itself is trainable even though the language model is frozen.
 """

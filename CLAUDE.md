@@ -23,7 +23,13 @@ reported passed in the retained notes. No historical checkpoint or original
 run log has been recovered in this checkout; exact executed revisions are
 unknown. Historical "saved"/"passed" statements below are reports, not claims
 of present local artifact availability. Revised full RGAT training remains
-unverified. Phase 3 integration is the next implementation milestone.
+unverified. Phase 3 integration is the next implementation milestone, with
+**R-GCN at KG dimension 128 selected** in
+[experiments/configs/phase3_integration.yaml](experiments/configs/phase3_integration.yaml).
+Use two layers, 30 bases and graph dropout 0.2 to match the full baseline;
+the semantic bridge maps 128 -> 768 -> frozen RoBERTa -> 768 -> 128.
+RGAT remains a separate comparison track. The Phase 3 config is a contract for
+the future runner, not evidence that integration or checkpoint recovery passed.
 
 ## Core idea (one paragraph)
 
@@ -546,8 +552,8 @@ training run. Full-dataset training only happens after the smoke test passes.
    unverified. The tested bridge path accepts `[batch, 32]`, creates
    `[batch, 768]` soft prompts, and returns `[batch, 32]`. `KGLMBridge` accepts
    a configurable `kg_dim`; these test settings do not fix the architecture to
-   32 or settle the Phase 3 encoder choice. The reported full R-GCN baseline
-   uses dimension 128.
+   32. The later Phase 3 selection is R-GCN at dimension 128, matching the
+   reported full baseline; this does not change the historical Phase 2 tests.
 
    After the generic bridge behaviour was established, the next major task was
    to replace placeholder text with real entity textual information. Entity
@@ -685,7 +691,10 @@ training run. Full-dataset training only happens after the smoke test passes.
    ```
 
 4. **Phase 3 — Integrate Phase 1 → Phase 2 (KG → LM).**
-   Feed real Phase 1 embeddings (loaded from the Phase 1 checkpoint) into the
+   Use the selected R-GCN/128 contract in `phase3_integration.yaml`, matching
+   `phase1_full.yaml`. Recover and validate `kg_only_baseline.pt` first; it is
+   not present locally. Feed real entity outputs and scorer relation embeddings
+   from that model into the
    now-validated LM module. Run a small forward/backward smoke test and
    confirm gradients flow into Encoder Phase 1 and the projection layers but
    not into the frozen LM.
@@ -864,6 +873,7 @@ locations. Historical verification claims are detailed in experiments/RUNS.md.
 | `models/frozen_lm.py`, `models/kg_lm_bridge.py` | Frozen RoBERTa soft-prompt conditioning and complete standalone KG-to-LM-to-KG bridge. |
 | `preprocessing/entity_text.py`, `preprocessing/relation_text.py` | Text acquisition, cleaning, fallback and alignment to existing KG IDs. |
 | `experiments/configs/phase2_lm_toy.yaml`, `run_phase2_smoke_test.py` | Generic standalone bridge gate with dummy KG vectors. |
+| `experiments/configs/phase3_integration.yaml` | Selected R-GCN/128 integration contract, matching the full baseline with a 128-dimensional bridge. Phase 3 runner and checkpoint-backed gate remain pending. |
 | `run_phase2_real_text_smoke_test.py`, `run_phase2_relation_text_smoke_test.py` | Real-text entity/relation gates with dummy KG vectors; local/T4 passes reported. Settings are currently constants in each script. |
 | `run_entity_text_alignment_check.py`, `run_long_text_alignment_check.py`, `run_relation_text_alignment_check.py` | Entity and relation text alignment diagnostics. |
 | `experiments/RUNS.md` | Evidence-aware run register and checkpoint recovery inventory. |
@@ -887,12 +897,13 @@ locations. Historical verification claims are detailed in experiments/RUNS.md.
   before treating a configured checkpoint path as available. Exact historical
   run revisions and external storage locations remain unknown.
 
-Next implementation work is Phase 3: recover/validate the chosen Phase 1
-checkpoint, resolve the encoder and dimension, and integrate real entity and
-relation embeddings with their aligned text bridge. Check finite, nonzero
-upstream gradients while keeping the LM frozen. R-GCN remains the established
-baseline; the bridge's dimension-32 smoke tests do not mandate RGAT or rule out
-R-GCN at dimension 128. This record update does not choose a new architecture.
+The encoder/dimension decision is complete: **R-GCN, dimension 128**, with two
+layers, 30 bases and dropout 0.2, matching the reported full baseline.
+Next implementation work is Phase 3: recover/validate `kg_only_baseline.pt`
+and integrate real entity and relation embeddings with their aligned text
+bridge at dimension 128. Check finite, nonzero upstream gradients while keeping
+the LM frozen. The historical dimension-32 smoke tests remain separate evidence;
+the selected 128-dimensional checkpoint-backed integration gate is still pending.
 
 Then add graph encoder 2 (Phase 4), assemble full DistMult training/evaluation
 (Phase 5), and run comparisons, ComplEx and ablations (Phase 6). A standalone

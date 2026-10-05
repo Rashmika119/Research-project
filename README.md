@@ -70,7 +70,19 @@ The bridge tests currently use random KG inputs, `kg_dim=32`, LM hidden size
 configurable; 32 is a tested setting, not an architectural restriction.
 R-GCN's reported full baseline uses dimension 128. RGAT's revised full config
 uses dimension 32 and one head, but a successful full run is not recorded.
-The encoder/dimension choice for Phase 3 remains to be resolved explicitly.
+**Phase 3 selects R-GCN at dimension 128**, matching the reported full baseline.
+The selected settings are recorded in
+[phase3_integration.yaml](experiments/configs/phase3_integration.yaml): two graph
+layers, 30 bases, graph dropout 0.2, frozen `roberta-base`, and projection
+dropout 0.1. The integration path is **128 -> 768 -> RoBERTa -> 768 -> 128**
+for both entities and relations. The bridge dimension is tied to the encoder
+dimension in that config.
+
+This choice preserves the baseline's capacity and uses the encoder with a
+recorded successful full run. RGAT remains a separate comparison track; its
+unverified full run is not a prerequisite for R-GCN integration. Historical
+32-dimensional Phase 2 configs and results remain unchanged. The new config
+records the integration contract; a Phase 3 runner has not yet been implemented.
 
 ## Phase status
 
@@ -132,7 +144,7 @@ end of a run; a Colab disconnect can lose its in-memory best weights.
 | `models/` | R-GCN/RGAT KG-only models, DistMult and standalone KG-LM bridge. |
 | `training/` | KG-only training, model factory, BCE and negative sampling. |
 | `evaluation/` | Filtered head/tail ranking. |
-| `experiments/configs/` | Phase 0/1 configs and generic Phase 2 smoke config. |
+| `experiments/configs/` | Phase 0/1 configs, generic Phase 2 smoke config, and selected Phase 3 integration contract. |
 | [experiments/RUNS.md](experiments/RUNS.md) | Historical results, settings, revision provenance and recovery inventory. |
 | `run_*.py` | Phase gates, alignment checks and Phase 1 full-training entry points. |
 | `notebooks/`, `tests/` | No tracked notebook or test source files in this revision; smoke scripts live at the root. |
@@ -170,9 +182,12 @@ new training result as a recovered historical checkpoint.
 
 ## Next milestone: Phase 3
 
-Recover and validate the selected Phase 1 checkpoint, agree the encoder and KG
-dimension, then feed actual encoder entity outputs and learned scorer relation
-vectors through aligned descriptions. Keep toy/full ID mappings explicit.
+Recover and validate `experiments/checkpoints/kg_only_baseline.pt` for the
+selected R-GCN/128 configuration, then feed actual encoder entity outputs and
+learned scorer relation vectors through aligned descriptions. The checkpoint
+is still missing locally. Its encoder settings and ID mapping must be verified;
+a 32-dimensional toy or RGAT checkpoint is not a compatible substitute.
+Keep toy/full ID mappings explicit.
 The gate must show finite outputs and finite, nonzero gradients into the KG
 encoder, relation embeddings and projections, with no LM parameter gradients.
 Adding the second encoder and full-model training belong to later phases.

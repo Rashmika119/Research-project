@@ -85,6 +85,16 @@ ID maps. Text resources are configured in `preprocessing/entity_text.py` and
 
 ## Failed attempts and pending runs
 
+**Phase 3 selection (2026-10-05): R-GCN, dimension 128.**
+[The integration contract](configs/phase3_integration.yaml) matches P1-RGCN-FULL:
+two layers, 30 bases and graph dropout 0.2. Its bridge uses frozen
+`roberta-base`, KG dimension 128 and projection dropout 0.1, with text length
+64 and batch size 4 for the planned gate. This is a configuration decision,
+not an additional completed run. The source checkpoint remains
+`experiments/checkpoints/kg_only_baseline.pt` and is still awaiting recovery.
+RGAT full training is an optional comparison track, not a prerequisite for this
+selection. Historical configs and reported results above are unchanged.
+
 | Run | Status | Artifact / revision provenance |
 |---|---|---|
 | R-GCN full at dimension 256, including basis-decomposition attempt | Reported CUDA OOM; not a completed baseline. | Failure history in `f8107d7:CLAUDE.md`; no recovered checkpoint or original failure log. |
