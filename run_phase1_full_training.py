@@ -25,8 +25,12 @@ from training.train_kg_baseline import run
 
 CONFIG_PATH = "experiments/configs/phase1_full.yaml"
 
-if __name__ == "__main__":
-    config_path = sys.argv[1] if len(sys.argv) > 1 else CONFIG_PATH
-    with open(config_path, "r") as f:
+def main(config_path: str = CONFIG_PATH) -> None:
+    """Shared launcher for the R-GCN and RGAT full-training configs."""
+    with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     run(config)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) > 1 else CONFIG_PATH)

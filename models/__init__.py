@@ -1,6 +1,6 @@
 """Model components: graph encoders, KGE scorers, and their compositions.
 
-Phase 1 lives here first (kg_encoder.py, scorer.py, kg_only_baseline.py).
-The LM bridge and full KG -> LM -> KG composition are added in later phases
-— see ../CLAUDE.md ("Implementation Strategy") for the build order.
+Includes KG-only R-GCN/RGAT models and the frozen-LM semantic bridge.
+The Phase 3 gate connects these components; a second graph encoder and
+full-model training remain pending. See ../README.md for the current workflow.
 """

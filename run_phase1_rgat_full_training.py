@@ -16,13 +16,9 @@ repo root, on `sys.path`, breaking its package imports.
 
 from __future__ import annotations
 
-import yaml
-
-from training.train_kg_baseline import run
+from run_phase1_full_training import main
 
 CONFIG_PATH = "experiments/configs/phase1_rgat_full.yaml"
 
 if __name__ == "__main__":
-    with open(CONFIG_PATH, "r") as f:
-        config = yaml.safe_load(f)
-    run(config)
+    main(CONFIG_PATH)

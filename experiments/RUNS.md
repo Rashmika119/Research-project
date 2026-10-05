@@ -1,7 +1,8 @@
 # Experiment register and checkpoint recovery
 
-**Status: Phase 2 complete; Phase 3 next.** Last reconciled: 2026-10-05
-(Asia/Colombo), using source tree `4b694a2`.
+**Status: Phase 3 implemented and offline-tested; real-checkpoint / pretrained-LM
+gate pending.** Updated 2026-10-05 (Asia/Colombo). Historical results were
+reconciled against source tree `4b694a2`; Phase 3 implementation is in `0b1d230`.
 
 ## Evidence conventions
 
@@ -164,8 +165,9 @@ resumable checkpointing remains implementation work.
 
 ## Phase 3 implementation verification (2026-10-05)
 
-- Code: working-tree changes based on `97754fc`; an exact committed revision
-  for these changes is not assigned yet.
+- Code at verification: working-tree changes based on `97754fc`, subsequently
+  committed as `0b1d230`. This identifies the implementation, not a historical
+  Colab runtime revision or a completed real-data Phase 3 run.
 - Configuration: [phase3_integration.yaml](configs/phase3_integration.yaml),
   R-GCN/128, two layers, 30 bases; pretrained `roberta-base` selected for the
   real gate. Source checkpoint and recovery status remain unchanged above.

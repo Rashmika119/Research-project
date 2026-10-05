@@ -9,7 +9,6 @@ dataset:
   use_synthetic_fallback: false
 
 phase1:
-  config_path: experiments/configs/phase1_full.yaml
   checkpoint_path: experiments/checkpoints/kg_only_baseline.pt
   # Legacy saves lack ID maps. Supply a verified sidecar for that original run
   # (checkpoint_sha256, entity2id, relation2id), or use a new save with maps.
@@ -18,7 +17,7 @@ phase1:
   # Missing/incompatible weights must fail the checkpoint-backed gate rather
   # than silently substituting random initialization or a different encoder.
 
-# Matches the full R-GCN baseline; compatible with training.model_factory.
+# Matches phase1_full.yaml; compatible with training.model_factory.
 model:
   encoder_type: rgcn
   dim: &kg_dim 128
