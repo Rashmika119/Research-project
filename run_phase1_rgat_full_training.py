@@ -1,7 +1,7 @@
-"""Trains the RGAT variant on the full FB15k-237 set.
+"""Trains RGAT + ComplEx on the full FB15k-237 set.
 
 Only run this after run_phase1_rgat_smoke_test.py has printed PASSED. This
-produces `experiments/checkpoints/kg_only_baseline_rgat.pt` — the RGAT
+produces `experiments/checkpoints/kg_only_baseline_rgat_complex.pt` — the RGAT
 comparison artifact alongside the R-GCN "KG-only baseline"
 (experiments/checkpoints/kg_only_baseline.pt), not a quick sanity check.
 

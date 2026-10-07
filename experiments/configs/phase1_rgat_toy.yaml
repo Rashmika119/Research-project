@@ -18,6 +18,7 @@ toy_subset:
 
 model:
   encoder_type: rgat
+  scorer_type: complex # dim=32 means 16 real + 16 imaginary coordinates
   dim: 32 # deliberately small for a fast smoke test
   num_layers: 2
   dropout: 0.2
@@ -32,4 +33,4 @@ training:
   eval_every: 5
   grad_clip_norm: 1.0
 
-checkpoint_path: experiments/checkpoints/phase1_rgat_toy.pt
+checkpoint_path: experiments/checkpoints/phase1_rgat_complex_toy.pt

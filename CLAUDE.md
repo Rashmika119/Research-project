@@ -1,5 +1,59 @@
 # CLAUDE.md
 
+## Current architecture decision (supersedes older scorer/encoder plans)
+
+The user selected **RGAT + ComplEx** for the proposed pipeline. The RGAT configs now explicitly select ComplEx;
+the historical R-GCN + DistMult result remains a comparison baseline.
+ComplEx uses packed real/imaginary halves of the existing 32-wide vectors.
+Previous instructions to defer ComplEx until Phase 6 are superseded by this
+explicit choice. Full graph/text integration and the second RGAT encoder
+remain to be implemented; changing the scorer does not complete those phases.
+
+### Current implementation: RGAT + ComplEx
+
+The selected structural model is RGAT with ComplEx scoring. The existing
+RGAT toy and full-training runners now select `model.scorer_type: complex`.
+R-GCN and DistMult remain available for comparison and old configurations.
+Configurations without scorer_type still use DistMult, so existing checkpoints
+can be reconstructed using their original saved configuration.
+
+`model.dim: 32` means 32 real tensor values: 16 real and 16 imaginary
+coordinates for ComplEx. RGAT learns both halves jointly. Its output width
+and the standalone RoBERTa bridge input/output width remain 32.
+The scorer follows Re(sum(head * relation * conjugate(tail))). BCE loss,
+train-only graph edges, negative sampling and filtered ranking remain in use.
+
+### Run next in Colab
+
+```bash
+pip install -r requirements.txt
+python run_complex_scorer_check.py
+python run_phase1_rgat_smoke_test.py
+python run_phase1_rgat_full_training.py
+```
+
+Run full training only after the small checks pass. The full configuration
+uses dimension 32, one attention head and 100 epochs. It saves a new artifact
+at `experiments/checkpoints/kg_only_baseline_rgat_complex.pt`; the toy run
+saves `experiments/checkpoints/phase1_rgat_complex_toy.pt`.
+These are new experiments: previous DistMult results do not describe ComplEx.
+
+### Following implementation stages
+
+1. Load the trained RGAT + ComplEx checkpoint using its saved model config.
+2. Connect its entity representations and scorer.relation_emb.weight to the
+   existing frozen RoBERTa bridge with correctly aligned descriptions.
+3. Verify gradients reach RGAT and the projections while RoBERTa stays frozen.
+4. Build the second RGAT encoder to refine the returned 32-wide entity vectors.
+5. Feed refined entities and text-enriched relation vectors into ComplEx.
+   The current scorer reads its own relation table; accepting enriched relation
+   vectors will need to be implemented during integration.
+6. Train the complete model and compare it with this structural baseline using
+   the same filtered evaluation protocol.
+
+The full RGAT -> RoBERTa -> RGAT -> ComplEx pipeline is not yet assembled.
+The standalone bridge still uses dummy structural vectors in its smoke tests.
+
 Guidance for Claude Code when working in this repository.
 
 ## What this repo is

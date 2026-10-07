@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 
 from models.kg_encoder import RGCNEncoder
-from models.scorer import DistMultScorer
+from models.scorer import build_scorer
 
 
 class KGOnlyBaseline(nn.Module):
@@ -24,6 +24,7 @@ class KGOnlyBaseline(nn.Module):
         num_layers: int = 2,
         dropout: float = 0.2,
         num_bases: int | None = None,
+        scorer_type: str = "distmult",
     ):
         super().__init__()
         self.num_relations = num_relations
@@ -41,7 +42,7 @@ class KGOnlyBaseline(nn.Module):
             dropout=dropout,
             num_bases=num_bases,
         )
-        self.scorer = DistMultScorer(num_relations, dim)
+        self.scorer = build_scorer(scorer_type, num_relations, dim)
 
     def encode(
         self, edge_index: torch.Tensor, edge_type: torch.Tensor

@@ -1,10 +1,6 @@
-"""Phase 1 variant: KG-only baseline using RGAT instead of R-GCN.
+"""RGAT structural model with configurable ComplEx or DistMult scoring.
 
-Built alongside `models/kg_only_baseline.py` (the R-GCN baseline, which stays
-the project's primary Phase 1 result — see CLAUDE.md's Phase 1 notes) for a
-later encoder comparison. Same DistMult scorer, same training loop
-(`training/train_kg_baseline.py`, via `training/model_factory.py`) — only the
-encoder differs.
+The selected RGAT configurations use ComplEx; legacy configs use DistMult.
 """
 
 from __future__ import annotations
@@ -13,7 +9,7 @@ import torch
 import torch.nn as nn
 
 from models.kg_encoder_rgat import RGATEncoder
-from models.scorer import DistMultScorer
+from models.scorer import build_scorer
 
 
 class KGOnlyBaselineRGAT(nn.Module):
@@ -26,6 +22,7 @@ class KGOnlyBaselineRGAT(nn.Module):
         dropout: float = 0.2,
         heads: int = 2,
         num_bases: int | None = None,
+        scorer_type: str = "distmult",
     ):
         super().__init__()
         self.num_relations = num_relations
@@ -44,7 +41,7 @@ class KGOnlyBaselineRGAT(nn.Module):
             heads=heads,
             num_bases=num_bases,
         )
-        self.scorer = DistMultScorer(num_relations, dim)
+        self.scorer = build_scorer(scorer_type, num_relations, dim)
 
     def encode(
         self, edge_index: torch.Tensor, edge_type: torch.Tensor
