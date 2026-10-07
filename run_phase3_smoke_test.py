@@ -35,6 +35,8 @@ def main(refinement=False):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--checkpoint', default='experiments/checkpoints/kg_only_baseline_rgat_complex.pt')
     parser.add_argument('--lm-name', default='roberta-base')
+    if refinement:
+        parser.add_argument('--variant', choices=['original', 'residual', 'no-refinement'], default='original')
     args = parser.parse_args()
     if not Path(args.checkpoint).is_file():
         raise FileNotFoundError('Upload your trained checkpoint to ' + args.checkpoint)
@@ -112,7 +114,12 @@ def main(refinement=False):
     entity_tokens = tokenize(entity_text.texts_by_id, entity_ids)
     relation_tokens = tokenize(relation_text.texts_by_id, relation_ids)
     model_class = KGTextRefinement if refinement else KGTextIntegration
-    model = model_class(structural, args.lm_name).to(device)
+    if refinement:
+        model = model_class(structural, args.lm_name, residual=args.variant != 'original',
+                            use_refinement=args.variant != 'no-refinement').to(device)
+        print('Variant:', args.variant)
+    else:
+        model = model_class(structural, args.lm_name).to(device)
     model.train()
     assert not model.bridge.lm.lm.training
     assert all(not p.requires_grad for p in model.bridge.lm.lm.parameters())
@@ -144,8 +151,12 @@ def main(refinement=False):
         torch.testing.assert_close(positive_scores, (h * r * t.conj()).sum(-1).real)
         print('[ok] enriched-vector ComplEx scores and filtered-negative BCE; loss=', loss.item())
     loss.backward()
-    if refinement:
+    if refinement and model.refiner is not None:
         check_gradients(model.refiner, 'integrated second RGAT')
+    if refinement and model.residual:
+        gates = [p for name, p in model.named_parameters() if name.endswith('_gate')]
+        assert all(p.grad is not None and torch.isfinite(p.grad) for p in gates)
+        print('[ok] residual gates receive finite gradients')
     for module, label in ((model.structural.encoder, 'RGAT'),
                           (model.structural.entity_emb, 'entity embeddings'),
                           (model.structural.scorer.relation_emb, 'ComplEx relation embeddings'),

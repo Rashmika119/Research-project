@@ -184,6 +184,74 @@ the baseline has been measured.
 
 ### Phase 4 result and Phase 5 training implementation
 
+### Recorded Phase 5 experiment and improvement variants
+
+User-supplied Colab output confirms successful 20-epoch full-pipeline
+training/evaluation on a 200-entity subset: **222 train / 12 validation / 27
+test triples**. Loss changed from **2.7204 to 0.8119**. Best validation MRR
+occurred at **epoch 16**; the selected checkpoint was evaluated on test facts.
+
+| Model | Validation MRR | Test MRR | Test Hits@10 |
+| --- | --- | --- | --- |
+| Original full pipeline | 0.2928834 | 0.3001592 | 0.5185185 |
+| Matched pretrained graph-only baseline | 0.5791466 | 0.6119761 | 0.8703704 |
+
+The complete model learned but underperformed the pretrained graph-only
+baseline in this small experiment. The baseline had full-dataset structural
+training; new projections and the second RGAT learned from only 222 facts.
+Only 12 validation and 27 test facts make these estimates sensitive to a few
+rank changes. Restricted-candidate scores are not comparable to the earlier
+full-dataset baseline. These results do not establish that text is harmful.
+
+Implemented improvements (new GPU results pending):
+
+- `--variant residual` (new training default): preserve original learned entity
+  and relation vectors and add trainable text contributions. The second RGAT
+  also adds a residual update instead of replacing entity vectors. Three
+  scalar gates start at 0.01 and are bounded with tanh. Small nonzero gates
+  keep gradients active while starting near the pretrained model; their
+  actual improvement must be measured.
+- `--variant no-refinement`: same residual text path, with the second RGAT
+  omitted. Compare directly with residual to isolate the second encoder's
+  contribution. `--variant original` reproduces the replacement architecture
+  used in the recorded run.
+- Evaluate epoch zero before training and retain it if no epoch improves
+  validation. Record initial metrics and learned gates in the results.
+- Separate `--subset-seed` (default 0) from training `--seed` so repeated runs
+  use identical entities, splits, candidates and filtering.
+- `run_phase5_comparisons.py`: compare all three variants on a fixed larger
+  1,000-entity subset, 30 epochs, training seeds 0/1/2. Runs execute sequentially
+  in separate processes to free GPU memory. Save per-run artifacts plus
+  `runs.json` and `summary.json` with metric means/sample standard deviations.
+  Select the variant using mean validation MRR, not test metrics. These seeds
+  vary newly initialized components and sampling, not the already-trained
+  structural checkpoint, so this is not end-to-end multi-seed pretraining.
+
+First check the new variants:
+
+```bash
+python run_phase4_smoke_test.py --variant residual
+python run_phase4_smoke_test.py --variant no-refinement
+```
+
+Then run the larger comparison (nine experiments; longer than the earlier
+single subset run):
+
+```bash
+python run_phase5_comparisons.py --output-dir experiments/phase5_comparisons_run1
+```
+
+For one shorter initial residual experiment instead:
+
+```bash
+python run_phase5_training.py --variant residual --max-entities 1000 --epochs 30 --output-dir experiments/phase5_residual_1000_seed0
+```
+
+Use a mounted Drive output path for persistence. Existing result folders are
+protected against overwrite. Earlier checkpoint states use the original
+architecture; recreate the appropriate variant from saved metadata when
+loading new checkpoints. Full-dataset benchmarking remains subsequent work.
+
 User-supplied Colab output confirms **Phase 4 refinement smoke test PASSED
 on CUDA**, using 36 training triples and the existing trained checkpoint.
 Standalone and integrated second RGAT gradients were finite/nonzero, as were

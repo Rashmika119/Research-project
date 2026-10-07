@@ -50,6 +50,9 @@ def main():
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--text-batch-size', type=int, default=4)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--subset-seed', type=int, default=0,
+                        help='Keep subset fixed across initialization seeds')
+    parser.add_argument('--variant', choices=['original', 'residual', 'no-refinement'], default='residual')
     parser.add_argument('--output-dir', default='experiments/phase5_small')
     args = parser.parse_args()
     if args.epochs < 1 or args.max_entities < 2 or args.lr <= 0 or args.text_batch_size < 1:
@@ -73,7 +76,7 @@ def main():
             assert source[key] == getattr(full, key), 'Checkpoint ID mapping mismatch'
         else:
             print('Legacy checkpoint: assuming unchanged original dataset for', key)
-    data = make_toy_subset(full, max_entities=args.max_entities, seed=args.seed)
+    data = make_toy_subset(full, max_entities=args.max_entities, seed=args.subset_seed)
     if not data.valid or not data.test:
         raise ValueError('Subset has no validation/test facts. Increase --max-entities; do not invent new splits.')
     print('Subset:', data.num_entities, 'entities;', len(data.train), len(data.valid), len(data.test), 'train/valid/test')
@@ -101,7 +104,9 @@ def main():
         baseline_val = evaluate_filtered(structural, baseline_entities, data.valid, *filters)
         baseline_test = evaluate_filtered(structural, baseline_entities, data.test, *filters)
     print('Matched subset graph-only validation:', baseline_val)
-    model = KGTextRefinement(structural).to(device)
+    model = KGTextRefinement(structural, residual=args.variant != 'original',
+                             use_refinement=args.variant != 'no-refinement').to(device)
+    print('Variant:', args.variant)
     long_path, short_path = download_entity_text_files('data/text/fb15k237')
     texts = align_entity_texts(data.entity2id, long_path, short_path)
     relations = align_relation_texts(data.relation2id, read_relation_text_mapping(
@@ -134,13 +139,18 @@ def main():
     known = set(all_train_known)
     positives = torch.tensor(data.train, dtype=torch.long, device=device)
     rng = random.Random(args.seed)
-    history, best_mrr, best_epoch = [], -1., 0
+    initial_val = evaluate(data.valid)
+    print('Untrained full-model validation:', initial_val)
+    history, best_mrr, best_epoch = [], initial_val['MRR'], 0
     metadata = {**vars(args), 'lm_name': 'roberta-base', 'max_text_length': 64,
                 'num_negatives': 4, 'loss': 'BCE', 'optimizer': 'Adam', 'weight_decay': 0.00001,
                 'grad_clip_norm': 1.0, 'model_config': cfg['model'], 'refinement_layers': 2,
-                'refinement_heads': 1, 'entity2id': data.entity2id, 'relation2id': data.relation2id,
+                'refinement_heads': 1, 'residual': args.variant != 'original',
+                'use_refinement': args.variant != 'no-refinement',
+                'entity2id': data.entity2id, 'relation2id': data.relation2id,
                 'train': data.train, 'valid': data.valid, 'test': data.test,
-                'baseline_validation': baseline_val, 'baseline_test': baseline_test}
+                'baseline_validation': baseline_val, 'baseline_test': baseline_test,
+                'initial_validation': initial_val}
     def save(path, epoch):
         # Frozen pretrained LM can be reconstructed; save all trainable weights.
         torch.save({'model_state': {k: v.detach().cpu() for k, v in model.state_dict().items()
@@ -148,6 +158,8 @@ def main():
                     'optimizer_state': optimizer.state_dict(), 'metadata': metadata,
                     'epoch': epoch, 'history': history, 'best_epoch': best_epoch,
                     'best_val_mrr': best_mrr}, path)
+    # Retain epoch zero if training never improves validation.
+    save(output / 'best.pt', 0)
     for epoch in range(1, args.epochs + 1):
         model.train()
         optimizer.zero_grad()
@@ -178,6 +190,8 @@ def main():
     final_val, final_test = evaluate(data.valid), evaluate(data.test)
     results = {'settings': metadata, 'history': history, 'best_epoch': best_epoch,
                'full_model_validation': final_val, 'full_model_test': final_test,
+               'learned_gates': {name: float(param.detach().tanh().cpu())
+                                 for name, param in model.named_parameters() if name.endswith('_gate')},
                'note': 'Small subset with restricted candidates, not full FB15k-237 benchmark scores. Baseline initialized from full training facts.'}
     (output / 'results.json').write_text(json.dumps(results, indent=2), encoding='utf-8')
     print('Best epoch:', best_epoch)
