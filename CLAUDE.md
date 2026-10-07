@@ -23,7 +23,79 @@ and the standalone RoBERTa bridge input/output width remain 32.
 The scorer follows Re(sum(head * relation * conjugate(tail))). BCE loss,
 train-only graph edges, negative sampling and filtered ranking remain in use.
 
-### Run next in Colab
+### Completed RGAT + ComplEx training results
+
+Source: Colab output supplied by the user. These results have not been
+independently rerun locally. This section supersedes older statements that
+the revised RGAT full run has not completed.
+
+- ComplEx scorer checks: **PASSED** (formula, candidate scores, directionality,
+  gradients and invalid dimensions).
+- RGAT + ComplEx toy training: **PASSED** on CPU, 50 entities, 237 relations,
+  72 train / 8 validation / 16 test triples, 20 epochs. Loss decreased from
+  1.3831 to 0.2875; early/late three-epoch averages were 1.1563 / 0.2963.
+  Validation evaluation and exact checkpoint parameter reload passed.
+- Full training: **completed successfully on CUDA**, FB15k-237 with 14,541
+  entities, 237 relations and 272,115 / 17,535 / 20,466 train/validation/test
+  triples. RGAT + ComplEx, total tensor width 32 (16 complex coordinates),
+  two graph layers, one attention head, 100 epochs. The full config specifies
+  seed 0, dropout 0.2, Adam, fixed learning rate 0.001, weight decay 0.00001,
+  batch size 32,768, four negatives per positive, BCE loss, gradient clipping
+  at 1.0, validation every five epochs and best-validation checkpoint saving.
+
+| Measure | Recorded result |
+| --- | --- |
+| Epoch 1 training loss | 1.3863 |
+| Epoch 100 training loss | 0.2192 |
+| Best validation MRR | **0.1441 at epoch 100** |
+| Validation Hits@10 at best-MRR epoch | **0.2801 (28.01%)** |
+| Highest logged validation Hits@10 | 0.2818 at epoch 95 |
+| Saved Colab checkpoint | `experiments/checkpoints/kg_only_baseline_rgat_complex.pt` |
+
+The checkpoint was selected by validation MRR, not by Hits@10. Its presence
+in persistent storage or this local workspace has not been confirmed.
+Download or copy it to persistent storage before the Colab runtime ends.
+Test-set scores and full-run checkpoint reload verification are not yet
+reported. The toy test did verify checkpoint reload.
+
+Interpretation: training was stable and learned useful structure; prediction
+quality is modest. Validation MRR rose from 0.0458 at epoch 5 to 0.1441 at
+epoch 100, with small fluctuations. This is a usable graph-only baseline,
+not evidence that the proposed graph/text pipeline is complete or improves
+performance. Toy metrics are code checks, not research performance results.
+
+The earlier R-GCN + DistMult baseline recorded validation MRR 0.1842 and
+Hits@10 0.3409. This RGAT + ComplEx run scored lower, but encoder, scorer and
+embedding width all differ (128 versus 32 total real values), so the result
+does not isolate which architecture or scorer is better.
+
+### Prioritised improvements and next work
+
+1. **Integrate text first:** replace dummy bridge inputs with trained RGAT
+   entity vectors and learned ComplEx relation vectors. Verify ID/text
+   alignment and gradient flow on a small graph, keeping RoBERTa frozen.
+   Add the second RGAT encoder, then compare the full model with this saved
+   graph-only baseline under matching training and evaluation settings.
+   Improvement from text is a hypothesis to test, not a promised outcome.
+2. **Try longer training as a separate experiment:** validation MRR was still
+   improving near epoch 100. Try 200 epochs with a fixed learning rate and
+   best-validation-MRR selection. The current runner starts from scratch;
+   checkpoint/optimizer resume support must be added before claiming a run
+   continues the existing 100-epoch training. More epochs may or may not help.
+3. **Tune settings with controlled comparisons:** vary learning rate, dropout
+   and negative count one at a time. Record configurations, seeds and results;
+   retain separate checkpoint paths for each experiment.
+4. **Consider larger embeddings within measured GPU memory limits:** width
+   32 holds only 16 real and 16 imaginary coordinates. Larger widths may help
+   capacity, but RGAT has already caused full-graph GPU out-of-memory errors.
+   Changing graph width also requires matching LM bridge widths; larger
+   dimensions should not be prescribed without a memory feasibility check.
+5. **Strengthen evaluation:** repeat promising settings with multiple seeds,
+   use validation for selection, and evaluate the chosen model on held-out
+   test triples. Report filtered MRR and Hits@1/3/10. Keep graph-only and
+   text-enhanced comparisons matched so the effect of text can be assessed.
+
+### Colab commands for reproducing the completed baseline
 
 ```bash
 pip install -r requirements.txt
@@ -39,6 +111,40 @@ saves `experiments/checkpoints/phase1_rgat_complex_toy.pt`.
 These are new experiments: previous DistMult results do not describe ComplEx.
 
 ### Following implementation stages
+
+**Phase 3 integration code is now implemented; its Colab gate is pending.**
+`models/kg_text_integration.py` connects learned RGAT entity outputs and
+ComplEx relation embeddings to the shared frozen RoBERTa bridge. It preserves
+autograd into the structural model and projections. It does not yet include
+the second RGAT encoder or full link-prediction training with enriched relations.
+
+Run after the completed structural training, in the repository root:
+
+```bash
+python run_phase3_smoke_test.py
+```
+
+The default checkpoint is
+`experiments/checkpoints/kg_only_baseline_rgat_complex.pt`. If using a fresh
+Colab runtime, upload the saved checkpoint there first. Alternatively use
+`--checkpoint experiments/checkpoints/phase1_rgat_complex_toy.pt` with a trained
+toy model. The gate loads the checkpoint strictly, reconstructs its dataset
+from the saved config, selects a small training-only graph retaining global
+IDs, aligns real entity/relation descriptions, and verifies finite outputs,
+nonzero gradients in RGAT/embeddings/projections, frozen RoBERTa and a working
+optimizer update. The diagnostic loss checks wiring, not prediction quality.
+Neither checkpoint is overwritten, and small-graph outputs are not claimed
+to equal full-graph representations.
+
+New structural checkpoints include entity/relation ID mappings and these are
+checked before integration. The previously completed checkpoint lacks these
+maps; its IDs are reconstructed from the original dataset/config. Counts and
+parameter loading are checked, but cannot independently prove ID identity if
+the original data files changed. Keep the same dataset version.
+
+Local validation: Python syntax and whitespace checks only; this workspace's
+Python lacks PyTorch, so the integration runtime gate must run in Colab.
+Do not report Phase 3 as passed until its output confirms success.
 
 1. Load the trained RGAT + ComplEx checkpoint using its saved model config.
 2. Connect its entity representations and scorer.relation_emb.weight to the
