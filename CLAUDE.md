@@ -182,7 +182,66 @@ the baseline has been measured.
 
 ### Next stages before full evaluation
 
-**Phase 4 code is implemented; Colab smoke-test results are pending.**
+### Phase 4 result and Phase 5 training implementation
+
+User-supplied Colab output confirms **Phase 4 refinement smoke test PASSED
+on CUDA**, using 36 training triples and the existing trained checkpoint.
+Standalone and integrated second RGAT gradients were finite/nonzero, as were
+gradients for the first RGAT, entity/relation embeddings and both projections.
+Explicit enriched-vector ComplEx scoring matched complex arithmetic. The
+single-step BCE diagnostic loss was **3.037477493286133**; this is not a
+convergence or prediction-performance measure. RoBERTa stayed frozen, the
+optimizer update succeeded and the original checkpoint was unchanged.
+
+`run_phase5_training.py` now implements a **multi-epoch small-subset training
+and held-out ranking experiment** for the assembled model. Runtime results
+are pending. Default settings: a fixed seed-0, 200-entity subset of real
+FB15k-237, original held-out validation/test splits, 20 epochs, fixed Adam
+learning rate 0.001, BCE, four negatives, text length 64 and text batch size 4.
+Each epoch encodes the graph once for training, then evaluates validation
+ranking. LM chunks use activation checkpointing to retain gradient flow with
+lower activation memory. All entities and original relations are enriched;
+scoring and filtered ranking both use the enriched relations.
+
+```bash
+python run_phase5_training.py
+```
+
+Use the full graph-only checkpoint at the existing default path. Subset
+entity weights are selected by entity names from the checkpoint's original
+ID mapping; relation IDs are preserved. Legacy mapping assumptions still
+apply. The matched graph-only baseline uses the same subset message graph,
+candidate entity set, held-out facts and filtering. It is initialized from
+the already trained full graph-only checkpoint, and the full model starts
+from those same structural weights. This is not a from-scratch matched
+training-budget architecture comparison. Negative sampling rejects all
+original training facts covered by the subset, including facts omitted by
+the graph sampler. Validation/test labels are used only for evaluation.
+
+The experiment saves `best.pt` selected by validation MRR, `last.pt` each
+epoch with optimizer state, and `results.json` with settings, mappings,
+triples, epoch losses/validation metrics and final held-out test results for
+both models in `experiments/phase5_small`. Frozen pretrained LM weights are
+omitted from checkpoints and must be reconstructed from RoBERTa-base.
+Existing output artifacts are protected against overwrite; use a different
+`--output-dir` for another run. Save the output directory to Drive to preserve
+it across Colab resets, for example:
+
+```bash
+python run_phase5_training.py --output-dir /content/drive/MyDrive/Research/phase5_small_run1
+```
+
+Mount Drive first if choosing that path. The runner records optimizer state
+but does not yet implement automatic resume. An empty validation/test subset
+causes an explicit error; increase `--max-entities` rather than changing
+splits. Small-subset candidate rankings are **not full FB15k-237 benchmark
+metrics**, and must not be compared directly with the earlier full-dataset
+0.1441 validation MRR. No improvement is assumed: compare the recorded matched
+subset scores. Syntax/whitespace checks can run locally, but actual multi-epoch
+GPU training still requires Colab. Full-scale GPU feasibility and full-dataset
+training/evaluation remain subsequent work after this experiment.
+
+**Phase 4 code is implemented and the Colab smoke-test gate passed.**
 `models/kg_text_refinement.py` adds a second two-layer RGAT (one head) over
 the semantic entity vectors. The shared bridge enriches both entity and
 relation vectors, and `ComplExScorer.score_vectors` accepts those explicit
@@ -207,7 +266,7 @@ arithmetic and verifies finite nonzero gradients through both encoders,
 embeddings and projections while RoBERTa stays frozen. The source checkpoint
 is not overwritten. This is a connectivity gate, not a loss-convergence or
 prediction-performance experiment. Expected final output is
-`Phase 4 refinement smoke test PASSED`; do not record a pass until observed.
+`Phase 4 refinement smoke test PASSED`, confirmed by the user's Colab output.
 
 Local syntax and whitespace checks passed. Runtime verification remains in
 Colab because PyTorch is absent locally. Next after this gate: implement the
@@ -219,8 +278,8 @@ training loop does not train this composed model.
 2. **Done:** connect its entity representations and scorer.relation_emb.weight to the
    existing frozen RoBERTa bridge with correctly aligned descriptions.
 3. **Done:** verify gradients reach RGAT and the projections while RoBERTa stays frozen.
-4. **Implemented, gate pending:** second RGAT refines the returned 32-wide entity vectors.
-5. **Implemented, gate pending:** score refined entities and enriched relation
+4. **Done, gate passed:** second RGAT refines the returned 32-wide entity vectors.
+5. **Done, gate passed:** score refined entities and enriched relation
    vectors with ComplEx through the explicit-vector interface.
 6. Train the complete model and compare it with this structural baseline using
    the same filtered evaluation protocol.
