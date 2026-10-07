@@ -17,6 +17,11 @@ from preprocessing.relation_text import (
 )
 from preprocessing.toy_subset import make_toy_subset
 from training.model_factory import build_model
+from models.kg_text_refinement import KGTextRefinement
+from models.kg_encoder_rgat import RGATEncoder
+from training.losses import bce_loss
+from training.negative_sampling import sample_negatives
+import random
 
 
 def check_gradients(module, label):
@@ -26,7 +31,7 @@ def check_gradients(module, label):
     print('[ok] finite nonzero gradients reach ' + label)
 
 
-def main():
+def main(refinement=False):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--checkpoint', default='experiments/checkpoints/kg_only_baseline_rgat_complex.pt')
     parser.add_argument('--lm-name', default='roberta-base')
@@ -76,6 +81,22 @@ def main():
     edge_index = torch.tensor(edges, dtype=torch.long, device=device).t().contiguous()
     edge_type = torch.tensor(types, dtype=torch.long, device=device)
     print('[ok] small train-only graph:', len(triples), 'triples; original IDs retained')
+    if refinement:
+        entity_ids = torch.tensor(sorted({v for h, _, t in triples for v in (h, t)}), device=device)
+        relation_ids = torch.tensor(sorted({r for _, r, _ in triples}), device=device)
+        entity_rows = {v: i for i, v in enumerate(entity_ids.tolist())}
+        relation_rows = {v: i for i, v in enumerate(relation_ids.tolist())}
+        local_edges = torch.tensor([(entity_rows[h], entity_rows[t]) for h, t in edges],
+                                   dtype=torch.long, device=device).t().contiguous()
+        # Standalone refiner gate before wiring the real semantic outputs.
+        refiner = RGATEncoder(cfg['dim'], dataset.num_relations * 2, heads=1).to(device)
+        dummy = torch.randn(len(entity_ids), cfg['dim'], device=device, requires_grad=True)
+        refined = refiner(dummy, local_edges, edge_type)
+        assert refined.shape == dummy.shape and torch.isfinite(refined).all()
+        refined.square().mean().backward()
+        check_gradients(refiner, 'standalone second RGAT')
+        assert dummy.grad is not None and torch.isfinite(dummy.grad).all() and dummy.grad.abs().sum() > 0
+        del refiner, dummy, refined
 
     text_dir = 'data/text/fb15k237'
     long_path, short_path = download_entity_text_files(text_dir)
@@ -90,19 +111,41 @@ def main():
         return {key: value.to(device) for key, value in tokens.items()}
     entity_tokens = tokenize(entity_text.texts_by_id, entity_ids)
     relation_tokens = tokenize(relation_text.texts_by_id, relation_ids)
-    model = KGTextIntegration(structural, args.lm_name).to(device)
+    model_class = KGTextRefinement if refinement else KGTextIntegration
+    model = model_class(structural, args.lm_name).to(device)
     model.train()
     assert not model.bridge.lm.lm.training
     assert all(not p.requires_grad for p in model.bridge.lm.lm.parameters())
     optimizer = torch.optim.Adam((p for p in model.parameters() if p.requires_grad), lr=0.001)
     optimizer.zero_grad()
-    entities, relations = model(edge_index, edge_type, entity_ids, relation_ids, entity_tokens, relation_tokens)
+    inputs = (edge_index, edge_type, entity_ids, relation_ids, entity_tokens, relation_tokens)
+    entities, relations = model(*inputs, local_edges) if refinement else model(*inputs)
     dim = cfg['dim']
     assert entities.shape == (len(entity_ids), dim) and relations.shape == (len(relation_ids), dim)
     assert torch.isfinite(entities).all() and torch.isfinite(relations).all()
     # Diagnostic objective verifies connectivity, not link-prediction quality.
     loss = entities.square().mean() + relations.square().mean()
+    if refinement:
+        known = {(entity_rows[h], relation_rows[r], entity_rows[t])
+                 for h, r, t in dataset.train
+                 if h in entity_rows and t in entity_rows and r in relation_rows}
+        positive = torch.tensor([(entity_rows[h], relation_rows[r], entity_rows[t])
+                                 for h, r, t in triples[:4]], dtype=torch.long, device=device)
+        negative = sample_negatives(positive.cpu(), len(entity_ids), known, 2,
+                                    random.Random(0)).to(device)
+        positive_scores = model.score_triples(entities, relations, positive)
+        negative_scores = model.score_triples(entities, relations, negative.reshape(-1, 3)).reshape(len(positive), 2)
+        loss = bce_loss(positive_scores, negative_scores)
+        assert torch.isfinite(loss), 'Non-finite full-pipeline BCE loss'
+        # Verify explicitly enriched relation scores against complex arithmetic.
+        h = torch.complex(*entities[positive[:, 0]].chunk(2, -1))
+        r = torch.complex(*relations[positive[:, 1]].chunk(2, -1))
+        t = torch.complex(*entities[positive[:, 2]].chunk(2, -1))
+        torch.testing.assert_close(positive_scores, (h * r * t.conj()).sum(-1).real)
+        print('[ok] enriched-vector ComplEx scores and filtered-negative BCE; loss=', loss.item())
     loss.backward()
+    if refinement:
+        check_gradients(model.refiner, 'integrated second RGAT')
     for module, label in ((model.structural.encoder, 'RGAT'),
                           (model.structural.entity_emb, 'entity embeddings'),
                           (model.structural.scorer.relation_emb, 'ComplEx relation embeddings'),
@@ -118,7 +161,7 @@ def main():
     assert not torch.equal(previous, trainable.detach()), 'Optimizer did not update projection'
     assert all(torch.isfinite(p).all() for p in model.parameters())
     print('[ok] optimizer step updates trainable parameters; checkpoint unchanged')
-    print('Phase 3 integration smoke test PASSED')
+    print('Phase 4 refinement smoke test PASSED' if refinement else 'Phase 3 integration smoke test PASSED')
 
 
 if __name__ == '__main__':

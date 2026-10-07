@@ -59,8 +59,13 @@ class ComplExScorer(nn.Module):
         nn.init.xavier_uniform_(self.relation_emb.weight)
 
     def score(self, h, relation_ids, t):
+        return self.score_vectors(h, self.relation_emb(relation_ids), t)
+
+    @staticmethod
+    def score_vectors(h, r, t):
+        """Score explicit vectors, including text-enriched relation vectors."""
         hr, hi = h.chunk(2, dim=-1)
-        rr, ri = self.relation_emb(relation_ids).chunk(2, dim=-1)
+        rr, ri = r.chunk(2, dim=-1)
         tr, ti = t.chunk(2, dim=-1)
         return ((hr * rr - hi * ri) * tr + (hr * ri + hi * rr) * ti).sum(-1)
 

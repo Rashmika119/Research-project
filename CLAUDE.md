@@ -112,7 +112,7 @@ These are new experiments: previous DistMult results do not describe ComplEx.
 
 ### Following implementation stages
 
-**Phase 3 integration code is now implemented; its Colab gate is pending.**
+**Phase 3 integration is implemented and its Colab smoke-test gate PASSED.**
 `models/kg_text_integration.py` connects learned RGAT entity outputs and
 ComplEx relation embeddings to the shared frozen RoBERTa bridge. It preserves
 autograd into the structural model and projections. It does not yet include
@@ -142,23 +142,104 @@ maps; its IDs are reconstructed from the original dataset/config. Counts and
 parameter loading are checked, but cannot independently prove ID identity if
 the original data files changed. Keep the same dataset version.
 
-Local validation: Python syntax and whitespace checks only; this workspace's
-Python lacks PyTorch, so the integration runtime gate must run in Colab.
-Do not report Phase 3 as passed until its output confirms success.
+### Recorded Phase 3 Colab results
 
-1. Load the trained RGAT + ComplEx checkpoint using its saved model config.
-2. Connect its entity representations and scorer.relation_emb.weight to the
+Source: successful run output supplied by the user; not independently rerun
+locally. Local validation was limited to Python syntax and whitespace checks
+because this workspace's Python lacks PyTorch.
+
+- Device: **CUDA**.
+- Trained RGAT + ComplEx checkpoint: **loaded successfully**.
+- Integration graph: **36 original training triples**, retaining original
+  global entity/relation IDs and excluding validation/test edges.
+- Real entity descriptions and relation descriptions downloaded and used;
+  RoBERTa-base tokenizer and model weights loaded successfully.
+- **Finite nonzero gradients confirmed** for the first RGAT encoder, entity
+  embeddings, ComplEx relation embeddings, KG-to-LM projection and LM-to-KG
+  projection.
+- Frozen RoBERTa: **no parameter gradients**.
+- Optimizer step: **trainable parameters updated**; original checkpoint
+  unchanged.
+- Final output: **`Phase 3 integration smoke test PASSED`**.
+
+The legacy checkpoint messages indicate that entity2id and relation2id were
+reconstructed from the original dataset/config, rather than verified against
+stored checkpoint maps. Keep the dataset unchanged; this limitation remains.
+
+The RoBERTa load report listed `lm_head.*` as UNEXPECTED because the checkpoint's
+word-prediction head is unused by the base encoder. It listed `pooler.dense.*`
+as MISSING because those weights were newly initialized. The bridge reads
+`last_hidden_state[:, 0, :]`, so neither the prediction head nor the pooler is
+used in its output. The gate passed despite these loading messages. Disabling
+the unused pooler with `add_pooling_layer=False` is optional and has not been
+implemented. The unauthenticated Hugging Face warning did not stop downloads.
+
+**What this result proves:** learned graph vectors and real text can pass
+through the frozen LM bridge with working backpropagation. This was a wiring
+test on a small graph, using a diagnostic squared-output loss; it was not full
+link-prediction training or evaluation. No Phase 3 MRR/Hits@K improvement over
+the baseline has been measured.
+
+### Next stages before full evaluation
+
+**Phase 4 code is implemented; Colab smoke-test results are pending.**
+`models/kg_text_refinement.py` adds a second two-layer RGAT (one head) over
+the semantic entity vectors. The shared bridge enriches both entity and
+relation vectors, and `ComplExScorer.score_vectors` accepts those explicit
+enriched relation vectors instead of looking up the original relation table.
+Total tensor width remains 32. The first encoder retains global checkpoint
+IDs; refinement graph nodes and scoring triples use explicitly mapped local
+rows. Message-passing relation IDs retain the original inverse-edge offset.
+
+Run in Colab after pulling these changes, with the existing trained checkpoint:
+
+```bash
+python run_phase4_smoke_test.py
+```
+
+This reuses the Phase 3 checkpoint/text setup. It first checks the second RGAT
+standalone on dummy inputs, then enriches every node in the selected small
+training graph and runs the connected first RGAT -> frozen RoBERTa -> second
+RGAT -> ComplEx pipeline. A single BCE backward/optimizer step uses real
+training triples and corruptions filtered against all training facts within
+the selected ID sets. It checks explicit-vector ComplEx scores against complex
+arithmetic and verifies finite nonzero gradients through both encoders,
+embeddings and projections while RoBERTa stays frozen. The source checkpoint
+is not overwritten. This is a connectivity gate, not a loss-convergence or
+prediction-performance experiment. Expected final output is
+`Phase 4 refinement smoke test PASSED`; do not record a pass until observed.
+
+Local syntax and whitespace checks passed. Runtime verification remains in
+Colab because PyTorch is absent locally. Next after this gate: implement the
+full training/evaluation loop with memory-controlled text batches, persistent
+checkpoints and consistent filtered candidate scoring. The existing baseline
+training loop does not train this composed model.
+
+1. **Done:** load the trained RGAT + ComplEx checkpoint using its saved model config.
+2. **Done:** connect its entity representations and scorer.relation_emb.weight to the
    existing frozen RoBERTa bridge with correctly aligned descriptions.
-3. Verify gradients reach RGAT and the projections while RoBERTa stays frozen.
-4. Build the second RGAT encoder to refine the returned 32-wide entity vectors.
-5. Feed refined entities and text-enriched relation vectors into ComplEx.
-   The current scorer reads its own relation table; accepting enriched relation
-   vectors will need to be implemented during integration.
+3. **Done:** verify gradients reach RGAT and the projections while RoBERTa stays frozen.
+4. **Implemented, gate pending:** second RGAT refines the returned 32-wide entity vectors.
+5. **Implemented, gate pending:** score refined entities and enriched relation
+   vectors with ComplEx through the explicit-vector interface.
 6. Train the complete model and compare it with this structural baseline using
    the same filtered evaluation protocol.
 
-The full RGAT -> RoBERTa -> RGAT -> ComplEx pipeline is not yet assembled.
-The standalone bridge still uses dummy structural vectors in its smoke tests.
+After the second RGAT and enriched-relation ComplEx scoring are connected,
+run a small full-pipeline smoke test first. Then train on the full training
+split, select the best checkpoint by validation MRR, and evaluate that chosen
+model on held-out test triples with filtered MRR and Hits@1/3/10. Compare
+against the graph-only RGAT + ComplEx baseline under matching settings and
+on the same split (existing 0.1441 MRR / 0.2801 Hits@10 are validation scores,
+not test scores). Adding the second encoder alone does not establish prediction
+quality; a full training loop and evaluation are still required. An intermediate
+model without the second RGAT can later serve as an ablation if trained and
+evaluated properly.
+
+The full RGAT -> RoBERTa -> RGAT -> ComplEx forward/backward wiring is now
+implemented for the Phase 4 gate, but full training/evaluation is not yet
+implemented. Historical standalone Phase 2 tests still use dummy vectors;
+Phase 3 and Phase 4 load trained structural vectors.
 
 Guidance for Claude Code when working in this repository.
 
