@@ -22,6 +22,7 @@ def build_model(
         num_entities=num_entities,
         num_relations=num_relations,
         dim=model_cfg["dim"],
+        scorer_type=model_cfg.get("scorer_type", "distmult"),
         num_layers=model_cfg.get("num_layers", 2),
         dropout=model_cfg.get("dropout", 0.2),
         num_bases=model_cfg.get("num_bases"),

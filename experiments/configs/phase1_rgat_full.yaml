@@ -47,6 +47,7 @@ use_toy_subset: false
 
 model:
   encoder_type: rgat
+  scorer_type: complex # dim=32 means 16 real + 16 imaginary coordinates
   dim: 32
   num_layers: 2
   dropout: 0.2
@@ -67,4 +68,4 @@ training:
   grad_clip_norm: 1.0
   save_best: true # keep the best-validation-MRR checkpoint, not just the last epoch
 
-checkpoint_path: experiments/checkpoints/kg_only_baseline_rgat.pt
+checkpoint_path: experiments/checkpoints/kg_only_baseline_rgat_complex.pt

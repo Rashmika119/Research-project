@@ -68,6 +68,7 @@ def run(config: dict) -> dict:
 
     model_cfg = config["model"]
     print(f"Encoder: {model_cfg.get('encoder_type', 'rgcn')}")
+    print(f"Scorer: {model_cfg.get('scorer_type', 'distmult')}")
     model = build_model(
         model_cfg, dataset.num_entities, dataset.num_relations
     ).to(device)
