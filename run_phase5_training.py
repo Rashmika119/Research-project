@@ -143,6 +143,7 @@ def main():
     print('Untrained full-model validation:', initial_val)
     history, best_mrr, best_epoch = [], initial_val['MRR'], 0
     metadata = {**vars(args), 'lm_name': 'roberta-base', 'max_text_length': 64,
+                'ranking_policy': 'average_exact_ties',
                 'num_negatives': 4, 'loss': 'BCE', 'optimizer': 'Adam', 'weight_decay': 0.00001,
                 'grad_clip_norm': 1.0, 'model_config': cfg['model'], 'refinement_layers': 2,
                 'refinement_heads': 1, 'residual': args.variant != 'original',

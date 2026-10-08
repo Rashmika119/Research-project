@@ -1,6 +1,116 @@
 # CLAUDE.md
 
+## Evaluation correction and checkpoint reevaluation
+
+The previous evaluator used optimistic ranks: rank = 1 + candidates scoring
+strictly higher. This gives all tied candidates the best position within a
+tie, potentially inflating metrics when representations collapse. The actual
+contribution of ties in the supplied experiment outputs is still unconfirmed.
+Those historical metrics must be labelled as optimistic, not retrospectively
+presented as average-rank results. Optimistic tie handling is a defined policy;
+the problem is relying on it alone when many candidates may be indistinguishable.
+
+`evaluation/metrics.py` now defaults to average exact-tie ranks:
+`1 + higher_count + (equal_count - 1) / 2`, including the correct entity in
+equal_count. For 1,000 equally scored candidates, rank is 500.5 rather than 1.
+Filtered other known truths remain excluded and the correct candidate is
+restored. Reports retain `Optimistic_MRR` for comparison and add
+`Tie_query_fraction`, `Mean_tied_candidates` (including true candidate) and
+`Max_tied_candidates`. Equality is exact, not a tolerance-based score grouping.
+Hits@K now use the average rank directly. All new baseline and full-model
+training calls share this policy; new metadata records `average_exact_ties`.
+
+`run_tie_ranking_check.py` checks all-equal, partial-tie, no-tie and filtered
+cases with known answers. `run_reevaluate_checkpoint.py` reloads an existing
+Phase 5 best.pt or last.pt and the original full graph-only checkpoint, rebuilds
+the exact saved subset graph/splits, and reevaluates both models without
+training or modifying weights. Baseline entity rows are matched by names.
+Legacy baseline ID reconstruction still assumes unchanged data. Frozen
+RoBERTa and external text resources are reconstructed, so keep their versions
+consistent with the original experiment.
+
+```bash
+python run_tie_ranking_check.py
+python run_reevaluate_checkpoint.py --checkpoint experiments/phase5_comparisons_run2/original_seed1/best.pt
+```
+
+The report defaults to `best.tie_report.json` beside the checkpoint and
+contains per-query true scores, score min/max, tie and higher-score counts,
+remaining candidate counts, optimistic/average ranks, and aggregate metrics.
+It also reports exact duplicate and all-zero entity vectors. Reports cannot
+overwrite existing reports; choose another `--output` path if necessary.
+Repeat with original_seed0/2 and available residual/no-refinement checkpoints.
+Also reevaluate last.pt when available to check the effect of training.
+
+Existing best.pt files were selected by the old optimistic validation policy.
+Reevaluation does not recover the best average-rank epoch unless that epoch's
+weights were saved. Do not claim these weights were selected under the corrected
+policy. First audit existing results; any later retraining should use a new
+output directory and the corrected policy. Diagnostics alone do not prove
+the architectural cause of ties or establish that residual connections help.
+
+Local syntax and whitespace checks passed; local Python lacks PyTorch, so the
+known-answer runtime checks and checkpoint reevaluation are pending in Colab.
+
 ## Current architecture decision (supersedes older scorer/encoder plans)
+
+### Why the residual variant was introduced
+
+The research intention is to learn graph representations, enrich them with
+text, and refine them through a second graph encoder. The user did not
+explicitly decide to discard existing graph vectors. The variant named
+`original` denotes the first coded implementation, not a confirmed decision
+to use replacement-only fusion. That implementation feeds the projected LM
+output into the second RGAT. Graph information conditions the LM via the
+soft prompt, but the initial graph vector has no direct shortcut to the
+second encoder.
+
+Residual fusion was introduced after the first 200-entity experiment: the
+combined model's test MRR was 0.3002 versus 0.6120 for the pretrained graph-only
+baseline under the then-used optimistic tie policy. Newly initialized
+projections and the second encoder had trained on only 222 facts. A possible
+explanation was loss of useful pretrained graph information during these
+transformations; this was a hypothesis, not a demonstrated cause.
+
+The residual variant explicitly retains graph information:
+
+```text
+entity input to second RGAT = first RGAT entity vector + tanh(entity gate) * LM-derived entity vector
+relation used by ComplEx = learned relation vector + tanh(relation gate) * LM-derived relation vector
+final entity vector = second RGAT input + tanh(refinement gate) * second RGAT output
+```
+
+The trainable scalar gates start at 0.01, giving small nonzero contributions
+and allowing gradients through the new components. The graph model is not
+frozen: its parameters still train. Residual connections preserve a direct
+information path; they do not guarantee preservation of rankings or improved
+accuracy. The unexpectedly low initial residual validation MRR in the
+1,000-entity run reinforces the need to inspect ties and representations.
+
+This is a candidate improvement and an experimental fusion choice, not a
+debugging trick or proof that small training data caused the performance
+drop. Compare `original` with `residual` under matching settings to assess
+fusion, and compare `residual` with `no-refinement` to assess the second RGAT.
+Data-size and training-duration explanations need their own controlled
+experiments. Smoke tests for both residual and no-refinement passed on CUDA,
+with diagnostic BCE losses 0.4654372 and 0.4669769 respectively. Those losses
+only verify working computation and gradients, not prediction superiority.
+
+JAKET itself combines representations: its graph update includes an additive
+skip and layer normalization (Equation 5), and its language fusion adds graph
+entity vectors to text representations before normalization (Equations 8-9).
+See the [JAKET paper](https://cdn.aaai.org/ojs/21417/21417-13-25430-1-2-20220628.pdf).
+This supports discussing fusion in the reversed KG-centred design, but does
+not prescribe our exact reversal. Our small trainable gates are not JAKET's
+exact mechanism. Document the chosen fusion explicitly rather than claiming
+the first implementation or gated variant is automatically a faithful reversal.
+
+Current runner behaviour: Phase 5 defaults to `residual`; use
+`--variant original` explicitly to run the first coded design. The main
+stages remain RGAT -> frozen RoBERTa -> RGAT -> ComplEx. `no-refinement`
+removes the second RGAT and is an ablation rather than the complete design.
+Reevaluate saved checkpoints using average tie ranks before interpreting
+historical optimistic scores or claiming that any variant improves results.
 
 The user selected **RGAT + ComplEx** for the proposed pipeline. The RGAT configs now explicitly select ComplEx;
 the historical R-GCN + DistMult result remains a comparison baseline.
