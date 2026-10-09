@@ -5,3 +5,13 @@ experiments/logs/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+data/text/
+data/cache/
+experiments/research/
+experiments/phase5*/
+*.pt
+*.pth
+*.ckpt
+*.tmp
+.pytest_cache/
+.cache/

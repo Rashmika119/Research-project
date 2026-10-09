@@ -2,18 +2,23 @@
 from torch import nn
 
 from models.kg_lm_bridge import KGLMBridge
+from models.independent_text_bridge import IndependentTextBridge
 
 
 class KGTextIntegration(nn.Module):
     """Shares one frozen LM bridge for entities and relations; no second GNN yet."""
 
-    def __init__(self, structural_model, lm_name="roberta-base", projection_dropout=0.1):
+    def __init__(self, structural_model, lm_name="roberta-base", projection_dropout=0.1,
+                 soft_prompt=True, lm_revision=None):
         super().__init__()
         self.structural = structural_model
-        self.bridge = KGLMBridge(
+        self.soft_prompt = soft_prompt
+        bridge_class = KGLMBridge if soft_prompt else IndependentTextBridge
+        self.bridge = bridge_class(
             kg_dim=structural_model.entity_emb.embedding_dim,
             model_name=lm_name,
             projection_dropout=projection_dropout,
+            lm_revision=lm_revision,
         )
 
     def forward(self, edge_index, edge_type, entity_ids, relation_ids,

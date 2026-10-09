@@ -16,8 +16,8 @@ class KGTextRefinement(KGTextIntegration):
 
     def __init__(self, structural_model, lm_name='roberta-base',
                  projection_dropout=0.1, refinement_layers=2, refinement_heads=1,
-                 residual=False, use_refinement=True):
-        super().__init__(structural_model, lm_name, projection_dropout)
+                 residual=False, use_refinement=True, soft_prompt=True, lm_revision=None):
+        super().__init__(structural_model, lm_name, projection_dropout, soft_prompt, lm_revision)
         self.residual = residual
         self.use_refinement = use_refinement
         if residual:
@@ -35,26 +35,36 @@ class KGTextRefinement(KGTextIntegration):
 
     def forward(self, edge_index, edge_type, entity_ids, relation_ids,
                 entity_tokens, relation_tokens, refinement_edge_index,
-                text_batch_size=None):
+                text_batch_size=None, entity_pooled=None, relation_pooled=None):
         if text_batch_size is not None and text_batch_size < 1:
             raise ValueError('text_batch_size must be positive')
         structural = self.structural.encode(edge_index, edge_type)
         base_entities = structural[entity_ids]
         base_relations = self.structural.scorer.relation_emb(relation_ids)
-        def enrich(vectors, tokens):
+        def enrich(vectors, tokens, pooled):
             batch_size = text_batch_size or len(vectors)
             parts = []
             for start in range(0, len(vectors), batch_size):
                 stop = start + batch_size
+                if not self.soft_prompt:
+                    if pooled is not None:
+                        parts.append(self.bridge(pooled=pooled[start:stop].to(vectors.device)))
+                    else:
+                        parts.append(self.bridge(tokens['input_ids'][start:stop].to(vectors.device),
+                                                 tokens['attention_mask'][start:stop].to(vectors.device)))
+                    continue
+                if pooled is not None:
+                    raise ValueError('Soft-prompt outputs depend on KG weights and cannot be cached')
                 inputs = (vectors[start:stop], tokens['input_ids'][start:stop],
                           tokens['attention_mask'][start:stop])
+                inputs = tuple(value.to(vectors.device) for value in inputs)
                 if text_batch_size is not None and self.training and torch.is_grad_enabled():
                     parts.append(checkpoint(self.bridge, *inputs, use_reentrant=False))
                 else:
                     parts.append(self.bridge(*inputs))
             return torch.cat(parts)
-        entities = enrich(base_entities, entity_tokens)
-        relations = enrich(base_relations, relation_tokens)
+        entities = enrich(base_entities, entity_tokens, entity_pooled)
+        relations = enrich(base_relations, relation_tokens, relation_pooled)
         if self.residual:
             entities = base_entities + self.entity_text_gate.tanh() * entities
             relations = base_relations + self.relation_text_gate.tanh() * relations

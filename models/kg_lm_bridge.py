@@ -41,6 +41,7 @@ class KGLMBridge(nn.Module):
         kg_dim: int = 32,
         model_name: str = "roberta-base",
         projection_dropout: float = 0.1,
+        lm_revision: str | None = None,
     ):
         super().__init__()
 
@@ -49,6 +50,7 @@ class KGLMBridge(nn.Module):
         # Frozen language model.
         self.lm = FrozenLM(
             model_name=model_name,
+            revision=lm_revision,
         )
 
         self.lm_dim = self.lm.hidden_size

@@ -4,6 +4,8 @@ numpy
 pandas
 pyyaml
 matplotlib
+nbformat>=5
+ipython
 
 # Graph encoders (Phase 1+). On Colab, torch-geometric sometimes needs a
 # CUDA/torch-version-matched wheel index — if the plain pip install below
@@ -14,6 +16,4 @@ torch-geometric
 # Frozen LM conditioning (Phase 2+)
 transformers
 
-# KGE scoring utilities (DistMult/ComplEx baselines) — already used in the
-# preliminary diagnostic experiment described in README.md.
-torchkge
+# ComplEx/DistMult are implemented locally in models/scorer.py.
