@@ -1,4 +1,4 @@
-"""Offline tests by default; --real-lm checks all five variants with RoBERTa."""
+"""Isolated CPU regressions by default; --real-lm checks all available architectures."""
 import argparse
 import os
 import subprocess
@@ -76,6 +76,8 @@ if __name__ == '__main__':
         real_lm_smoke(args.device)
     else:
         environment = os.environ.copy()
+        environment.pop('RESEARCH_MODEL_BACKUP', None)
+        environment['HF_HUB_OFFLINE'] = '1'
         if args.device in ('auto', 'cpu'):
             environment['CUDA_VISIBLE_DEVICES'] = ''
         else:

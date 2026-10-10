@@ -1,4 +1,7 @@
-"""Regenerate the checked-in Colab notebook from readable, reviewable cells."""
+"""Historical stage-1 template. Never overwrite the user's research_pipeline.ipynb.
+
+For the active study use build_warmup_ablation_notebook.py instead.
+"""
 import json
 from pathlib import Path
 from textwrap import dedent
@@ -366,7 +369,9 @@ def build():
         'nbformat': 4, 'nbformat_minor': 5}
     for index, cell in enumerate(notebook['cells']):
         cell['id'] = f'research-{index:03d}'
-    target = Path(__file__).with_name('research_pipeline.ipynb')
+    target = Path(__file__).with_name('research_pipeline.generated.ipynb')
+    if target.exists():
+        raise FileExistsError('Historical preview already exists; preserve it. Use the new warmup notebook builder.')
     target.write_text(json.dumps(notebook, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
     print(target)
 

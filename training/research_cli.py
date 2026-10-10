@@ -2,13 +2,15 @@
 import argparse
 
 from training.research_pipeline import ExperimentConfig, run_experiment
-from training.variants import VARIANTS
+from training.variants import VARIANTS, CONFIGURATIONS, configuration_settings
 
 
 def main(baseline=False):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--variant', choices=VARIANTS, default='residual')
-    parser.add_argument('--max-entities', type=int, default=0 if baseline else 1000,
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument('--variant', '--architecture', dest='variant', choices=VARIANTS)
+    selection.add_argument('--configuration', choices=CONFIGURATIONS)
+    parser.add_argument('--max-entities', type=int, default=0 if baseline else 5000,
                         help='0 selects the complete dataset')
     parser.add_argument('--epochs', type=int, default=100 if baseline else 30,
                         help='Total epochs INCLUDING structural warmup')
@@ -31,8 +33,13 @@ def main(baseline=False):
     parser.add_argument('--skip-completed', action='store_true')
     parser.add_argument('--resume', action='store_true')
     args = parser.parse_args()
-    cfg = ExperimentConfig(variant='baseline' if baseline else args.variant,
-        max_entities=args.max_entities, epochs=args.epochs, warmup=args.warmup_epochs,
+    architecture, warmup = args.variant or 'residual', args.warmup_epochs
+    if args.configuration:
+        if baseline:
+            parser.error('Baseline does not accept ablation configurations')
+        architecture, warmup = configuration_settings(args.configuration, args.warmup_epochs)
+    cfg = ExperimentConfig(variant='baseline' if baseline else architecture,
+        max_entities=args.max_entities, epochs=args.epochs, warmup=0 if baseline else warmup,
         seed=args.seed, subset_seed=args.subset_seed, lr=args.lr, num_negatives=args.num_negatives,
         train_batch_size=args.train_batch_size, text_batch_size=args.text_batch_size,
         max_text_length=args.max_text_length, eval_every=args.eval_every,

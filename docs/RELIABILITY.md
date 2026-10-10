@@ -1,5 +1,10 @@
 # RoBERTa loading and checkpoint resume investigation
 
+Historical reliability work for the earlier five-variant stage is recorded below.
+Its loader, complete RNG restoration and strict deterministic checks are retained
+in the [current four-configuration study](WARMUP_ABLATION_5000.md). The new notebook
+also isolates corruption fixtures from persistent Drive model backups.
+
 This change preserves all five variants, scratch KG initialization, frozen
 pretrained RoBERTa, equations, 5+25/0+30 budgets, fixed LR, BCE, ComplEx scoring,
 original splits and validation-only selection. Short synthetic diagnostic runs

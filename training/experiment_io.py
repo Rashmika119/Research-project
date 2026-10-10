@@ -11,7 +11,7 @@ import torch
 
 from preprocessing.dataset import load_dataset
 from preprocessing.graph_builder import build_train_graph, assert_no_leakage
-from preprocessing.toy_subset import make_toy_subset
+from preprocessing.induced_subset import make_induced_subset, graph_statistics, STRATEGY
 
 
 def digest(value):
@@ -80,14 +80,17 @@ def prepare_data(raw_dir, max_entities, subset_seed, manifest_path=None, full_da
     if full is None:
         full = load_dataset(raw_dir, download_if_missing=True, use_synthetic_fallback=False)
         validate_fb15k237(full)
-    data = full if max_entities == 0 else make_toy_subset(full, max_entities, subset_seed)
+    data = full if max_entities == 0 else make_induced_subset(full, max_entities, subset_seed)
     if not data.train or not data.valid or not data.test:
         raise ValueError('Empty split. Increase the subset size; never manufacture held-out facts.')
     original_to_local = {full.entity2id[name]: local for name, local in data.entity2id.items()}
     known_train = [(original_to_local[h], r, original_to_local[t]) for h, r, t in full.train
                    if h in original_to_local and t in original_to_local]
     payload = dataset_payload(data)
-    manifest = {'schema': 1, 'dataset_sha256': digest(dataset_payload(full)),
+    manifest = {'schema': 2, 'dataset_sha256': digest(dataset_payload(full)),
+                'selection_strategy': STRATEGY if max_entities else 'full_original_splits',
+                'statistics': graph_statistics(data),
+                'original_entity_ids': [full.entity2id[name] for name in data.entity2id],
                 'max_entities': max_entities, 'subset_seed': subset_seed,
                 'data': payload, 'known_train': known_train}
     manifest['sha256'] = digest(manifest)

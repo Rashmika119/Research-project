@@ -1,0 +1,58 @@
+{
+  "old_traversal": {
+    "entities": 5000,
+    "relations": 237,
+    "train_triples": 7221,
+    "valid_triples": 4717,
+    "test_triples": 5465,
+    "isolated_entity_ids": [],
+    "components": 1,
+    "component_sizes": [
+      5000
+    ],
+    "unique_undirected_pairs": 6500,
+    "undirected_density": 0.0005201040208041609,
+    "mean_undirected_degree": 2.6,
+    "train_triples_per_entity": 1.4442,
+    "definition": "Weak connectivity; undirected simple density excludes self-loops and duplicate relation pairs"
+  },
+  "new_induced": {
+    "entities": 5000,
+    "relations": 237,
+    "train_triples": 72374,
+    "valid_triples": 4717,
+    "test_triples": 5465,
+    "isolated_entity_ids": [],
+    "components": 1,
+    "component_sizes": [
+      5000
+    ],
+    "unique_undirected_pairs": 57692,
+    "undirected_density": 0.00461628325665133,
+    "mean_undirected_degree": 23.0768,
+    "train_triples_per_entity": 14.4748,
+    "definition": "Weak connectivity; undirected simple density excludes self-loops and duplicate relation pairs"
+  },
+  "dataset_sha256": "e465b6f9eee2bc96d507ed6903116fe73b920e5f35163dc7d812455c10b70dfe",
+  "manifest_sha256": "13fd23da9f71d36463e1af7775d847f973b5c617cdc470dfc5b119630d0a300f",
+  "same_selected_entities_as_old": true,
+  "selection_strategy": "train_bfs_induced_v1",
+  "subset_seed": 0,
+  "old_1000_traversal": {
+    "entities": 1000,
+    "relations": 237,
+    "train_triples": 1022,
+    "valid_triples": 55,
+    "test_triples": 86,
+    "isolated_entity_ids": [],
+    "components": 1,
+    "component_sizes": [
+      1000
+    ],
+    "unique_undirected_pairs": 1022,
+    "undirected_density": 0.002046046046046046,
+    "mean_undirected_degree": 2.044,
+    "train_triples_per_entity": 1.022,
+    "definition": "Weak connectivity; undirected simple density excludes self-loops and duplicate relation pairs"
+  }
+}

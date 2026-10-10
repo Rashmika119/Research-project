@@ -78,7 +78,7 @@ class ArchitectureTests(unittest.TestCase):
         torch.set_num_threads(1)
 
     @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
-    def test_all_five_forward_backward_and_frozen_weights(self, _):
+    def test_available_architectures_forward_backward_and_frozen_weights(self, _):
         data = tiny_data()
         graph = build_train_graph(data.train, data.num_entities, data.num_relations)
         edges = torch.tensor(graph.edge_index).t().contiguous()
@@ -142,22 +142,31 @@ class ArchitectureTests(unittest.TestCase):
                         torch.testing.assert_close(a, b)
 
     @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
-    def test_original_pair_identical_and_budget(self, _):
-        states = []
-        for variant in ('original', 'original-no-warmup'):
-            torch.manual_seed(9)
-            model = build_scratch_model(variant, 12, 3, {**MODEL_CONFIG, 'dim': 8}, 'offline-test')
-            states.append(trainable_state(model))
-            self.assertFalse(model.residual)
-            self.assertTrue(model.soft_prompt)
-            self.assertIsNotNone(model.refiner)
-        self.assertEqual(states[0].keys(), states[1].keys())
-        for key in states[0]:
-            torch.testing.assert_close(states[0][key], states[1][key], rtol=0, atol=0)
-        self.assertEqual(warmup_epochs('original', 30, 5), 5)
-        self.assertEqual(warmup_epochs('original-no-warmup', 30, 5), 0)
+    def test_architecture_independent_of_warmup_and_retired_variants_rejected(self, _):
+        from training.variants import CONFIGURATIONS, configuration_settings
+        self.assertEqual(len(CONFIGURATIONS), 4)
+        self.assertEqual(configuration_settings('residual-no-warmup', 0), ('residual', 0))
         with self.assertRaises(ValueError):
-            warmup_epochs('original', 5, 5)
+            configuration_settings('residual-warmup', 0)
+        for architecture in ('residual', 'residual-no-softprompt'):
+            states = []
+            for enabled in (True, False):
+                identifier = architecture + ('-warmup' if enabled else '-no-warmup')
+                selected, warm = configuration_settings(identifier)
+                self.assertEqual(warm, 5 if enabled else 0)
+                torch.manual_seed(9)
+                model = build_scratch_model(selected, 12, 3, {**MODEL_CONFIG, 'dim': 8}, 'offline-test')
+                states.append(trainable_state(model))
+                self.assertTrue(model.residual)
+                self.assertIsNotNone(model.refiner)
+            assert_exact_state(*states)
+        for retired in ('original', 'original-no-warmup'):
+            with self.assertRaises(ValueError):
+                build_scratch_model(retired, 12, 3)
+        self.assertIn('no-refinement', VARIANTS)
+        self.assertFalse(any(a == 'no-refinement' for a, _ in CONFIGURATIONS.values()))
+        with self.assertRaises(ValueError):
+            warmup_epochs('residual', 5, 5)
 
     @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_pooling_cache_and_trainable_projection(self, _):
@@ -236,7 +245,7 @@ class PipelineTests(unittest.TestCase):
                 self.assertEqual(result['ranking_policy'], 'average_exact_ties')
                 self.assertTrue(all((folder / f).exists() for f in (
                     'best.pt', 'last.pt', 'config.json', 'history.json', 'results.json', 'history.csv', 'metrics.csv')))
-                self.assertEqual(result['warmup_epochs'], 0 if variant in ('baseline', 'original-no-warmup') else 1)
+                self.assertEqual(result['warmup_epochs'], 0 if variant == 'baseline' else 1)
                 self.assertEqual(result['main_epochs'] + result['warmup_epochs'], 3)
                 fingerprints.append(result['initial_structural_sha256'])
                 saved = torch.load(folder / 'best.pt', weights_only=True)
@@ -252,7 +261,7 @@ class PipelineTests(unittest.TestCase):
         data = tiny_data()
         tokens = (make_tokens(data.num_entities), make_tokens(data.num_relations))
         with tempfile.TemporaryDirectory() as directory:
-            cfg = small_config(variant='original')
+            cfg = small_config(variant='residual')
             clean = Path(directory) / 'clean'
             interrupted = Path(directory) / 'interrupted'
             expected = run_experiment(cfg, clean, full_dataset=data, tokens=tokens)
@@ -275,8 +284,9 @@ class PipelineTests(unittest.TestCase):
                         'best_model_state', 'best_epoch', 'initial_validation', 'module_modes'):
                 assert_exact_state(a[key], b[key], key)
             for expected_row, actual_row in zip(expected['history'], actual['history']):
-                assert_exact_state({k: v for k, v in expected_row.items() if k != 'epoch_seconds'},
-                                   {k: v for k, v in actual_row.items() if k != 'epoch_seconds'})
+                observational = {'epoch_seconds', 'train_seconds', 'elapsed_seconds', 'gpu_memory_bytes', 'peak_gpu_memory_bytes'}
+                assert_exact_state({k: v for k, v in expected_row.items() if k not in observational},
+                                   {k: v for k, v in actual_row.items() if k not in observational})
             audit = json.loads((interrupted / 'resume_audit.json').read_text())
             self.assertTrue(audit['optimizer_exact'] and audit['rng_exact'] and audit['model_and_buffers_exact'])
 
@@ -289,16 +299,15 @@ class PipelineTests(unittest.TestCase):
                 result = {'status': 'complete', 'initialization': 'scratch', 'settings': asdict(cfg),
                     'manifest_sha256': 'same', 'ranking_policy': 'average_exact_ties',
                     'initial_structural_sha256': f'seed{seed}', 'best_epoch': 2,
-                    'optimizer_steps': 3, 'warmup_epochs': 0 if variant == 'original-no-warmup' else 1,
-                    'main_epochs': 3 if variant == 'original-no-warmup' else 2,
+                    'optimizer_steps': 3, 'warmup_epochs': 1, 'main_epochs': 2,
                     'duration_seconds': 1., 'peak_gpu_memory_bytes': None,
                     'validation': {m: .1 + index * .05 + seed * .01 for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')},
                     'test': {m: .9 - index * .05 for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')},
                     'history': [{'epoch': 2, 'phase': 'main', 'loss': 1.}]}
                 results.append(result)
         summary, _ = summarize(results)
-        self.assertEqual(summary['selected_by_validation'], 'residual-no-softprompt')
-        self.assertAlmostEqual(summary['variants']['original']['validation']['MRR']['std'], .01)
+        self.assertEqual(summary['selected_by_validation'], 'no-refinement')
+        self.assertAlmostEqual(summary['variants']['residual']['validation']['MRR']['std'], .01)
         with self.assertRaises(ValueError):
             summarize(results[:-1])
         with tempfile.TemporaryDirectory() as directory:

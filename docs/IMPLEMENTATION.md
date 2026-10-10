@@ -1,5 +1,9 @@
 # Scratch pipeline implementation and verification
 
+This report describes the completed 1,000-entity stage. For the current twelve-run
+5,000-entity warmup ablation, see [WARMUP_ABLATION_5000.md](WARMUP_ABLATION_5000.md).
+The historical notebook/results remain preserved; active registrations have changed.
+
 ## Changed and added files
 
 | Area | Files and purpose |

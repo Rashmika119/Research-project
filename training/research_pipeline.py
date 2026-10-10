@@ -26,7 +26,7 @@ from training.experiment_io import (digest, environment, file_digest, prepare_da
 from training.losses import bce_loss
 from training.negative_sampling import sample_negatives
 from training.text_cache import lm_identity, pooled_text
-from training.variants import MODEL_CONFIG, VARIANTS, build_scratch_model, warmup_epochs
+from training.variants import MODEL_CONFIG, VARIANTS, build_scratch_model, warmup_epochs, configuration_id
 from training.reproducibility import (seed_everything, capture_rng, numerical_policy,
                                       restore_training_state)
 
@@ -34,7 +34,7 @@ from training.reproducibility import (seed_everything, capture_rng, numerical_po
 @dataclass
 class ExperimentConfig:
     variant: str = 'residual'
-    max_entities: int = 1000  # zero means the complete original dataset
+    max_entities: int = 5000  # zero means the complete original dataset
     epochs: int = 30  # INCLUDES warmup
     warmup: int = 5
     seed: int = 0
@@ -170,13 +170,16 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     started = time.perf_counter()
     if device.type == 'cuda':
         torch.cuda.reset_peak_memory_stats(device)
-    print(f'Device: {device}; variant={cfg.variant}; initialization=scratch', flush=True)
+    identifier = configuration_id(cfg.variant, cfg.warmup)
+    print(f'Device: {device}; configuration={identifier}; architecture={cfg.variant}; '
+          f'warmup={cfg.warmup}; seed={cfg.seed}; initialization=scratch', flush=True)
     print(f'Data: {data.num_entities} entities, {len(data.train)}/{len(data.valid)}/{len(data.test)} train/valid/test', flush=True)
     # Factory has no checkpoint input. This is the ONLY initial model creation.
     model = build_scratch_model(cfg.variant, data.num_entities, data.num_relations,
                                 cfg.model, cfg.lm_name, lm_revision).to(device)
     structural = model if cfg.variant == 'baseline' else model.structural
     initial_structural_sha = state_fingerprint(structural)
+    initial_trainable_sha = state_dict_fingerprint(trainable_state(model))
     lm_info = None if cfg.variant == 'baseline' else lm_identity(model.bridge.lm)
     entity_pooled = relation_pooled = None
     cache_keys = None
@@ -258,6 +261,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
             'best_epoch': best_epoch, 'best_val_mrr': best_mrr,
             'optimizer_steps': optimizer_steps, 'initial_validation': initial_validation,
             'initial_structural_sha256': initial_structural_sha, 'lm_identity': lm_info,
+            'initial_trainable_sha256': initial_trainable_sha,
             'elapsed_seconds': elapsed_before + time.perf_counter() - started,
             'peak_gpu_memory_bytes': peak_memory(),
             'checkpoint_boundary': 'epoch_end' if name == 'last.pt' else 'selection_only',
@@ -277,6 +281,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
         start_epoch, optimizer_steps = saved['epoch'] + 1, saved['optimizer_steps']
         initial_validation = saved['initial_validation']
         initial_structural_sha = saved['initial_structural_sha256']
+        initial_trainable_sha = saved.get('initial_trainable_sha256', initial_trainable_sha)
         best_state = saved['best_model_state']
         elapsed_before, previous_peak = saved['elapsed_seconds'], saved['peak_gpu_memory_bytes']
         # last.pt is the epoch commit. It carries the selected weights so a
@@ -321,13 +326,20 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                 del e, r, loss, positive, negative
             row = {'epoch': epoch, 'phase': 'structural_warmup' if structural_only else 'main',
                    'loss': total_loss / steps, 'optimizer_steps': optimizer_steps,
-                   'epoch_seconds': time.perf_counter() - epoch_started}
+                   'train_seconds': time.perf_counter() - epoch_started}
             if epoch % cfg.eval_every == 0 or epoch in (warm, cfg.epochs):
                 val = evaluate(data.valid, structural_only)
                 row['validation'] = val
+                row['validation_model'] = 'structural' if structural_only else 'integrated'
+            row['epoch_seconds'] = time.perf_counter() - epoch_started
+            row['elapsed_seconds'] = elapsed_before + time.perf_counter() - started
+            row['gpu_memory_bytes'] = torch.cuda.memory_allocated(device) if device.type == 'cuda' else None
+            row['peak_gpu_memory_bytes'] = peak_memory() if device.type == 'cuda' else None
             history.append(row)
             print(f"Epoch {epoch:03d}/{cfg.epochs} | {row['phase']} | loss={row['loss']:.6f}"
-                  + (f" | val_MRR={row['validation']['MRR']:.6f}" if 'validation' in row else ''), flush=True)
+                  + (f" | val_MRR={row['validation']['MRR']:.6f}"
+                     f" | val_Hits@10={row['validation']['Hits@10']:.6f}" if 'validation' in row else '')
+                  + f" | GPU_peak={row['peak_gpu_memory_bytes']} bytes | elapsed={row['elapsed_seconds']:.1f}s", flush=True)
             if not structural_only and 'validation' in row and row['validation']['MRR'] > best_mrr:
                 best_mrr, best_epoch = row['validation']['MRR'], epoch
                 save('best.pt', epoch)
@@ -344,17 +356,24 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                              'Full-graph RGAT memory also depends on graph size; text batching cannot fix that.'})
         raise
     result = {'status': 'complete', 'run_id': run_id, 'settings': asdict(cfg),
+              'configuration': identifier, 'architecture': cfg.variant,
               'initialization': 'scratch', 'baseline_checkpoint_used': False,
               'dataset_scope': 'full' if cfg.max_entities == 0 else 'subset',
               'manifest_sha256': manifest['sha256'], 'dataset_sha256': manifest['dataset_sha256'],
               'candidate_entities': data.num_entities, 'ranking_policy': 'average_exact_ties',
               'warmup_epochs': warm, 'main_epochs': cfg.epochs - warm,
               'optimizer_steps': optimizer_steps, 'steps_per_epoch': steps_per_epoch,
+              'structural_optimizer_steps': warm * steps_per_epoch,
+              'integrated_optimizer_steps': (cfg.epochs - warm) * steps_per_epoch,
               'best_epoch': best_epoch, 'best_main_epoch': best_epoch - warm,
               'validation': validation, 'test': test, 'initial_validation': initial_validation,
+              'final_epoch_validation': history[-1].get('validation'),
+              'final_training_loss': history[-1]['loss'],
+              'subset_statistics': manifest['statistics'],
               'history': history, 'duration_seconds': elapsed_before + time.perf_counter() - started,
               'peak_gpu_memory_bytes': peak_memory() if device.type == 'cuda' else None,
               'initial_structural_sha256': initial_structural_sha, 'lm_identity': lm_info,
+              'initial_trainable_sha256': initial_trainable_sha,
               'text_cache_keys': cache_keys, 'environment': provenance,
               'learned_gates': {n: float(p.detach().tanh().cpu()) for n, p in model.named_parameters()
                                 if n.endswith('_gate')},
@@ -373,9 +392,13 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
 
 
 def state_fingerprint(model):
+    return state_dict_fingerprint(model.state_dict())
+
+
+def state_dict_fingerprint(state):
     import hashlib
     h = hashlib.sha256()
-    for name, value in sorted(model.state_dict().items()):
+    for name, value in sorted(state.items()):
         h.update(name.encode())
-        h.update(value.detach().cpu().contiguous().view(torch.uint8).numpy().tobytes())
+        h.update(value.detach().cpu().contiguous().reshape(-1).view(torch.uint8).numpy().tobytes())
     return h.hexdigest()

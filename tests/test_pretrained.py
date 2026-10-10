@@ -1,6 +1,7 @@
 """Offline corruption tests use tiny safetensors, never pretend to be real RoBERTa."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -14,6 +15,12 @@ from models import pretrained as p
 
 
 class PretrainedTests(unittest.TestCase):
+    def setUp(self):
+        # Direct unittest/pytest execution must not inherit a Colab Drive backup.
+        isolated = patch.dict(os.environ, {'RESEARCH_MODEL_BACKUP': '', 'HF_HUB_OFFLINE': '1'})
+        isolated.start()
+        self.addCleanup(isolated.stop)
+
     def test_missing_encoder_weights_are_fatal(self):
         model = SimpleNamespace(config=SimpleNamespace())
         prepared = p.PreparedModel(Path('verified-fixture'), p.REVISION, [])

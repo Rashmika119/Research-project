@@ -1,5 +1,6 @@
-"""Validate notebook schema and run all cells in order with external-work fixtures."""
+﻿"""New notebook wiring and twelve-run orchestration; old notebook is a protected artifact."""
 from dataclasses import asdict
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -14,148 +15,140 @@ import nbformat
 
 from preprocessing.dataset import load_synthetic_toy_graph
 from training.experiment_io import write_json
-from training.reports import comparison_report
+from training.ablation_reports import ablation_report, METRICS
 from training.research_pipeline import ExperimentConfig
-from training.variants import VARIANTS
-
+from training.variants import CONFIGURATIONS, configuration_settings
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK = ROOT / 'notebooks' / 'research_pipeline.ipynb'
+NOTEBOOK = ROOT / 'notebooks' / 'warmup_ablation_5000.ipynb'
+OLD_NOTEBOOK = ROOT / 'notebooks' / 'research_pipeline.ipynb'
+OLD_SHA256 = '24fc8df77eff6473b016c7ee84cc7e1384af88d33924ad8bc5a917501d2270c8'
 
 
-def fixture_result(variant, seed, full=False):
-    """Explicit fictional values for exercising notebook wiring, never benchmarks."""
-    cfg = ExperimentConfig(variant=variant, seed=seed, max_entities=0 if full else 1000)
-    return {'settings': asdict(cfg), 'status': 'complete', 'initialization': 'scratch',
-            'dataset_scope': 'full' if full else 'subset', 'dataset_sha256': 'fixture',
-            'manifest_sha256': 'full' if full else 'subset', 'ranking_policy': 'average_exact_ties',
-            'initial_structural_sha256': f'fixture_seed{seed}', 'best_epoch': 6,
-            'warmup_epochs': 0 if variant in ('baseline', 'original-no-warmup') else 5,
-            'main_epochs': 30 if variant in ('baseline', 'original-no-warmup') else 25,
-            'optimizer_steps': 30, 'duration_seconds': 1., 'peak_gpu_memory_bytes': None,
-            'history': [{'epoch': 6, 'phase': 'main', 'loss': 1.0,
-                         'validation': {'MRR': .1}}],
-            'validation': {m: .1 for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')},
-            'test': {m: .2 for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')}}
+def fixture_result(identifier, seed, cfg=None):
+    """Fictional mechanics-only fixture. Not a scientific result."""
+    architecture, warm = configuration_settings(identifier, 1)
+    cfg = cfg or ExperimentConfig(variant=architecture, seed=seed, max_entities=10, epochs=3, warmup=warm)
+    index = list(CONFIGURATIONS).index(identifier)
+    def metrics(mrr):
+        return {'MRR': mrr, 'Hits@1': .05, 'Hits@3': .1, 'Hits@10': .3,
+                'Optimistic_MRR': mrr, 'Tie_query_fraction': 0., 'Mean_tied_candidates': 1., 'Max_tied_candidates': 1}
+    validation, test = metrics(.1 + index * .03 + seed * .01), metrics(.8 - index * .04)
+    history = [{'epoch': epoch, 'phase': 'structural_warmup' if epoch <= cfg.warmup else 'main',
+                'loss': 1.4 - epoch * .01, 'validation': validation, 'optimizer_steps': epoch,
+                'epoch_seconds': .1} for epoch in range(1, cfg.epochs + 1)]
+    return {'configuration': identifier, 'architecture': architecture, 'settings': asdict(cfg),
+            'status': 'complete', 'initialization': 'scratch', 'baseline_checkpoint_used': False,
+            'dataset_scope': 'subset', 'dataset_sha256': 'fixture', 'manifest_sha256': 'same_fixture',
+            'candidate_entities': cfg.max_entities, 'ranking_policy': 'average_exact_ties',
+            'initial_structural_sha256': f'seed{seed}',
+            'initial_trainable_sha256': f'{architecture}_seed{seed}',
+            'best_epoch': cfg.epochs, 'warmup_epochs': cfg.warmup, 'main_epochs': cfg.epochs - cfg.warmup,
+            'optimizer_steps': cfg.epochs, 'steps_per_epoch': 1,
+            'structural_optimizer_steps': cfg.warmup, 'integrated_optimizer_steps': cfg.epochs - cfg.warmup,
+            'duration_seconds': 1. + index, 'peak_gpu_memory_bytes': None,
+            'history': history, 'validation': validation, 'test': test}
 
 
 class NotebookTests(unittest.TestCase):
-    def test_fifteen_run_orchestrator_uses_scratch_cli(self):
+    def test_original_notebook_untouched_and_generator_cannot_target_it(self):
+        self.assertEqual(hashlib.sha256(OLD_NOTEBOOK.read_bytes()).hexdigest(), OLD_SHA256)
+        from notebooks import build_colab_notebook as historical
+        import inspect
+        self.assertNotIn("with_name('research_pipeline.ipynb')", inspect.getsource(historical.build))
+
+    def test_schema_syntax_sections_and_builder_match(self):
+        notebook = nbformat.read(NOTEBOOK, as_version=4)
+        nbformat.validate(notebook)
+        from notebooks.build_warmup_ablation_notebook import cells
+        self.assertEqual([c['source'] for c in cells], [c.source for c in notebook.cells])
+        sections = [c.source for c in notebook.cells if c.cell_type == 'markdown' and c.source.startswith('## ')]
+        self.assertEqual(len(sections), 8)
+        for number, section in enumerate(sections, 1):
+            self.assertTrue(section.startswith(f'## {number}.'))
+        for index, cell in enumerate(notebook.cells):
+            if cell.cell_type == 'code':
+                compile(cell.source, f'cell_{index}', 'exec')
+                self.assertIsNone(cell.execution_count)
+                self.assertFalse(cell.outputs)
+
+    def test_twelve_run_orchestrator_uses_configuration_cli(self):
         from training.comparisons import main as comparison_main
         from training.research_cli import main as scratch_main
         from training.experiment_io import prepare_data
         synthetic = load_synthetic_toy_graph(12, 3, 35, 5, 5, seed=3)
-        calls = []
+        calls, manifests = [], []
         with tempfile.TemporaryDirectory() as directory:
             def prepare(*args, **kwargs):
                 return prepare_data(*args, **kwargs, full_dataset=synthetic)
-
-            def record_run(cfg, output_dir, **kwargs):
+            def record(cfg, output_dir, **kwargs):
+                from training.variants import configuration_id
                 calls.append(cfg)
-                result = fixture_result(cfg.variant, cfg.seed)
-                result['settings'] = asdict(cfg)
+                manifests.append(json.loads(Path(kwargs['manifest_path']).read_text())['sha256'])
+                result = fixture_result(configuration_id(cfg.variant, cfg.warmup), cfg.seed, cfg)
                 write_json(Path(output_dir) / 'results.json', result)
                 return result
-
-            def child(command, **kwargs):
+            def child(command, *args, **kwargs):
                 self.assertNotIn('--checkpoint', command)
                 self.assertNotIn('--legacy-pretrained', command)
                 with patch.object(sys, 'argv', command[1:]):
                     scratch_main()
                 return subprocess.CompletedProcess(command, 0)
-
-            argv = ['run_phase5_comparisons.py', '--output-dir', directory,
-                    '--max-entities', '10', '--epochs', '3', '--warmup-epochs', '1']
+            argv = ['run_warmup_ablation.py', '--output-dir', directory, '--max-entities', '10',
+                    '--epochs', '3', '--warmup-epochs', '1']
             with (patch.object(sys, 'argv', argv),
                   patch('training.comparisons.prepare_data', side_effect=prepare),
-                  patch('training.comparisons.subprocess.run', side_effect=child),
-                  patch('training.research_cli.run_experiment', side_effect=record_run)):
+                  patch('training.comparisons.run_logged', side_effect=child),
+                  patch('training.research_cli.run_experiment', side_effect=record)):
                 comparison_main()
-            self.assertEqual({(c.variant, c.seed) for c in calls},
-                             {(v, s) for v in VARIANTS for s in (0, 1, 2)})
-            self.assertEqual(len(calls), 15)
-            self.assertTrue(all(c.epochs == 3 and c.warmup == 1 and c.subset_seed == 0 for c in calls))
+            self.assertEqual(len(calls), 12)
+            self.assertEqual({(c.variant, c.warmup, c.seed) for c in calls},
+                             {(a, int(enabled), s) for a, enabled in CONFIGURATIONS.values() for s in (0, 1, 2)})
+            self.assertEqual(len(set(manifests)), 1)
+            self.assertTrue(all(c.epochs == 3 and c.train_batch_size == 0 and c.eval_every == 1 for c in calls))
             self.assertTrue((Path(directory) / 'summary.json').is_file())
 
-    def test_schema_syntax_and_sections(self):
-        notebook = nbformat.read(NOTEBOOK, as_version=4)
-        nbformat.validate(notebook)
-        sections = [c.source for c in notebook.cells if c.cell_type == 'markdown' and c.source.startswith('## ')]
-        self.assertEqual(len(sections), 16)
-        for number, section in enumerate(sections, 1):
-            self.assertTrue(section.startswith(f'## {number}.'))
-        for index, cell in enumerate(notebook.cells):
-            if cell.cell_type == 'code':
-                compile(cell.source, f'notebook_cell_{index}', 'exec')
-                self.assertIsNone(cell.execution_count)
-                self.assertFalse(cell.outputs)
-
-    def test_ordered_execution_including_optional_final_stage(self):
+    def test_ordered_execution_all_new_cells(self):
         notebook = nbformat.read(NOTEBOOK, as_version=4)
         synthetic = load_synthetic_toy_graph(12, 3, 35, 5, 5, seed=3)
-        launched = []
-        all_calls = []
+        calls = []
         with tempfile.TemporaryDirectory() as directory:
             def fake_run(command, **kwargs):
                 command = list(map(str, command))
-                all_calls.append(command)
+                calls.append(command)
                 if '--offline-only' in command:
                     self.assertEqual(kwargs['env']['CUDA_VISIBLE_DEVICES'], '')
-                if '--real-lm-only' in command:
-                    self.assertEqual(command[-2:], ['--device', 'cuda'])
-                if len(command) > 1 and command[1].endswith('.py'):
-                    script = command[1]
-                    if script in ('run_research_baseline.py', 'run_phase5_training.py', 'run_phase5_comparisons.py'):
-                        launched.append(command)
-                        self.assertNotIn('--checkpoint', command)
-                        dest = Path(command[command.index('--output-dir') + 1])
-                        if script == 'run_phase5_comparisons.py':
-                            results = [fixture_result(v, seed) for v in VARIANTS for seed in (0, 1, 2)]
-                            for r in results:
-                                write_json(dest / f"{r['settings']['variant']}_seed{r['settings']['seed']}" / 'results.json', r)
-                            comparison_report(dest, results)
-                        else:
-                            variant = 'baseline' if script == 'run_research_baseline.py' else command[command.index('--variant') + 1]
-                            if script == 'run_phase5_training.py':
-                                self.assertEqual(command[command.index('--max-entities') + 1], '0')
-                            write_json(dest / 'results.json', fixture_result(variant, 0, full=True))
+                    self.assertNotIn('RESEARCH_MODEL_BACKUP', kwargs['env'])
+                if len(command) > 1 and command[1] == 'run_warmup_ablation.py':
+                    dest = Path(command[command.index('--output-dir') + 1])
+                    results = [fixture_result(c, s) for c in CONFIGURATIONS for s in (0, 1, 2)]
+                    for r in results:
+                        write_json(dest / f"{r['configuration']}_seed{r['settings']['seed']}" / 'results.json', r)
+                    ablation_report(dest, results)
                 return subprocess.CompletedProcess(command, 0)
-
-            fake_colab = SimpleNamespace(drive=SimpleNamespace(mount=lambda path: None))
-            scope = {'__name__': '__notebook_test__', 'display': lambda *a, **k: None}
-            with (patch.dict(sys.modules, {'google.colab': fake_colab}),
-                  patch.dict(os.environ), patch('os.chdir'),
-                  patch('subprocess.run', side_effect=fake_run),
-                  patch('training.process.run_logged', side_effect=lambda command, log_path, **kwargs: fake_run(command, **kwargs)),
+            scope = {'__name__': '__notebook_test__'}
+            with (patch.dict(sys.modules, {'google.colab': SimpleNamespace(drive=SimpleNamespace(mount=lambda path: None))}),
+                  patch.dict(os.environ), patch('os.chdir'), patch('subprocess.run', side_effect=fake_run),
+                  patch('training.process.run_logged', side_effect=lambda command, log_path, **kw: fake_run(command, **kw)),
+                  patch('subprocess.check_output', return_value='fixture_sha'),
+                  patch('torch.cuda.is_available', return_value=True),
+                  patch('torch.cuda.get_device_name', return_value='Tesla T4 (fixture)'),
                   patch('run_pretrained_check.select_device', return_value='cuda'),
-                  patch('subprocess.check_output', return_value='fixture_commit'),
-                  patch('preprocessing.dataset.load_dataset', return_value=synthetic),
                   patch('training.experiment_io.load_dataset', return_value=synthetic),
-                  patch('training.experiment_io.validate_fb15k237'),
-                  patch('IPython.display.display')):
-                # prepare_data's production validation is patched only here;
-                # it still executes the real sampler and graph-integrity checks.
+                  patch('training.experiment_io.validate_fb15k237'), patch('IPython.display.display')):
                 for index, cell in enumerate(notebook.cells):
                     if cell.cell_type != 'code':
                         continue
                     source = cell.source.replace("Path('/content/Research-project')", f'Path({str(ROOT)!r})')
-                    source = source.replace("Path('/content/drive/MyDrive/Research/scratch_pipeline_v1')",
-                                            f'Path({directory!r})')
-                    source = source.replace('RUN_FINAL_FULL_DATASET = False', 'RUN_FINAL_FULL_DATASET = True')
-                    exec(compile(source, f'notebook_cell_{index}', 'exec'), scope)
-                # Even with optional tests disabled, direct training calls must
-                # stop when the mandatory preflight fails.
+                    source = source.replace("Path('/content/drive/MyDrive/Research/scratch_pipeline_v1')", f'Path({str(Path(directory)/"shared")!r})')
+                    source = source.replace("Path('/content/drive/MyDrive/Research/warmup_ablation_5000')", f'Path({str(Path(directory)/"stage")!r})')
+                    source = source.replace('MAX_ENTITIES = 5000', 'MAX_ENTITIES = 10')
+                    exec(compile(source, f'cell_{index}', 'exec'), scope)
                 scope['PRETRAINED_VERIFIED'] = False
-                scope['run_logged'] = lambda *a, **k: (_ for _ in ()).throw(RuntimeError('bad weights'))
-                with self.assertRaisesRegex(RuntimeError, 'bad weights'):
-                    scope['launch']('run_research_baseline.py', '--output-dir', 'must_not_start')
-            self.assertEqual(len(launched), 3)
-            scripts = [command[1] for command in all_calls if len(command) > 1]
-            self.assertLess(scripts.index('run_pretrained_check.py'), scripts.index('run_research_baseline.py'))
-            self.assertEqual(scripts.count('run_pretrained_check.py'), 1)
+                scope['run_logged'] = lambda *a, **k: (_ for _ in ()).throw(RuntimeError('pretrained failure'))
+                with self.assertRaisesRegex(RuntimeError, 'pretrained failure'):
+                    scope['launch_study']()
+            scripts = [c[1] for c in calls if len(c) > 1]
+            self.assertEqual(scripts.count('run_warmup_ablation.py'), 1)
+            self.assertLess(scripts.index('run_pretrained_check.py'), scripts.index('run_warmup_ablation.py'))
             self.assertEqual(scripts.count('run_resume_diagnostic.py'), 2)
-            self.assertTrue((Path(directory) / 'run2_verified' / 'exports' / 'final_comparison.csv').is_file())
-
-
-if __name__ == '__main__':
-    unittest.main()

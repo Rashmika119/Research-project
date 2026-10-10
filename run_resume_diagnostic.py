@@ -44,7 +44,8 @@ def compare(left_dir, right_dir, report_path):
     for state, folder in ((a, left_dir), (b, right_dir)):
         result = json.loads((folder / 'results.json').read_text())
         state['validation'], state['test'] = result['validation'], result['test']
-        state['history'] = [{k: v for k, v in row.items() if k != 'epoch_seconds'} for row in result['history']]
+        observational = {'epoch_seconds', 'train_seconds', 'elapsed_seconds', 'gpu_memory_bytes', 'peak_gpu_memory_bytes'}
+        state['history'] = [{k: v for k, v in row.items() if k not in observational} for row in result['history']]
     report = {'left': str(left_dir), 'right': str(right_dir), 'rtol': 0, 'atol': 0,
               'tensors': tensor_differences(a, b), 'left_history': a['history'], 'right_history': b['history'],
               'left_metrics': {'validation': a['validation'], 'test': a['test']},
@@ -140,8 +141,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--device', choices=('cpu', 'cuda'), default='cuda')
     parser.add_argument('--real-lm', action='store_true')
-    parser.add_argument('--variant', choices=('original', 'residual', 'no-refinement',
-                                             'original-no-warmup', 'residual-no-softprompt'), default='original')
+    parser.add_argument('--variant', choices=('residual', 'no-refinement', 'residual-no-softprompt'), default='residual')
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--output-dir', type=Path, required=True)
     args = parser.parse_args()
