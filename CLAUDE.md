@@ -1,127 +1,104 @@
-﻿# CLAUDE.md - current project instructions
+# Current instructions: approved full-data study
 
-Read README.md, experiments/configs/research_protocol.yaml and
- docs/WARMUP_ABLATION_5000.md for the active stage. Completed-stage protocol and
-user-reported results are preserved in docs/STAGE1_PROTOCOL.md and
- docs/STAGE1_RESULTS.md. Older notes in docs/HISTORICAL_NOTES.md are historical,
-including superseded architecture decisions and optimistic-tie metrics.
+Read README.md, docs/FULL_DATASET_300.md and experiments/configs/full_dataset_300.yaml.
+Previous instructions are archived byte-for-byte in docs/WARMUP_STAGE_INSTRUCTIONS.md.
+Historical stage results/protocols remain preserved; they are not current defaults.
 
-## Active research protocol
+## Protocol
 
-Compare exactly four scratch configurations on the same 5,000-entity FB15k-237
-subset, subset seed 0, training seeds 0/1/2 (12 independent runs):
+Exactly three configurations, seeds 0,1,2 (nine independent runs):
+- baseline: first RGAT + ComplEx; 300 baseline epochs, 2,700 baseline updates.
+- residual-no-softprompt-warmup: 30 structural + 270 integrated epochs;
+  270 structural + 2,430 integrated updates.
+- residual-no-softprompt-no-warmup: identical architecture; 300 integrated epochs,
+  2,700 integrated updates.
 
-- residual-warmup: residual architecture, 5 structural + 25 integrated epochs.
-- residual-no-warmup: identical residual architecture, 0 + 30 epochs.
-- residual-no-softprompt-warmup: independent-text residual, 5 + 25 epochs.
-- residual-no-softprompt-no-warmup: identical independent-text architecture, 0 + 30.
+Full FB15k-237: max_entities=0, 14541 entities, 237 relations,
+272115/17535/20466 train/valid/test triples. Keep original mappings/splits,
+training edges and inverses only, all candidates including isolated entities.
+No synthetic fallback. Verify full manifest/fingerprints; reject changed data.
+Negative filtering uses training facts only; evaluation filtering uses all splits.
+Correct exact-tie rank: 1+higher+(equal-1)/2; optimistic MRR/ties are diagnostics.
 
-Separate architecture selection from warmup selection. Available architectures are
-residual, residual-no-softprompt and no-refinement. No-Refinement remains usable
-but is excluded from this study. Original and Original No-Warmup must not return
-to active registrations, CLI choices or comparison selection. Keep shared classes
-needed by explicit historical workflows; do not delete historical artifacts.
-The independent full-data RGAT + ComplEx baseline remains available separately.
+300 epochs, training batch32768, final batch9971; nine updates/epoch. No dropping,
+accumulation, early stopping or hidden budget changes. Adam .001, weight decay
+.00001, gradient clip1, four negatives, BCE, full precision, width32,
+two-layer/one-head RGAT/dropout .2, projection dropout .1, text batch256,
+length64, eval batch512. No scheduler/scaler. Changed chunks require explicit
+configuration/new tag. Equal update counts do not mean equal computational cost.
 
-All task-specific modules initialize from scratch before warmup. Never initialize
-from another configuration, seed, baseline or historical checkpoint. Only pretrained
-frozen RoBERTa weights may be reused. Same-architecture warmup pairs must have
-identical initial complete trainable-state fingerprints for the same seed. Warmup
-retains only its own structural parameters and Adam moments. It is structural BCE
-training, not an LR schedule. Use one full-subset optimizer update per epoch:
-5 structural + 25 integrated or 30 integrated updates, 30 total in both cases.
+## Mathematics and initialization
 
-Preserve width 32, two-layer/one-head RGATs, Adam LR .001, weight decay .00001,
-four negatives, BCE, gradient clipping 1, full precision, text length 64, text
-batch 4 and evaluation batch 64. Validate each epoch; select by mean validation
-MRR across seeds, never test. Report sample SD and descriptive paired differences;
-three seeds do not establish statistical significance. Test data is untouched
-until evaluating the validation-selected checkpoint.
+Initialize every trainable module from scratch before warmup. Never transfer
+trainable weights between runs. Pair same-seed structural fingerprints across all
+models and complete trainable fingerprints across text schedules. Warmup retains
+only its own structural parameters and Adam moments.
 
-## Dataset rules
+Keep RGAT, ComplEx, BCE, sampling, projection and fusion/refinement equations:
+U=E+tanh(gE)*TE; final entities=U+tanh(gF)*G2(U,A);
+final relations=R+tanh(gR)*TR; raw scalar gates start .01.
+Independent frozen RoBERTa uses masked mean pooling including unmasked special
+tokens, then live Linear/LayerNorm/GELU/Dropout 768-to-32 projection. Cache only
+frozen pooled vectors; never projected or structural outputs. Encode full graph
+anew once per optimizer update, sharing the encoding for positive/negative scores.
 
-Use train_bfs_induced_v1: deterministic training-only BFS entity selection, then
-retain every original training fact between selected endpoints. Fixed ordered
-training facts and subset seed determine selection. If a component is exhausted,
-choose another root from remaining sorted training-incident entity IDs. Fail if
-exact requested count is impossible; never silently reduce entities or select by
-held-out edges. Preserve original valid/test split boundaries, relation IDs and
-sorted-original-ID entity remapping. Message edges are training facts and inverses
-only. Negative sampling rejects original training facts in candidate scope, never
-uses held-out labels. Filtering held-out positives is evaluation-only.
+Baseline must never construct RoBERTa or require text resources. Text models
+construct frozen LM once per child, keep it CPU on pooled-cache hits, and move it
+to GPU only for missing encodings. Frozen LM stays eval. Retain No-Refinement and
+soft-prompt Residual outside this comparison. Do not reactivate Original variants
+or delete shared mathematical/historical checkpoint inspection code.
 
-Persist and verify the shared versioned manifest, mappings, exact splits, full-data
-and subset hashes, graph counts/connectivity/density. Every run uses the same
-5,000 ranking candidates. Local audit: 72,374/4,717/5,465 train/valid/test facts,
-237 relations, one component, no isolated entities. The old 1,000 pilot had 1,022
-training facts; old and new MRR are not directly comparable across data scopes.
-Do not silently vary sampling between configurations.
+## Evaluation
 
-## Equations and implementation constraints
+Every five epochs. New study selection_policy=scheduled_only: initial integrated
+validation at epoch0/boundary30 is diagnostic only. Warmup structural validation
+cannot select integrated weights. Baseline/no-warmup selection starts5; warmup
+integrated selection starts35. Earliest equal best wins. Preserve the historical
+initial_and_scheduled default for older workflows. After training, evaluate the
+best validation checkpoint on test; select configuration by mean validation MRR,
+never test. Report sample SD, paired seed effects, ties, memory/time, best/final
+metrics and phase-separated learning curves. No significance claims from three seeds.
+Keep epoch loss as mean update losses; additionally record example-weighted loss
+and all2700 step losses, without altering optimization.
 
-E is first-RGAT entity output; R is the ComplEx relation table; G2 is the second
-RGAT. Residual: U=E+tanh(gE)*TE; final relations=R+tanh(gR)*TR;
-final entities=U+tanh(gF)*G2(U,A). Raw scalar gates start at .01.
-No-Refinement uses the same text fusion and omits G2/refinement gate.
-Soft prompts project KG vectors to RoBERTa space, prepend one continuous token,
-and project its contextualized output back to KG space. Independent text has no
-KG-to-LM projection/structural input; use masked mean pooling of frozen outputs,
-then a live trainable 768-to-32 projection. It retains G2 and residual refinement.
+## Notebook protection and execution
 
-Do not change RGAT, fusion/refinement, pooling, projection, ComplEx or BCE math.
-Freeze RoBERTa and keep it eval; allow gradients through its soft-prompt operations.
-Cache only independent frozen pooled vectors, not projected or structural outputs.
-Encode graph once per optimizer step; reuse for positives and negatives. Preserve
-average rank for exact ties: 1+higher+(equal-1)/2. Optimistic MRR/ties are diagnostics.
-Warmup validation evaluates the structural model and cannot select an integrated
-checkpoint. Evaluate the initial integrated model at warmup transition (or epoch 0)
-and allow that checkpoint to remain best. Label the two phases in plots/reports.
+NEVER modify, regenerate or revert notebooks/research_pipeline.ipynb or
+notebooks/warmup_ablation_5000.ipynb. Both contain manual edits and saved outputs.
+Generators must refuse overwriting them. New notebook:
+notebooks/full_dataset_comparison_300.ipynb; separate generator:
+notebooks/build_full_dataset_notebook.py (also refuses overwrite).
+New Drive root: Research/full_dataset_comparison_300. New entrypoint:
+run_full_dataset_comparison.py; --report-only never trains.
+The full-study registry is separate from the retained pilot registry.
 
-## Notebook protection and entry points
+No preliminary test training by default: CPU/synthetic/real-LM/CUDA-resume flags
+false. No one-epoch or smoke requirement before the real runs. Keep optional
+developer tests. Lightweight file integrity, CUDA info, dataset/config/manifest
+and checkpoint identity checks remain enabled. Do not launch expensive training
+during implementation; use static/mocked non-training validation. Actual training
+starts only when the user executes the training cell/CLI. Never claim GPU
+verification based on CPU or mocked checks.
 
-NEVER modify, overwrite, regenerate or revert notebooks/research_pipeline.ipynb.
-The researcher manually edited it. Preserve all cells/outputs byte-for-byte.
-New notebook: notebooks/warmup_ablation_5000.ipynb.
-Separate generator: notebooks/build_warmup_ablation_notebook.py.
-Historical generator can only write a separate non-overwriting preview.
+## Reliability and capacity
 
-- run_warmup_ablation.py: four configurations by three seeds, shared data and reports.
-- run_phase5_comparisons.py: alias for the current twelve-run study.
-- run_phase5_training.py: --configuration for the study or --architecture for a single model.
-- run_research_baseline.py: independent full graph baseline, outside current comparison.
-- run_subset_audit.py: real-data selection/density audit, no training.
-- run_scratch_smoke_test.py: --offline-only --device cpu or --real-lm-only --device cuda.
-- run_pretrained_check.py: mandatory notebook preflight; --inspect-file is read-only.
-- run_resume_diagnostic.py: repeated exact controls/resume; optional actual RoBERTa.
-- training/ablation_reports.py: phase-separated analysis, eight plots, paired comparisons.
+Pinned RoBERTa revision e2da8e2f811d1448a5b465c236feacd80ffbac7b and strict
+checksums remain. HF_HOME=/content/hf_cache; consistent Hub paths; remove stale
+TRANSFORMERS_CACHE before model imports. Verified Drive backups copy to local
+storage. Never mmap Drive weights, clear cache trees or substitute random models.
+Corruption fixtures must not inherit persistent RESEARCH_MODEL_BACKUP.
 
-## Reliability, resume and resource limits
+Strict deterministic algorithms remain enabled. Restore/audit own atomic last.pt:
+model/buffers, Adam, module modes, Python/NumPy/Torch CPU/all-CUDA RNG, negative
+sampler/shuffle, progress and selected state. Preserve RNG schema2/additive fields.
+Source/data/environment/numerical mismatches reject resume. No exact cross-GPU
+claim or unexplained tolerance relaxation. An unfinished epoch replays; last.pt
+is authoritative over derived CSVs. Source changes need new outputs; historical
+checkpoints require their historical source version.
 
-Keep verified roberta-base revision e2da8e2f811d1448a5b465c236feacd80ffbac7b and
-file checksums. In Colab set HF_HOME=/content/hf_cache and consistent Hub cache
-paths before imports; remove stale TRANSFORMERS_CACHE. Copy verified backups
-from Drive to local storage and validate before loading. Never clear a cache tree,
-use random encoder weights, alternate models or pickle fallback to hide failures.
-The unused AutoModel pooler is the only allowed missing pretrained component.
-
-Preserve separate CPU tests, real-LM GPU tests and CUDA resume diagnostics with
-streamed/saved logs. Corruption fixtures must not inherit RESEARCH_MODEL_BACKUP
-from persistent Drive; isolate it in both the runner environment and test setup.
-A failed mandatory pretrained preflight must block study launches even if optional
-tests are disabled. Never report CPU checks as CUDA/T4 verification.
-
-Resume only a run's own verified atomic last.pt: parameters/buffers, Adam state,
-module modes, Python/NumPy/Torch CPU/all-CUDA RNG, negative sampler, shuffle generator,
-progress/history and best selection. Restore and audit exactly before training.
-Strict deterministic algorithms stay enabled; unsupported kernels fail explicitly.
-No tolerance relaxation without GPU evidence. No scheduler/scaler exists under
-fixed-LR/full-precision protocol. Preserve RNG schema and additive checkpoint
-compatibility; old source/data identities require a new run directory.
-
-Do not launch expensive twelve-run experiments during development. Use synthetic
-fixtures and data-only audits. T4 feasibility of 5,000-entity integrated training
-is unverified. If OOM occurs, report it; never silently change entities, width,
-precision, objectives or optimizer-update budget. Text/eval chunk reductions need
-consistent explicit settings/new tag and do not remove full-graph RGAT costs.
-Preserve all old checkpoints/results and historical notebooks. Record environment,
-source/LM/data identities, all phase budgets, timings, GPU peaks and diagnostics.
+T4 full-data memory is unverified: four edge-expanded RGAT tensors alone are
+about8.3GiB before backward temporaries. Graph recomputes nine times/epoch.
+OOM must stop with diagnostics; never silently change entities/width/precision,
+equations/objective, training batches or update budgets. Text/eval chunks do not
+remove graph allocations. Larger GPU or activation checkpointing needs explicit
+consistent protocol/new tag. Preserve all historical artifacts and documents.

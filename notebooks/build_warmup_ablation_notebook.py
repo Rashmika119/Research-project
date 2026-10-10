@@ -299,6 +299,8 @@ def build():
     for index, cell in enumerate(cells):
         cell['id'] = f'warmup-ablation-{index:03d}'
     target = Path(__file__).with_name('warmup_ablation_5000.ipynb')
+    if target.exists():
+        raise FileExistsError('Historical notebook contains manual edits; do not overwrite it')
     target.write_text(json.dumps(notebook, indent=2) + '\n', encoding='utf-8')
     print(target)
 

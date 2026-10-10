@@ -53,8 +53,12 @@ class ExperimentConfig:
     text_dir: str = 'data/text/fb15k237'
     model: dict = field(default_factory=lambda: dict(MODEL_CONFIG))
     deterministic: bool = True
+    selection_policy: str = 'initial_and_scheduled'  # historical default
+    record_step_losses: bool = False
 
     def validate(self):
+        if self.selection_policy not in ('initial_and_scheduled', 'scheduled_only'):
+            raise ValueError('Unknown checkpoint-selection policy')
         if self.variant not in (*VARIANTS, 'baseline'):
             raise ValueError('Unknown architecture')
         if (self.max_entities < 0 or self.max_entities == 1 or self.lr <= 0
@@ -96,6 +100,14 @@ def text_inputs(data, cfg, revision=None):
 
 def token_identity(tokens):
     return digest([{k: v.tolist() for k, v in group.items()} for group in tokens])
+
+
+def validation_due(cfg, epoch, warm):
+    return epoch % cfg.eval_every == 0 or epoch in (warm, cfg.epochs)
+
+
+def can_select_initial(cfg):
+    return cfg.selection_policy == 'initial_and_scheduled'
 
 
 def completed_result(output, run_id):
@@ -176,7 +188,18 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     print(f'Data: {data.num_entities} entities, {len(data.train)}/{len(data.valid)}/{len(data.test)} train/valid/test', flush=True)
     # Factory has no checkpoint input. This is the ONLY initial model creation.
     model = build_scratch_model(cfg.variant, data.num_entities, data.num_relations,
-                                cfg.model, cfg.lm_name, lm_revision).to(device)
+                                cfg.model, cfg.lm_name, lm_revision)
+    # Keep independent frozen text on CPU on cache hits. Moving the rest of
+    # the model preserves every registered parameter/buffer and its identity.
+    if cfg.variant == 'residual-no-softprompt':
+        frozen_lm = model.bridge.lm
+        model.bridge.lm = None
+        try:
+            model.to(device)
+        finally:
+            model.bridge.lm = frozen_lm
+    else:
+        model.to(device)
     structural = model if cfg.variant == 'baseline' else model.structural
     initial_structural_sha = state_fingerprint(structural)
     initial_trainable_sha = state_dict_fingerprint(trainable_state(model))
@@ -295,13 +318,17 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
             structural_only = epoch <= warm
             if cfg.variant != 'baseline' and not structural_only and initial_validation is None:
                 initial_validation = evaluate(data.valid)
-                best_mrr, best_epoch = initial_validation['MRR'], epoch - 1
-                save('best.pt', best_epoch)
-                print('Initial integrated validation:', initial_validation, flush=True)
+                if can_select_initial(cfg):
+                    best_mrr, best_epoch = initial_validation['MRR'], epoch - 1
+                    save('best.pt', best_epoch)
+                print('Initial integrated validation (selection policy: '
+                      + cfg.selection_policy + '):', initial_validation, flush=True)
             epoch_started = time.perf_counter()
             model.train()
             permutation = torch.randperm(len(positives_cpu), generator=shuffle_rng)
             total_loss, steps = 0., 0
+            step_losses = []
+            weighted_loss = 0.
             for offset in range(0, len(permutation), batch_size):
                 positive_cpu = positives_cpu[permutation[offset:offset + batch_size]]
                 positive = positive_cpu.to(device)
@@ -320,17 +347,26 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                 if cfg.variant != 'baseline' and any(p.grad is not None for p in model.bridge.lm.parameters()):
                     raise AssertionError('Frozen LM received parameter gradients')
                 optimizer.step()
-                total_loss += loss.item()
+                loss_value = loss.item()
+                total_loss += loss_value
+                weighted_loss += loss_value * len(positive_cpu)
                 optimizer_steps += 1
                 steps += 1
+                if cfg.record_step_losses:
+                    step_losses.append({'optimizer_step': optimizer_steps,
+                                        'positive_count': len(positive_cpu), 'loss': loss_value})
                 del e, r, loss, positive, negative
             row = {'epoch': epoch, 'phase': 'structural_warmup' if structural_only else 'main',
                    'loss': total_loss / steps, 'optimizer_steps': optimizer_steps,
                    'train_seconds': time.perf_counter() - epoch_started}
-            if epoch % cfg.eval_every == 0 or epoch in (warm, cfg.epochs):
+            if cfg.record_step_losses:
+                row.update(step_losses=step_losses,
+                           example_weighted_loss=weighted_loss / len(positives_cpu))
+            if validation_due(cfg, epoch, warm):
                 val = evaluate(data.valid, structural_only)
                 row['validation'] = val
-                row['validation_model'] = 'structural' if structural_only else 'integrated'
+                row['validation_model'] = ('baseline' if cfg.variant == 'baseline' else
+                                           'structural' if structural_only else 'integrated')
             row['epoch_seconds'] = time.perf_counter() - epoch_started
             row['elapsed_seconds'] = elapsed_before + time.perf_counter() - started
             row['gpu_memory_bytes'] = torch.cuda.memory_allocated(device) if device.type == 'cuda' else None
@@ -345,6 +381,10 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                 save('best.pt', epoch)
             save('last.pt', epoch)
             write_json(output / 'history.json', history)
+            if cfg.record_step_losses:
+                from training.reports import write_csv
+                write_csv(output / 'steps.csv', [dict(epoch=h['epoch'], phase=h['phase'], **s)
+                          for h in history for s in h.get('step_losses', [])])
         chosen = torch.load(output / 'best.pt', map_location='cpu', weights_only=True)
         if chosen['run_id'] != run_id:
             raise ValueError('Best checkpoint belongs to a different run')
@@ -364,9 +404,11 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
               'warmup_epochs': warm, 'main_epochs': cfg.epochs - warm,
               'optimizer_steps': optimizer_steps, 'steps_per_epoch': steps_per_epoch,
               'structural_optimizer_steps': warm * steps_per_epoch,
-              'integrated_optimizer_steps': (cfg.epochs - warm) * steps_per_epoch,
+              'integrated_optimizer_steps': (cfg.epochs - warm) * steps_per_epoch if cfg.variant != 'baseline' else 0,
+              'baseline_optimizer_steps': optimizer_steps if cfg.variant == 'baseline' else 0,
               'best_epoch': best_epoch, 'best_main_epoch': best_epoch - warm,
               'validation': validation, 'test': test, 'initial_validation': initial_validation,
+              'initial_validation_epoch': warm if cfg.variant != 'baseline' else None,
               'final_epoch_validation': history[-1].get('validation'),
               'final_training_loss': history[-1]['loss'],
               'subset_statistics': manifest['statistics'],

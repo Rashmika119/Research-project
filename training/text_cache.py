@@ -45,11 +45,18 @@ def pooled_text(lm, tokens, batch_size, device, cache_dir=None):
         result = cached['pooled']
         if cached['key'] != key or tuple(result.shape) != shape or not torch.isfinite(result).all():
             raise ValueError('Invalid pooled-text cache: ' + str(path))
+        print('Frozen pooled-text cache hit:', path, flush=True)
         return result.detach(), key
     parts = []
-    for start in range(0, shape[0], batch_size):
-        part = {k: v[start:start + batch_size].to(device) for k, v in tokens.items()}
-        parts.append(lm.encode_text(part['input_ids'], part['attention_mask']).detach().cpu())
+    original_device = next(lm.parameters()).device
+    print('Computing frozen pooled text:', shape, '; batch size:', batch_size, flush=True)
+    lm.to(device)
+    try:
+        for start in range(0, shape[0], batch_size):
+            part = {k: v[start:start + batch_size].to(device) for k, v in tokens.items()}
+            parts.append(lm.encode_text(part['input_ids'], part['attention_mask']).detach().cpu())
+    finally:
+        lm.to(original_device)
     result = torch.cat(parts)
     if tuple(result.shape) != shape or not torch.isfinite(result).all():
         raise ValueError('Invalid frozen text representations')
