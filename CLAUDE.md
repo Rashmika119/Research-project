@@ -85,7 +85,9 @@ Scalar gates retain initial raw value 0.01 and tanh bounding.
 - run_research_baseline.py: independent full baseline with persistent artifacts.
 - run_phase5_training.py: scratch variants, --max-entities 0 for full dataset.
 - run_phase5_comparisons.py: five variants by three seeds, shared subset, reports.
-- run_scratch_smoke_test.py: offline regressions; --real-lm for actual RoBERTa gate.
+- run_scratch_smoke_test.py: --offline-only --device cpu; --real-lm-only --device cuda.
+- run_pretrained_check.py: mandatory notebook model-load/forward preflight; read-only --inspect-file diagnosis.
+- run_resume_diagnostic.py: repeated exact control/resume comparisons; --real-lm tests actual RoBERTa.
 - run_complex_scorer_check.py and run_tie_ranking_check.py: mathematical checks.
 - training/research_pipeline.py: shared training, warmup, resume and test evaluation.
 - training/reports.py: validation-only selection, exports, figures, final comparison.
@@ -106,8 +108,37 @@ precision or change objectives after OOM. No full LM fine-tuning is requested.
 
 Store checkpoints directly on Drive, use fresh output directories for changed
 protocols, and preserve completed results. --skip-completed verifies compatibility;
---resume restores the same run's checkpoint and RNG state. GPU scatter operations
-can remain nondeterministic across devices/versions despite seeded RNG streams.
+--resume restores the same run's parameters/buffers, Adam state, module modes,
+Python/NumPy/Torch CPU/all-CUDA RNG streams, negative sampler and shuffle generator.
+Strict deterministic algorithms are enabled, including PyTorch CUDA scatter where
+supported. Unsupported deterministic kernels must fail, never silently fall back
+to nondeterministic training. Exact resume tests are retained; do not relax their
+tolerances without evidence from GPU controls. Fixed LR/full precision means no LR
+scheduler or gradient scaler state. Save only epoch-boundary resumable checkpoints.
+Resume audits must pass before another optimizer update. Numerical policy is part
+of run identity. New RNG schema/source identity requires a fresh output directory;
+do not fabricate missing RNG states to migrate old experiments.
+
+## Verified pretrained model loading
+
+The Hub model remains roberta-base, pinned to
+e2da8e2f811d1448a5b465c236feacd80ffbac7b. models/pretrained.py validates safetensors
+headers/layouts and pinned file hashes, stages files locally, and uses explicit
+local_files_only/use_safetensors loading. Never use random weights, another model,
+or a pickle-format fallback to hide a load failure. An unused AutoModel pooler is
+the only allowed missing component; all encoder weights must load.
+
+In Colab set HF_HOME=/content/hf_cache and HF_HUB_CACHE=/content/hf_cache/hub before
+imports. Remove stale TRANSFORMERS_CACHE. RESEARCH_MODEL_BACKUP points to a verified
+Drive backup; weights are copied to local storage and checked before loading.
+Persistent checkpoints/results/pooled text remain on Drive. Repair only confirmed
+bad files; never clear the entire HF cache or touch unrelated artifacts. Explicit
+local model directories are read-only and require safetensors.
+
+Notebook preflight must pass before baseline, pilot or final launches, regardless
+of optional test flags. CPU offline tests, GPU real-model tests, and dedicated GPU
+resume diagnostics are separate groups with persistent logs. See
+docs/RELIABILITY.md for diagnosis, commands and actual verification limits.
 
 ## Cleanup discipline
 

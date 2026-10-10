@@ -94,9 +94,15 @@ class NotebookTests(unittest.TestCase):
         notebook = nbformat.read(NOTEBOOK, as_version=4)
         synthetic = load_synthetic_toy_graph(12, 3, 35, 5, 5, seed=3)
         launched = []
+        all_calls = []
         with tempfile.TemporaryDirectory() as directory:
             def fake_run(command, **kwargs):
                 command = list(map(str, command))
+                all_calls.append(command)
+                if '--offline-only' in command:
+                    self.assertEqual(kwargs['env']['CUDA_VISIBLE_DEVICES'], '')
+                if '--real-lm-only' in command:
+                    self.assertEqual(command[-2:], ['--device', 'cuda'])
                 if len(command) > 1 and command[1].endswith('.py'):
                     script = command[1]
                     if script in ('run_research_baseline.py', 'run_phase5_training.py', 'run_phase5_comparisons.py'):
@@ -120,6 +126,8 @@ class NotebookTests(unittest.TestCase):
             with (patch.dict(sys.modules, {'google.colab': fake_colab}),
                   patch.dict(os.environ), patch('os.chdir'),
                   patch('subprocess.run', side_effect=fake_run),
+                  patch('training.process.run_logged', side_effect=lambda command, log_path, **kwargs: fake_run(command, **kwargs)),
+                  patch('run_pretrained_check.select_device', return_value='cuda'),
                   patch('subprocess.check_output', return_value='fixture_commit'),
                   patch('preprocessing.dataset.load_dataset', return_value=synthetic),
                   patch('training.experiment_io.load_dataset', return_value=synthetic),
@@ -135,8 +143,18 @@ class NotebookTests(unittest.TestCase):
                                             f'Path({directory!r})')
                     source = source.replace('RUN_FINAL_FULL_DATASET = False', 'RUN_FINAL_FULL_DATASET = True')
                     exec(compile(source, f'notebook_cell_{index}', 'exec'), scope)
+                # Even with optional tests disabled, direct training calls must
+                # stop when the mandatory preflight fails.
+                scope['PRETRAINED_VERIFIED'] = False
+                scope['run_logged'] = lambda *a, **k: (_ for _ in ()).throw(RuntimeError('bad weights'))
+                with self.assertRaisesRegex(RuntimeError, 'bad weights'):
+                    scope['launch']('run_research_baseline.py', '--output-dir', 'must_not_start')
             self.assertEqual(len(launched), 3)
-            self.assertTrue((Path(directory) / 'run1' / 'exports' / 'final_comparison.csv').is_file())
+            scripts = [command[1] for command in all_calls if len(command) > 1]
+            self.assertLess(scripts.index('run_pretrained_check.py'), scripts.index('run_research_baseline.py'))
+            self.assertEqual(scripts.count('run_pretrained_check.py'), 1)
+            self.assertEqual(scripts.count('run_resume_diagnostic.py'), 2)
+            self.assertTrue((Path(directory) / 'run2_verified' / 'exports' / 'final_comparison.csv').is_file())
 
 
 if __name__ == '__main__':

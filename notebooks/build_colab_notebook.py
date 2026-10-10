@@ -71,8 +71,16 @@ from google.colab import drive
 drive.mount('/content/drive')
 RESEARCH_ROOT = Path('/content/drive/MyDrive/Research/scratch_pipeline_v1')
 RESEARCH_ROOT.mkdir(parents=True, exist_ok=True)
-# Set before importing Transformers. Downloads persist across runtime resets.
-os.environ['HF_HOME'] = str(RESEARCH_ROOT / 'huggingface_cache')
+# Configure before importing Transformers/Hub. Never memory-map weights on Drive.
+LOCAL_HF_HOME = Path('/content/hf_cache')
+os.environ['HF_HOME'] = str(LOCAL_HF_HOME)
+os.environ['HF_HUB_CACHE'] = str(LOCAL_HF_HOME / 'hub')
+os.environ['HUGGINGFACE_HUB_CACHE'] = str(LOCAL_HF_HOME / 'hub')
+os.environ.pop('TRANSFORMERS_CACHE', None)
+# Only verified files are copied to/from this persistent backup.
+os.environ['RESEARCH_MODEL_BACKUP'] = str(RESEARCH_ROOT / 'verified_roberta_backup')
+print('Local model cache:', os.environ['HF_HUB_CACHE'])
+print('Verified Drive backup:', os.environ['RESEARCH_MODEL_BACKUP'])
 ''')
 markdown('## 4. Configure paths, seeds, and training settings')
 code('''
@@ -86,9 +94,11 @@ RUN_PILOT = True
 RUN_FINAL_FULL_DATASET = False
 RUN_OFFLINE_TESTS = True
 RUN_REAL_LM_SMOKE = True
+RUN_CUDA_RESUME_CHECK = True
+RUN_REAL_LM_RESUME_CHECK = True
 SKIP_COMPLETED = True
 RESUME_INTERRUPTED = True
-RUN_TAG = 'run1'  # Change for a new protocol, dependency environment or dataset version.
+RUN_TAG = 'run2_verified'  # New code/RNG schema requires a new run, not an old checkpoint.
 
 protocol = yaml.safe_load(Path('experiments/configs/research_protocol.yaml').read_text())
 SEEDS = protocol['pilot']['seeds']
@@ -108,15 +118,29 @@ BASELINE_DIR = RUN_ROOT / 'baseline_full_seed0'
 PILOT_DIR = RUN_ROOT / 'pilot_1000'
 baseline_path = BASELINE_DIR / 'best.pt'  # Evaluation artifact only; never passed to variants.
 RUN_ROOT.mkdir(parents=True, exist_ok=True)
+from training.process import run_logged
+from datetime import datetime
+LOG_DIR = RUN_ROOT / 'logs' / datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+CPU_ENV = dict(os.environ, CUDA_VISIBLE_DEVICES='')
+PRETRAINED_VERIFIED = False
+
+def ensure_pretrained():
+    global PRETRAINED_VERIFIED
+    if not PRETRAINED_VERIFIED:
+        run_logged([sys.executable, 'run_pretrained_check.py', '--device', 'cuda',
+                    '--report', str(LOG_DIR / 'pretrained_report.json')], LOG_DIR / 'pretrained.log')
+        PRETRAINED_VERIFIED = True
 
 def launch(script, *arguments):
+    # Also protects running an experiment cell directly without running test cells.
+    ensure_pretrained()
     command = [sys.executable, script, *map(str, arguments)]
     if SKIP_COMPLETED:
         command.append('--skip-completed')
     if RESUME_INTERRUPTED:
         command.append('--resume')
     print('Starting:', script, flush=True)
-    subprocess.run(command, check=True)
+    run_logged(command, LOG_DIR / (Path(script).stem + '.log'))
 
 print('Pilot:', len(protocol['pilot']['variants']) * len(SEEDS), 'independent runs')
 print('Budget:', WARMUP_EPOCHS, '+', PILOT_EPOCHS - WARMUP_EPOCHS,
@@ -140,14 +164,52 @@ print('Pilot:', pilot_data.num_entities, 'entities;', len(pilot_data.train),
       len(pilot_data.valid), len(pilot_data.test), 'train/valid/test')
 print('Pilot manifest SHA256:', pilot_manifest['sha256'])
 ''')
-markdown('## 6. Run initial smoke tests')
+markdown('''
+## 6. Verify pretrained weights and run independent test groups
+Preflight is mandatory before any experiment, even if optional smoke tests are off.
+Offline regressions run in a CPU child process. The next cells independently test
+actual pretrained RoBERTa and strict CUDA checkpoint resume. Explicit GPU requests
+fail if CUDA is unavailable. Full logs and JSON diagnostics persist on Drive.
+The resume diagnostic compares a second uninterrupted control as well as a resumed
+run, including losses, weights, Adam state, RNG streams, progress and metrics.
+''')
 code('''
+if RUN_BASELINE or RUN_PILOT or RUN_FINAL_FULL_DATASET or RUN_REAL_LM_SMOKE or RUN_REAL_LM_RESUME_CHECK:
+    ensure_pretrained()
+''')
+code('''
+# CPU regressions: can be rerun independently of the GPU cells.
 for script in ('run_tie_ranking_check.py', 'run_complex_scorer_check.py'):
-    subprocess.run([sys.executable, script], check=True)
+    run_logged([sys.executable, script], LOG_DIR / (Path(script).stem + '.log'), env=CPU_ENV)
 if RUN_OFFLINE_TESTS:
-    subprocess.run([sys.executable, 'run_scratch_smoke_test.py'], check=True)
+    run_logged([sys.executable, 'run_scratch_smoke_test.py', '--offline-only', '--device', 'cpu'],
+               LOG_DIR / 'offline_tests.log', env=CPU_ENV)
+''')
+code('''
+# Real pretrained GPU forward/backward gate for all five architectures.
 if RUN_REAL_LM_SMOKE:
-    subprocess.run([sys.executable, 'run_scratch_smoke_test.py', '--real-lm'], check=True)
+    run_logged([sys.executable, 'run_scratch_smoke_test.py', '--real-lm-only', '--device', 'cuda'],
+               LOG_DIR / 'real_roberta.log')
+''')
+code('''
+# Dedicated CUDA resume verification; never covered up by the CPU test setting.
+DIAGNOSTIC_DIR = RUN_ROOT / 'diagnostics' / datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+if RUN_CUDA_RESUME_CHECK:
+    from run_pretrained_check import select_device
+    select_device('cuda')
+    for repeat in range(3):
+        run_logged([sys.executable, '-m', 'unittest',
+                    'tests.test_research_pipeline.PipelineTests.test_resume_matches_uninterrupted', '-v'],
+                   LOG_DIR / f'cuda_resume_targeted_{repeat}.log')
+    run_logged([sys.executable, 'run_resume_diagnostic.py', '--device', 'cuda', '--repeats', '3',
+                '--output-dir', str(DIAGNOSTIC_DIR / 'tiny_lm')], LOG_DIR / 'cuda_resume.log')
+''')
+code('''
+# A separate real-RoBERTa GPU training interruption/resume experiment.
+if RUN_REAL_LM_RESUME_CHECK:
+    run_logged([sys.executable, 'run_resume_diagnostic.py', '--device', 'cuda', '--real-lm',
+                '--variant', 'residual', '--repeats', '1',
+                '--output-dir', str(DIAGNOSTIC_DIR / 'real_roberta')], LOG_DIR / 'real_roberta_resume.log')
 ''')
 markdown('''
 ## 7. Train or load the independent graph-only baseline

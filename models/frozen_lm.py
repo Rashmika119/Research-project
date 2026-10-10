@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-from transformers import AutoModel
+from models.pretrained import load_pretrained_model
 
 
 class FrozenLM(nn.Module):
@@ -37,7 +37,7 @@ class FrozenLM(nn.Module):
         super().__init__()
 
         self.model_name = model_name
-        self.lm = AutoModel.from_pretrained(model_name, revision=revision)
+        self.lm = load_pretrained_model(model_name, revision=revision)
 
         # Freeze all RoBERTa parameters.
         for param in self.lm.parameters():

@@ -43,7 +43,7 @@ def save_checkpoint(path, value):
 
 def environment():
     packages = {}
-    for name in ('torch', 'torch-geometric', 'transformers', 'numpy', 'matplotlib'):
+    for name in ('torch', 'torch-geometric', 'transformers', 'huggingface-hub', 'safetensors', 'numpy', 'matplotlib'):
         try:
             packages[name] = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:

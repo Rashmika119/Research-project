@@ -15,5 +15,7 @@ torch-geometric
 
 # Frozen LM conditioning (Phase 2+)
 transformers
+huggingface-hub>=0.23
+safetensors>=0.4.3
 
 # ComplEx/DistMult are implemented locally in models/scorer.py.

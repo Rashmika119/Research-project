@@ -25,6 +25,7 @@ from training.research_pipeline import (ExperimentConfig, load_model_state, run_
                                         state_fingerprint, trainable_state)
 from training.text_cache import pooled_text
 from training.variants import MODEL_CONFIG, VARIANTS, build_scratch_model, warmup_epochs
+from training.reproducibility import assert_exact_state
 
 
 class TinyFrozenLM(nn.Module):
@@ -76,7 +77,7 @@ class ArchitectureTests(unittest.TestCase):
     def setUpClass(cls):
         torch.set_num_threads(1)
 
-    @patch('models.frozen_lm.AutoModel.from_pretrained', side_effect=fake_lm)
+    @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_all_five_forward_backward_and_frozen_weights(self, _):
         data = tiny_data()
         graph = build_train_graph(data.train, data.num_entities, data.num_relations)
@@ -140,7 +141,7 @@ class ArchitectureTests(unittest.TestCase):
                     for a, b in zip(model(*args), clone(*args)):
                         torch.testing.assert_close(a, b)
 
-    @patch('models.frozen_lm.AutoModel.from_pretrained', side_effect=fake_lm)
+    @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_original_pair_identical_and_budget(self, _):
         states = []
         for variant in ('original', 'original-no-warmup'):
@@ -158,7 +159,7 @@ class ArchitectureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             warmup_epochs('original', 5, 5)
 
-    @patch('models.frozen_lm.AutoModel.from_pretrained', side_effect=fake_lm)
+    @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_pooling_cache_and_trainable_projection(self, _):
         model = build_scratch_model('residual-no-softprompt', 12, 3,
                                     {**MODEL_CONFIG, 'dim': 8}, 'offline-test')
@@ -220,7 +221,7 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 prepare_data('', 10, 0, path, full_dataset=changed)
 
-    @patch('models.frozen_lm.AutoModel.from_pretrained', side_effect=fake_lm)
+    @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_train_baseline_and_all_variants_skip_and_outputs(self, _):
         data = tiny_data()
         tokens = (make_tokens(data.num_entities), make_tokens(data.num_relations))
@@ -246,7 +247,7 @@ class PipelineTests(unittest.TestCase):
                     run_experiment(replace(cfg, lr=.02), folder, full_dataset=data, tokens=tokens, skip_completed=True)
             self.assertEqual(len(set(fingerprints)), 1)
 
-    @patch('models.frozen_lm.AutoModel.from_pretrained', side_effect=fake_lm)
+    @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_resume_matches_uninterrupted(self, _):
         data = tiny_data()
         tokens = (make_tokens(data.num_entities), make_tokens(data.num_relations))
@@ -268,10 +269,16 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(expected['validation'], actual['validation'])
             self.assertEqual(expected['test'], actual['test'])
             self.assertEqual(expected['best_epoch'], actual['best_epoch'])
-            a = torch.load(clean / 'last.pt', weights_only=True)['model_state']
-            b = torch.load(interrupted / 'last.pt', weights_only=True)['model_state']
-            for key in a:
-                torch.testing.assert_close(a[key], b[key], rtol=0, atol=0)
+            a = torch.load(clean / 'last.pt', weights_only=True, map_location='cpu')
+            b = torch.load(interrupted / 'last.pt', weights_only=True, map_location='cpu')
+            for key in ('model_state', 'optimizer_state', 'rng', 'epoch', 'optimizer_steps',
+                        'best_model_state', 'best_epoch', 'initial_validation', 'module_modes'):
+                assert_exact_state(a[key], b[key], key)
+            for expected_row, actual_row in zip(expected['history'], actual['history']):
+                assert_exact_state({k: v for k, v in expected_row.items() if k != 'epoch_seconds'},
+                                   {k: v for k, v in actual_row.items() if k != 'epoch_seconds'})
+            audit = json.loads((interrupted / 'resume_audit.json').read_text())
+            self.assertTrue(audit['optimizer_exact'] and audit['rng_exact'] and audit['model_and_buffers_exact'])
 
     def test_selection_uses_validation_and_requires_all_runs(self):
         results = []

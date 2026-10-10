@@ -1,26 +1,28 @@
 """Offline tests by default; --real-lm checks all five variants with RoBERTa."""
 import argparse
+import os
 import subprocess
 import sys
 
 
-def real_lm_smoke():
+def real_lm_smoke(requested_device='auto'):
     import gc
     import torch
-    from transformers import AutoTokenizer
+    from models.pretrained import load_pretrained_tokenizer
+    from run_pretrained_check import select_device
     from preprocessing.dataset import load_synthetic_toy_graph
     from preprocessing.graph_builder import build_train_graph
     from training.research_pipeline import seed_everything, state_fingerprint
     from training.variants import VARIANTS, build_scratch_model
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = select_device(requested_device)
     data = load_synthetic_toy_graph(8, 2, 16, 3, 3, seed=4)
     graph = build_train_graph(data.train, data.num_entities, data.num_relations)
     edges = torch.tensor(graph.edge_index, device=device).t().contiguous()
     types = torch.tensor(graph.edge_type, device=device)
     entity_ids = torch.arange(data.num_entities, device=device)
     relation_ids = torch.arange(data.num_relations, device=device)
-    tokenizer = AutoTokenizer.from_pretrained('roberta-base')
+    tokenizer = load_pretrained_tokenizer()
     def tokens(count, label):
         encoded = tokenizer([f'{label} {i} has an example description.' for i in range(count)],
                             padding=True, truncation=True, max_length=16, return_tensors='pt')
@@ -31,6 +33,9 @@ def real_lm_smoke():
     for variant in VARIANTS:
         seed_everything(0)
         model = build_scratch_model(variant, data.num_entities, data.num_relations).to(device)
+        assert model.soft_prompt == (variant != 'residual-no-softprompt')
+        if not model.soft_prompt:
+            assert not hasattr(model.bridge, 'kg_to_lm')
         before = state_fingerprint(model.bridge.lm)
         model.train()
         e, r = model(edges, types, entity_ids, relation_ids, et, rt, edges, text_batch_size=2)
@@ -62,9 +67,22 @@ def real_lm_smoke():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--real-lm', action='store_true')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--real-lm', '--real-lm-only', dest='real_lm', action='store_true')
+    group.add_argument('--offline-only', action='store_true')
+    parser.add_argument('--device', choices=('auto', 'cpu', 'cuda'), default='auto')
     args = parser.parse_args()
     if args.real_lm:
-        real_lm_smoke()
+        real_lm_smoke(args.device)
     else:
-        subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-v'], check=True)
+        environment = os.environ.copy()
+        if args.device in ('auto', 'cpu'):
+            environment['CUDA_VISIBLE_DEVICES'] = ''
+        else:
+            from run_pretrained_check import select_device
+            select_device('cuda')
+        print('Offline regression suite; device=' + ('cuda' if args.device == 'cuda' else 'cpu'), flush=True)
+        result = subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-v'], env=environment)
+        if result.returncode:
+            print('Offline regressions failed. See the test names and tracebacks above.', file=sys.stderr)
+        sys.exit(result.returncode)

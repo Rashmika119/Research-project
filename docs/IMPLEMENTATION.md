@@ -39,6 +39,12 @@ the repository implements its scorers locally. This does not change scoring math
 
 ## Validation scope
 
+The 2026-10-10 model-loading/resume follow-up is documented in
+[RELIABILITY.md](RELIABILITY.md), including separate root-cause findings, new
+cache strategy, complete RNG restoration, strict deterministic execution,
+independent Colab GPU gates and current CPU/GPU verification limits. The earlier
+verification record below describes the original restructuring, not CUDA approval.
+
 Local verification on 2026-10-09: **10 regression tests passed**, including
 notebook schema/ordered execution and all fifteen orchestration configurations.
 Python syntax checks passed for 59 source files. Existing ComplEx and exact-tie

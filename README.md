@@ -114,10 +114,15 @@ Replace output paths below with mounted Drive paths in Colab.
 # Initial offline gates (tiny LM substitute; real RGAT and ComplEx)
 python run_tie_ranking_check.py
 python run_complex_scorer_check.py
-python run_scratch_smoke_test.py
+python run_scratch_smoke_test.py --offline-only --device cpu
 
 # Additional gate using real pretrained RoBERTa; downloads it if uncached
-python run_scratch_smoke_test.py --real-lm
+python run_pretrained_check.py --device cuda
+python run_scratch_smoke_test.py --real-lm-only --device cuda
+
+# Independent exact CUDA checkpoint checks, followed by real-LM training/resume
+python run_resume_diagnostic.py --device cuda --repeats 3 --output-dir experiments/research/resume_check
+python run_resume_diagnostic.py --device cuda --real-lm --variant residual --repeats 1 --output-dir experiments/research/real_resume_check
 
 # Independent full-data baseline: no LM, with held-out test evaluation
 python run_research_baseline.py --output-dir experiments/research/baseline
@@ -146,6 +151,7 @@ config.json          # experiment config, data/source identity, environment
 manifest.json        # exact entity/relation maps and train/valid/test facts
 best.pt              # validation-selected weights; frozen LM omitted
 last.pt              # latest epoch, optimizer/RNG state, selected weights
+resume_audit.json     # exact model, optimizer, RNG and mode checks before continuing
 history.json/.csv    # epoch, phase, loss, validation, timing and update counts
 metrics.csv          # selected checkpoint validation/test metrics
 results.json         # machine-readable completed result and checkpoint checksums
@@ -158,6 +164,14 @@ baseline and other experiment directories cannot be used as initialization input
 Changed settings/data/code/environment require a new directory. Atomic temporary
 file replacement protects epoch checkpoints; `last.pt` is the commit point and
 also carries the best weights for recovery between best/last writes.
+
+The notebook stores verified RoBERTa weights in `/content/hf_cache/hub`, with a
+verified backup on Drive. It validates the pinned revision and file hashes before
+loading and repairs only affected cached files. A mandatory pretrained preflight
+blocks experiments on failure. Separate CPU regressions, GPU real-RoBERTa checks,
+and CUDA resume cells save complete logs on Drive. Use a new run directory for
+the updated checkpoint schema. See [reliability notes](docs/RELIABILITY.md) for
+failure diagnosis, cache handling, exact state checks and verification results.
 
 The comparison adds a shared subset manifest, `comparison_config.json`, `runs.json`,
 `runs.csv`, `summary.json`, `comparison.csv`, `training_curves.png`, and
@@ -226,5 +240,7 @@ Full-data two-RGAT plus soft-prompt RoBERTa may exceed Colab GPU memory/runtime.
 Lower text/evaluation batch sizes can help their respective allocations; they do
 not remove full-graph RGAT activation costs. There is no silent downsampling,
 dimension reduction, mixed precision, or objective substitution. Fixed seeds and
-saved random states improve repeatability; GPU scatter reductions may still be
-nondeterministic. Per-run package versions and source hashes are recorded.
+saved random states and strict deterministic algorithms support repeatability
+within the same environment. Unsupported deterministic kernels fail explicitly;
+cross-device/version equality is not promised. Per-run package versions, numerical
+policy and source hashes are recorded. CUDA acceptance still requires the GPU gates.

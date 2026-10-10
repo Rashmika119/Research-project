@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import torch
-from transformers import AutoConfig, AutoTokenizer
+from models.pretrained import prepare_pretrained, load_pretrained_tokenizer
 
 from evaluation.enriched_scorer import EnrichedScorer
 from evaluation.metrics import build_filter_index, evaluate_filtered
@@ -27,6 +27,8 @@ from training.losses import bce_loss
 from training.negative_sampling import sample_negatives
 from training.text_cache import lm_identity, pooled_text
 from training.variants import MODEL_CONFIG, VARIANTS, build_scratch_model, warmup_epochs
+from training.reproducibility import (seed_everything, capture_rng, numerical_policy,
+                                      restore_training_state)
 
 
 @dataclass
@@ -50,6 +52,7 @@ class ExperimentConfig:
     raw_dir: str = 'data/raw/fb15k237'
     text_dir: str = 'data/text/fb15k237'
     model: dict = field(default_factory=lambda: dict(MODEL_CONFIG))
+    deterministic: bool = True
 
     def validate(self):
         if self.variant not in (*VARIANTS, 'baseline'):
@@ -63,17 +66,6 @@ class ExperimentConfig:
         if self.model.get('encoder_type') != 'rgat' or self.model.get('scorer_type') != 'complex':
             raise ValueError('This protocol requires RGAT + ComplEx')
         warmup_epochs(self.variant, self.epochs, self.warmup)
-
-
-def seed_everything(seed):
-    random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-    # RGAT uses GPU scatter reductions; record the limitation rather than claim
-    # bitwise reproducibility across devices/PyTorch versions.
 
 
 def trainable_state(model):
@@ -93,7 +85,7 @@ def text_inputs(data, cfg, revision=None):
     entities = align_entity_texts(data.entity2id, long_path, short_path).texts_by_id
     relations = align_relation_texts(data.relation2id, read_relation_text_mapping(
         download_relation_text_file(cfg.text_dir))).texts_by_id
-    tokenizer = AutoTokenizer.from_pretrained(cfg.lm_name, revision=revision)
+    tokenizer = load_pretrained_tokenizer(cfg.lm_name, revision=revision)
     def tokenize(texts):
         encoded = tokenizer([s if s.strip() else '[Missing description]' for s in texts],
                             padding=True, truncation=True, max_length=cfg.max_text_length,
@@ -131,7 +123,9 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     data, graph, known_train, manifest = prepare_data(
         cfg.raw_dir, cfg.max_entities, cfg.subset_seed, manifest_path, full_dataset)
     provenance = environment()
-    identity = {'protocol': 'scratch_v1', 'config': asdict(cfg),
+    seed_everything(cfg.seed, cfg.deterministic)
+    identity = {'protocol': 'scratch_v2_complete_rng', 'config': asdict(cfg),
+                'numerical_policy': numerical_policy(),
                 'manifest_sha256': manifest['sha256'],
                 'source_sha256': provenance['source_sha256'],
                 'packages': provenance['packages'], 'device': provenance['device'],
@@ -141,7 +135,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     lm_revision = None
     if cfg.variant != 'baseline':
         if tokens is None:
-            lm_revision = getattr(AutoConfig.from_pretrained(cfg.lm_name), '_commit_hash', None)
+            lm_revision = prepare_pretrained(cfg.lm_name).revision
             identity['lm_revision'] = lm_revision
             if lm_revision is None:
                 local_lm = Path(cfg.lm_name)
@@ -172,7 +166,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     write_json(output / 'config.json', {'run_id': run_id, **identity, 'environment': provenance})
     write_json(output / 'manifest.json', manifest)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    seed_everything(cfg.seed)
+    seed_everything(cfg.seed, cfg.deterministic)
     started = time.perf_counter()
     if device.type == 'cuda':
         torch.cuda.reset_peak_memory_stats(device)
@@ -197,7 +191,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     elif cfg.variant != 'baseline':
         tokens = tuple({k: v.to(device) for k, v in group.items()} for group in tokens)
     # Keep construction/download randomness outside the training RNG stream.
-    seed_everything(cfg.seed + 20000)
+    seed_everything(cfg.seed + 20000, cfg.deterministic)
     negative_rng = random.Random(cfg.seed)
     shuffle_rng = torch.Generator().manual_seed(cfg.seed)
     edges = torch.tensor(graph.edge_index, dtype=torch.long, device=device).t().contiguous()
@@ -266,28 +260,25 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
             'initial_structural_sha256': initial_structural_sha, 'lm_identity': lm_info,
             'elapsed_seconds': elapsed_before + time.perf_counter() - started,
             'peak_gpu_memory_bytes': peak_memory(),
-            'rng': {'torch': torch.get_rng_state(),
-                    'cuda': torch.cuda.get_rng_state_all() if device.type == 'cuda' else [],
-                    'negative': negative_rng.getstate(), 'shuffle': shuffle_rng.get_state()},
+            'checkpoint_boundary': 'epoch_end' if name == 'last.pt' else 'selection_only',
+            'module_modes': {n: m.training for n, m in model.named_modules()},
+            'scheduler_state': None, 'grad_scaler_state': None,
+            'numerical_policy': numerical_policy(),
+            'rng': capture_rng(negative_rng, shuffle_rng),
         })
 
     if resume and (output / 'last.pt').exists():
         saved = torch.load(output / 'last.pt', map_location='cpu', weights_only=True)
         if saved['run_id'] != run_id or saved['lm_identity'] != lm_info:
             raise ValueError('Resume checkpoint identity or frozen LM revision changed')
-        load_model_state(model, saved['model_state'])
-        optimizer.load_state_dict(saved['optimizer_state'])
+        audit = restore_training_state(model, optimizer, saved, negative_rng, shuffle_rng)
+        write_json(output / 'resume_audit.json', audit)
         history, best_mrr, best_epoch = saved['history'], saved['best_val_mrr'], saved['best_epoch']
         start_epoch, optimizer_steps = saved['epoch'] + 1, saved['optimizer_steps']
         initial_validation = saved['initial_validation']
         initial_structural_sha = saved['initial_structural_sha256']
         best_state = saved['best_model_state']
         elapsed_before, previous_peak = saved['elapsed_seconds'], saved['peak_gpu_memory_bytes']
-        torch.set_rng_state(saved['rng']['torch'])
-        if device.type == 'cuda':
-            torch.cuda.set_rng_state_all(saved['rng']['cuda'])
-        negative_rng.setstate(saved['rng']['negative'])
-        shuffle_rng.set_state(saved['rng']['shuffle'])
         # last.pt is the epoch commit. It carries the selected weights so a
         # disconnect between the two atomic checkpoint writes is recoverable.
         if best_state is not None:
@@ -368,7 +359,9 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
               'learned_gates': {n: float(p.detach().tanh().cpu()) for n, p in model.named_parameters()
                                 if n.endswith('_gate')},
               'checkpoint_sha256': {name: file_digest(output / name) for name in ('best.pt', 'last.pt')},
-              'reproducibility_note': 'Seeded RNG streams; GPU scatter reductions may be nondeterministic.'}
+              'numerical_policy': numerical_policy(),
+              'reproducibility_note': 'Strict deterministic algorithms by default; unsupported kernels fail loudly. '
+                                      'Reproducibility is limited to matching devices, libraries and numerical policy.'}
     from training.reports import export_run
     write_json(output / 'history.json', history)
     export_run(output, result)
