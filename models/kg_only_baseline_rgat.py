@@ -1,7 +1,4 @@
-"""RGAT structural model with configurable ComplEx or DistMult scoring.
-
-The selected RGAT configurations use ComplEx; legacy configs use DistMult.
-"""
+"""RGAT structural model with ComplEx scoring."""
 
 from __future__ import annotations
 
@@ -22,7 +19,7 @@ class KGOnlyBaselineRGAT(nn.Module):
         dropout: float = 0.2,
         heads: int = 2,
         num_bases: int | None = None,
-        scorer_type: str = "distmult",
+        scorer_type: str = "complex",
     ):
         super().__init__()
         self.num_relations = num_relations

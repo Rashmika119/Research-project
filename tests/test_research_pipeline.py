@@ -20,7 +20,6 @@ from models.scorer import ComplExScorer
 from preprocessing.dataset import load_synthetic_toy_graph
 from preprocessing.graph_builder import build_train_graph
 from training.experiment_io import prepare_data, write_json
-from training.reports import summarize, comparison_report, final_comparison
 from training.research_pipeline import (ExperimentConfig, load_model_state, run_experiment,
                                         state_fingerprint, trainable_state)
 from training.text_cache import pooled_text
@@ -109,9 +108,7 @@ class ArchitectureTests(unittest.TestCase):
                 loss.backward()
                 modules = [model.structural.encoder, model.structural.entity_emb,
                            model.structural.scorer.relation_emb, model.bridge.lm_to_kg]
-                if model.soft_prompt:
-                    modules.append(model.bridge.kg_to_lm)
-                else:
+                if not model.soft_prompt:
                     self.assertFalse(hasattr(model.bridge, 'kg_to_lm'))
                     self.assertIsNotNone(model.refiner)
                     self.assertTrue(model.residual)
@@ -144,29 +141,28 @@ class ArchitectureTests(unittest.TestCase):
     @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_architecture_independent_of_warmup_and_retired_variants_rejected(self, _):
         from training.variants import CONFIGURATIONS, configuration_settings
-        self.assertEqual(len(CONFIGURATIONS), 4)
-        self.assertEqual(configuration_settings('residual-no-warmup', 0), ('residual', 0))
-        with self.assertRaises(ValueError):
-            configuration_settings('residual-warmup', 0)
-        for architecture in ('residual', 'residual-no-softprompt'):
-            states = []
-            for enabled in (True, False):
-                identifier = architecture + ('-warmup' if enabled else '-no-warmup')
-                selected, warm = configuration_settings(identifier)
-                self.assertEqual(warm, 5 if enabled else 0)
-                torch.manual_seed(9)
-                model = build_scratch_model(selected, 12, 3, {**MODEL_CONFIG, 'dim': 8}, 'offline-test')
-                states.append(trainable_state(model))
-                self.assertTrue(model.residual)
-                self.assertIsNotNone(model.refiner)
-            assert_exact_state(*states)
-        for retired in ('original', 'original-no-warmup'):
+        self.assertEqual(set(CONFIGURATIONS), {'baseline', 'residual-no-softprompt-warmup', 'residual-no-softprompt-no-warmup'})
+        self.assertEqual(configuration_settings('baseline'), ('baseline', 0))
+        states = []
+        for enabled in (True, False):
+            identifier = 'residual-no-softprompt' + ('-warmup' if enabled else '-no-warmup')
+            selected, warm = configuration_settings(identifier)
+            self.assertEqual(warm, 10 if enabled else 0)
+            torch.manual_seed(9)
+            model = build_scratch_model(selected, 12, 3, {**MODEL_CONFIG, 'dim': 8}, 'offline-test')
+            states.append(trainable_state(model))
+            self.assertTrue(model.residual)
+            self.assertFalse(model.soft_prompt)
+            self.assertEqual(len(model.structural.encoder.layers), 2)
+            self.assertEqual(len(model.refiner.layers), 2)
+        assert_exact_state(*states)
+        for retired in ('original', 'original-no-warmup', 'residual', 'no-refinement'):
             with self.assertRaises(ValueError):
                 build_scratch_model(retired, 12, 3)
-        self.assertIn('no-refinement', VARIANTS)
-        self.assertFalse(any(a == 'no-refinement' for a, _ in CONFIGURATIONS.values()))
         with self.assertRaises(ValueError):
-            warmup_epochs('residual', 5, 5)
+            warmup_epochs('residual-no-softprompt', 5, 5)
+        with self.assertRaises(ValueError):
+            configuration_settings('residual-no-softprompt-warmup', 0)
 
     @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_pooling_cache_and_trainable_projection(self, _):
@@ -261,7 +257,7 @@ class PipelineTests(unittest.TestCase):
         data = tiny_data()
         tokens = (make_tokens(data.num_entities), make_tokens(data.num_relations))
         with tempfile.TemporaryDirectory() as directory:
-            cfg = small_config(variant='residual')
+            cfg = small_config(variant='residual-no-softprompt')
             clean = Path(directory) / 'clean'
             interrupted = Path(directory) / 'interrupted'
             expected = run_experiment(cfg, clean, full_dataset=data, tokens=tokens)
@@ -290,33 +286,6 @@ class PipelineTests(unittest.TestCase):
             audit = json.loads((interrupted / 'resume_audit.json').read_text())
             self.assertTrue(audit['optimizer_exact'] and audit['rng_exact'] and audit['model_and_buffers_exact'])
 
-    def test_selection_uses_validation_and_requires_all_runs(self):
-        results = []
-        for index, variant in enumerate(VARIANTS):
-            for seed in (0, 1, 2):
-                cfg = small_config(variant=variant, seed=seed)
-                from dataclasses import asdict
-                result = {'status': 'complete', 'initialization': 'scratch', 'settings': asdict(cfg),
-                    'manifest_sha256': 'same', 'ranking_policy': 'average_exact_ties',
-                    'initial_structural_sha256': f'seed{seed}', 'best_epoch': 2,
-                    'optimizer_steps': 3, 'warmup_epochs': 1, 'main_epochs': 2,
-                    'duration_seconds': 1., 'peak_gpu_memory_bytes': None,
-                    'validation': {m: .1 + index * .05 + seed * .01 for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')},
-                    'test': {m: .9 - index * .05 for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')},
-                    'history': [{'epoch': 2, 'phase': 'main', 'loss': 1.}]}
-                results.append(result)
-        summary, _ = summarize(results)
-        self.assertEqual(summary['selected_by_validation'], 'no-refinement')
-        self.assertAlmostEqual(summary['variants']['residual']['validation']['MRR']['std'], .01)
-        with self.assertRaises(ValueError):
-            summarize(results[:-1])
-        with tempfile.TemporaryDirectory() as directory:
-            comparison_report(directory, results)
-            for name in ('summary.json', 'runs.json', 'runs.csv', 'comparison.csv',
-                         'training_curves.png', 'validation_comparison.png'):
-                self.assertTrue((Path(directory) / name).is_file())
-            with self.assertRaises(ValueError):
-                final_comparison({'dataset_scope': 'subset'}, {'dataset_scope': 'full'}, directory)
 
 
 if __name__ == '__main__':

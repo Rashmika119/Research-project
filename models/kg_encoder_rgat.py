@@ -1,12 +1,4 @@
-"""KG Encoder Phase 1 (RGAT variant): relation-aware graph *attention* encoder.
-
-Built as a second Phase 1 variant alongside `RGCNEncoder` (kg_encoder.py) for
-a later side-by-side comparison — R-GCN stays the project's primary Phase 1
-baseline (see CLAUDE.md's Phase 1 notes for why). Uses PyTorch Geometric's
-`RGATConv`, which adds relation-aware attention on top of R-GCN's per-relation
-weight matrices: instead of treating every neighbor under a given relation
-equally, it learns how much to weight each one.
-"""
+"""Relation-aware graph attention; shared by structural and refinement encoders."""
 
 from __future__ import annotations
 
@@ -21,7 +13,7 @@ from torch_geometric.nn import RGATConv
 # to get a harmless constant init either way, but that was observed to leave
 # `l2` non-finite (NaN) on at least one installed PyTorch Geometric version
 # (caught by the Phase 1 RGAT toy smoke test's checkpoint-reload check —
-# see CLAUDE.md's Phase 1 notes). Rather than depend on upstream's init for
+# see docs/HISTORICAL_NOTES.md). Rather than depend on upstream's init for
 # a code path we don't use, zero them out and freeze them ourselves so every
 # parameter is guaranteed finite and reproducible no matter which PyG
 # version ends up installed.
@@ -37,14 +29,9 @@ def _neutralize_dead_scaled_mod_params(layer: RGATConv) -> None:
 
 
 class RGATEncoder(nn.Module):
-    """Stack of RGAT layers producing structure-aware entity embeddings.
+    """Stack of RGAT layers; inverse edges use twice the scoring relation count.
 
-    Same shape contract as `RGCNEncoder` (kg_encoder.py): `num_message_relations`
-    must be `2 * num_relations` once inverse edges are added (see
-    `preprocessing.graph_builder.build_train_graph`). `heads` attention heads
-    are averaged (`concat=False`), so `dim` stays the same at every layer,
-    matching `RGCNEncoder`'s interface exactly — the two encoders are
-    drop-in swaps for each other.
+    Heads are averaged (concat=False), preserving width at every layer.
     """
 
     def __init__(

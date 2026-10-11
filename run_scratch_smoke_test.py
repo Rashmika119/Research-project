@@ -33,9 +33,8 @@ def real_lm_smoke(requested_device='auto'):
     for variant in VARIANTS:
         seed_everything(0)
         model = build_scratch_model(variant, data.num_entities, data.num_relations).to(device)
-        assert model.soft_prompt == (variant != 'residual-no-softprompt')
-        if not model.soft_prompt:
-            assert not hasattr(model.bridge, 'kg_to_lm')
+        assert not model.soft_prompt
+        assert not hasattr(model.bridge, 'kg_to_lm')
         before = state_fingerprint(model.bridge.lm)
         model.train()
         e, r = model(edges, types, entity_ids, relation_ids, et, rt, edges, text_batch_size=2)
@@ -44,8 +43,6 @@ def real_lm_smoke(requested_device='auto'):
         loss.backward()
         modules = {'first_RGAT': model.structural.encoder, 'entities': model.structural.entity_emb,
                    'relations': model.structural.scorer.relation_emb, 'LM_to_KG': model.bridge.lm_to_kg}
-        if model.soft_prompt:
-            modules['KG_to_LM'] = model.bridge.kg_to_lm
         if model.refiner is not None:
             modules['second_RGAT'] = model.refiner
         for label, module in modules.items():

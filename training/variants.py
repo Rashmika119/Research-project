@@ -3,12 +3,11 @@ from models.kg_text_refinement import KGTextRefinement
 from training.model_factory import build_model
 
 
-ARCHITECTURES = ('residual', 'residual-no-softprompt', 'no-refinement')
+ARCHITECTURES = ('residual-no-softprompt',)
 VARIANTS = ARCHITECTURES  # compatibility name for architecture-oriented callers
 # Architecture and warmup are independent; no duplicate model classes.
 CONFIGURATIONS = {
-    'residual-warmup': ('residual', True),
-    'residual-no-warmup': ('residual', False),
+    'baseline': ('baseline', False),
     'residual-no-softprompt-warmup': ('residual-no-softprompt', True),
     'residual-no-softprompt-no-warmup': ('residual-no-softprompt', False),
 }
@@ -33,7 +32,7 @@ def configuration_id(architecture, warmup):
     return architecture + ('-warmup' if warmup > 0 else '-no-warmup')
 
 
-def configuration_settings(identifier, requested_warmup=5):
+def configuration_settings(identifier, requested_warmup=10):
     architecture, enabled = CONFIGURATIONS[identifier]
     if requested_warmup < 0 or (enabled and requested_warmup < 1):
         raise ValueError('Warmup-enabled configurations require positive warmup epochs')
@@ -51,7 +50,7 @@ def build_scratch_model(variant, num_entities, num_relations,
     return KGTextRefinement(
         structural, lm_name=lm_name,
         residual=True,
-        use_refinement=variant != 'no-refinement',
-        soft_prompt=variant != 'residual-no-softprompt',
+        use_refinement=True,
+        soft_prompt=False,
         lm_revision=lm_revision,
     )

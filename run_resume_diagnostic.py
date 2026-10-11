@@ -141,7 +141,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--device', choices=('cpu', 'cuda'), default='cuda')
     parser.add_argument('--real-lm', action='store_true')
-    parser.add_argument('--variant', choices=('residual', 'no-refinement', 'residual-no-softprompt'), default='residual')
+    parser.add_argument('--variant', choices=('residual-no-softprompt',), default='residual-no-softprompt')
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--output-dir', type=Path, required=True)
     args = parser.parse_args()

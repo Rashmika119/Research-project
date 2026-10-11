@@ -33,7 +33,7 @@ from training.reproducibility import (seed_everything, capture_rng, numerical_po
 
 @dataclass
 class ExperimentConfig:
-    variant: str = 'residual'
+    variant: str = 'residual-no-softprompt'
     max_entities: int = 5000  # zero means the complete original dataset
     epochs: int = 30  # INCLUDES warmup
     warmup: int = 5

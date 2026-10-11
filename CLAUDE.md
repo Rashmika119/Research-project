@@ -6,7 +6,7 @@ Historical stage results/protocols remain preserved; they are not current defaul
 
 ## Protocol
 
-Exactly three configurations, seed 0 only (three independent runs):
+Exactly three configurations; approved default seed 0 (three independent runs):
 - baseline: first RGAT + ComplEx; 100 baseline epochs, 900 baseline updates.
 - residual-no-softprompt-warmup: 10 structural + 90 integrated epochs;
   90 structural + 810 integrated updates.
@@ -44,9 +44,10 @@ anew once per optimizer update, sharing the encoding for positive/negative score
 
 Baseline must never construct RoBERTa or require text resources. Text models
 construct frozen LM once per child, keep it CPU on pooled-cache hits, and move it
-to GPU only for missing encodings. Frozen LM stays eval. Retain No-Refinement and
-soft-prompt Residual outside this comparison. Do not reactivate Original variants
-or delete shared mathematical/historical checkpoint inspection code.
+to GPU only for missing encodings. Frozen LM stays eval. Only the baseline and
+residual-no-softprompt implementations remain. Do not restore soft prompts,
+No-Refinement, Original, RGCN or DistMult. Both text schedules share one class.
+Retain the minimal integration base and parameter order for checkpoint keys.
 
 ## Evaluation
 
@@ -65,12 +66,16 @@ and all900 step losses, without altering optimization.
 
 NEVER modify, regenerate or revert notebooks/research_pipeline.ipynb or
 notebooks/warmup_ablation_5000.ipynb. Both contain manual edits and saved outputs.
-Generators must refuse overwriting them. New notebook:
+Historical generators were removed; never regenerate these notebooks. Active notebook:
 notebooks/full_dataset_comparison_300.ipynb; separate generator:
 notebooks/build_full_dataset_notebook.py (also refuses overwrite).
 New Drive root: Research/full_dataset_comparison_100. New entrypoint:
 run_full_dataset_comparison.py; --report-only never trains.
-The full-study registry is separate from the retained pilot registry.
+The full-study runner is the only research-training entrypoint. Retired source
+is recoverable at d9348c744da7c30c47e585de9e9ed4674a889399; historical YAMLs
+are in docs/archive/configs. See docs/CLEANUP.md for the audit and verification.
+Optional future seeds use --seed N with a new output directory; default stays 0.
+Do not modify the active notebook or its outputs during source cleanup.
 
 No preliminary test training by default: CPU/synthetic/real-LM/CUDA-resume flags
 false. No one-epoch or smoke requirement before the real runs. Keep optional
@@ -102,3 +107,8 @@ OOM must stop with diagnostics; never silently change entities/width/precision,
 equations/objective, training batches or update budgets. Text/eval chunks do not
 remove graph allocations. Larger GPU or activation checkpointing needs explicit
 consistent protocol/new tag. Preserve all historical artifacts and documents.
+
+Non-training development verification: `python run_static_checks.py`. This runs
+CPU model derivative checks but no optimizer steps or training loops. Optional
+training/smoke/resume runners remain opt-in only. Never use unittest discovery
+when a task forbids training: test_research_pipeline includes training tests.

@@ -1,11 +1,4 @@
-"""Loss functions.
-
-BCE/logistic loss for DistMult/ComplEx (bilinear scorers) — CLAUDE.md
-non-negotiable rule #2: margin-based ranking loss is for
-translational-distance models (TransE, RotatE) only, and using it with a
-bilinear scorer was the root cause of the preliminary experiment's first
-diagnostic failure (README.md §15-17). Do not swap this for margin loss.
-"""
+"""Positive and negative BCE for ComplEx; retain the established objective."""
 
 from __future__ import annotations
 

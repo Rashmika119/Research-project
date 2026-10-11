@@ -11,7 +11,8 @@ for existing links; their active settings are now 100/10. The new run tag is
 `full_fb15k237_100_seed0_v1_run1` under `Research/full_dataset_comparison_100`.
 Old 300-epoch artifacts remain untouched and cannot resume under these changed
 settings. Use the old source revision to finish an old run. The old 300-epoch
-YAML remains as a historical reference; current YAML is `full_dataset_100.yaml`.
+YAML is archived at `docs/archive/configs/full_dataset_300.yaml`; the only active
+YAML is `experiments/configs/full_dataset_100.yaml`.
 
 ## Fixed protocol
 
@@ -49,8 +50,9 @@ The same run's Adam moments and structural parameters continue through warmup.
 `experiments/configs/full_dataset_100.yaml` documents this protocol;
 `training/full_study.py` constructs and validates it. YAML alone does not override
 the runner. Fixed epochs/budgets cannot be changed accidentally by CLI flags.
-No-Refinement and soft-prompt Residual remain available outside this study;
-Original variants remain retired from active registration.
+The active registry contains only the three selected configurations. Unselected
+architecture implementations and historical training entrypoints were removed.
+See [the cleanup report](CLEANUP.md) for dependency and compatibility checks.
 
 ## Mathematics and caching
 
@@ -86,7 +88,8 @@ boundary epoch. It is committed with the first main epoch, so a disconnection
 before that commit can repeat the boundary evaluation without changing learning.
 
 `selection_policy=scheduled_only` implements this approved change; historical
-runners retain `initial_and_scheduled`. Equal validation MRR keeps the earliest
+checkpoints may record `initial_and_scheduled`; the shared checkpoint schema
+retains that value for explicit diagnostics. Equal validation MRR keeps the earliest
 eligible checkpoint. After all 100 epochs, reload the selected model, reevaluate
 validation and evaluate test. Test never selects checkpoints/configurations.
 Select configuration by mean selected validation MRR for seed 0; exact
@@ -239,27 +242,39 @@ do not establish full-data GPU feasibility or numerical training equivalence.
 Non-training validation command:
 
 ```bash
-python -m unittest tests.test_full_study tests.test_notebook -v
+python run_static_checks.py
 ```
 
 Both old notebooks are SHA256-protected by tests. The pilot's saved source/output
-is used as the reference, not regenerated from the template. Both generators
-refuse overwriting existing notebooks. New generator:
+is used as the reference. Historical generators are retired. The active
+generator refuses overwriting its notebook:
 `notebooks/build_full_dataset_notebook.py`; inspect `notebook()` for a reviewable
 preview if future manual edits need reconciliation.
 
-## Files and preservation
+## Cleanup, preservation and future seeds
 
-Created: full-study runner, training/full_study.py, training/full_reports.py,
-experiments/configs/full_dataset_100.yaml, new notebook/generator,
-tests/test_full_study.py, this guide, STAGE2_RESULTS.md and archived warmup-stage
-README/instructions. Modified: research_pipeline.py, text_cache.py, pilot
-generator protection, notebook tests, README.md and CLAUDE.md.
-No existing model-equation file, dataset, checkpoint, experiment result or
-historical notebook was deleted. Earlier stage documents remain linked below.
+The 2026-10-11 cleanup is documented in [CLEANUP.md](CLEANUP.md). All three
+notebooks remain byte-for-byte unchanged, including outputs and manual cells.
+The current notebook still uses 100/10, seed 0, and the same paths and cells.
+Set REPO_REF to the pushed cleanup commit and use a **fresh RUN_TAG** for new
+training. Do not reuse an existing directory after a source identity change.
 
-- [5,000-entity pilot results](STAGE2_RESULTS.md)
-- [5,000-entity protocol](WARMUP_ABLATION_5000.md)
-- [Archived stage README](WARMUP_STAGE_README.md)
-- [Archived stage instructions](WARMUP_STAGE_INSTRUCTIONS.md)
-- [1,000-entity results](STAGE1_RESULTS.md)
+For older checkpoints, use their recorded matching source version. The last
+pre-cleanup commit is `d9348c744da7c30c47e585de9e9ed4674a889399`;
+older experiments can require earlier commits. Strict source/data/environment
+checks remain active. No source hash exceptions or checkpoint migrations exist.
+
+Default CLI and notebook runs still perform exactly three experiments with seed
+0. An explicitly requested future independent seed is supported without bringing
+back retired code:
+
+```bash
+python run_full_dataset_comparison.py --seed 17 --output-dir experiments/research/full_100_seed17 --skip-completed --resume
+python run_full_dataset_comparison.py --seed 17 --report-only --output-dir experiments/research/full_100_seed17
+```
+
+Each invocation produces three runs and a single-seed report. Multi-seed
+aggregation is not implemented; do not interpret a single-seed report as an
+estimate of across-seed variance. Budgets, equations and all other defaults are
+unchanged. Historical documentation and evidence remain at their existing paths;
+[the archive index](archive/README.md) records recovery instructions.

@@ -48,7 +48,7 @@ python run_full_dataset_comparison.py --output-dir experiments/research/full_100
 python run_full_dataset_comparison.py --report-only --output-dir experiments/research/full_100_run1
 
 # Non-training development checks
-python -m unittest tests.test_full_study tests.test_notebook -v
+python run_static_checks.py
 ```
 
 Reports include seed-0 metrics and differences (across-seed SD unavailable), ties, best/final epochs,
@@ -70,8 +70,21 @@ reduction will hide an OOM. See the guide for the allocation analysis.
 - [Earlier implementation](docs/IMPLEMENTATION.md), [reliability investigation](docs/RELIABILITY.md)
   and [historical notes](docs/HISTORICAL_NOTES.md).
 
-Existing pilot/full-baseline outputs and checkpoints are not deleted or replaced.
-No-Refinement and soft-prompt Residual remain available through the single-model
-CLI; they are excluded from this study. The pilot runner still runs the four-way
-protocol, while run_research_baseline.py retains its historical 100-epoch default.
-Use the new runner for the matched 100-epoch baseline. Original variants remain retired.
+Existing outputs and checkpoints are preserved. Retired model implementations,
+training entrypoints and pilot report pathways have been removed. Historical
+notebooks are evidence; execute them only with their matching historical source.
+Historical YAMLs are preserved under [docs/archive/configs](docs/archive/configs).
+See the [cleanup and compatibility report](docs/CLEANUP.md) and
+[history/recovery index](docs/archive/README.md).
+
+The main training entrypoint is `run_full_dataset_comparison.py`. It exposes only
+`baseline`, `residual-no-softprompt-warmup`, and
+`residual-no-softprompt-no-warmup`. The default remains seed 0, three runs.
+A future independent seed uses `--seed N` and a new output directory; this still
+runs the same three configurations with the same 100/10 budgets. Pass the same
+seed when resuming or regenerating that study's reports.
+
+Cleanup changes the source identity. Use a fresh RUN_TAG for new runs; resume
+existing runs with the exact source revision saved in their provenance. The
+pre-cleanup revision is `d9348c744da7c30c47e585de9e9ed4674a889399`.
+Checkpoint integrity checks have not been relaxed.

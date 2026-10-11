@@ -1,0 +1,2635 @@
+{
+  "pre_cleanup_commit": "d9348c744da7c30c47e585de9e9ed4674a889399",
+  "branch": "cleanup/three-selected-pipelines",
+  "initial_worktree": "clean",
+  "files": [
+    {
+      "path": ".gitignore",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "76f55066685e754385d9981a4e0a5f02200c402432e639272f918e9259680136",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "CLAUDE.md",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "612df1a19895474e7f74f0febed88200635468996105afbf9ab135e924add8b6",
+      "imports": [],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "README.md",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "f7ad19ba95d793689af571e215fb83f7087fe9a2cdbde0f3fe3d3037323d7839",
+      "imports": [],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "docs/FULL_DATASET_300.md",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "3977d0fbe747a51003530c1feb380be94fd9b814fcd6a2b1a58614b3aa201f3e",
+      "imports": [],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "docs/HISTORICAL_NOTES.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "9a4c8342e83b9c4c7fd9fee0fbfb1fc0674e732ffbff3761f003820c4f0eb5cb",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/IMPLEMENTATION.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "e9ed6ae87cfe46e05af6196a0e5c5395e3816b72216ce997835b1cd0ab59c8ea",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/RELIABILITY.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "42f66a25fbb8fd1f5893bb0af77b2f405355479ad698864cd38a791282fe79ba",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/STAGE1_PROTOCOL.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "932101cdd3b07d2e7be936ac9344508fedb2fb2a76e27075178b0deff7e10fd1",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/STAGE1_RESULTS.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "e9bd4209efbd2839cee415013c3422d9527bcb5076bc03f571c85c050dec0752",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/STAGE2_RESULTS.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "95c65f5f2cee57fc253eca808e1830a86ffcff7be29ff571bc11467dbbbdd651",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/WARMUP_ABLATION_5000.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "df3f9d7e2b0cb803ff8d68411fbe3d1751d4ec88595198f824d1d05461d7d841",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/WARMUP_STAGE_INSTRUCTIONS.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "f13f067450ea3285262243fcc37620c398eeff783cf4a4d40f77a3eb5be1f839",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/WARMUP_STAGE_README.md",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "ff0e8da8bf2e06d4636e3ef42ae23f661cb2266461e3223b3683638d1acead12",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "docs/subset_audit_5000.json",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "493f23e3741ce661d037f1e095fdb8c099a713eebef15ae1eb845e38a3d104c1",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "evaluation/__init__.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "618557bd210f6b95821b3f93ae2b98cdc966ba81a0bf2d0c2921bebbe9985549",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "evaluation/enriched_scorer.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "de3e952b790239f87db2906fa1276b831bba921e1a0c0fc27755699b67ac3145",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "evaluation/metrics.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "3389e963298090474ea25bb4e3096fea32ce63b64eed8ce0faaaf34749f3a75a",
+      "imports": [
+        "__future__",
+        "collections",
+        "torch"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "experiments/configs/full_dataset_100.yaml",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "1dd0a0f8d76d2a18eb195f04e6330a23bd75ef7269c273e6a72267d1b8803bbb",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "experiments/configs/full_dataset_300.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "2a6eb70a70fabdb6e8afc80ce0db537fffd8807b2cc64f2d28bd02c0549b61e6",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/phase0_fb15k237.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "6248f44591014b3e2ff4597ee74e3a9022ee53f2e47793a303aed759556a5dda",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/phase1_full.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "b7a7ad3f09857c7a19be0383fa91ba276c3d16836e7cecbf32d687fb07d5458c",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/phase1_rgat_full.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "445dc0fef7681140f90cc81572aa660300ac04876b481a0210f3c44b442a6800",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/phase1_rgat_toy.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "ca2ef14f4669517411d202b9db29630553979e84a68a95a7dec5cb58d1f77df0",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/phase1_toy.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "ccca63f4c482678a215085785776713a42e0e1cf60024b3c0d07d9781b93594c",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/phase2_lm_toy.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "89fba02d23c2e5087b09e9fa2be792822c1ff0bb6fb07002e00f2a989f7f2c3f",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/research_protocol.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "1995235f6fd90c553b4a9888c3504344963c7cc0ab74c07db09326fa2411c23c",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "experiments/configs/research_protocol_1000_historical.yaml",
+      "action": "ARCHIVE",
+      "reason": "Historical protocol, preserved byte-for-byte outside active configs.",
+      "sha256": "3384065f8c98ad7d549a63f439e793c27e39b41d64eefc29b8f179c51d9f280a",
+      "imports": [],
+      "final_action": "ARCHIVE"
+    },
+    {
+      "path": "models/__init__.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "fb927d7795a881a791f1bff858b258a98445c05e654adb868c2aeaf71c0513c2",
+      "imports": [],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "models/frozen_lm.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "75297040c3f123c1c6969bca8a43b98ca2b93dad6c9dd9e3fb42597e81b8d51d",
+      "imports": [
+        "__future__",
+        "models.pretrained",
+        "torch",
+        "torch.nn"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "models/independent_text_bridge.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "bee90d97cf29f5766c8c139c8d02efd4ec12d53951c7ed467266c7d7b53384f9",
+      "imports": [
+        "models.frozen_lm",
+        "models.lm_kg_projection",
+        "torch"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "models/kg_encoder.py",
+      "action": "REMOVE",
+      "reason": "Unused RGCN encoder; selected structural/refinement modules use RGATEncoder.",
+      "sha256": "11650fe8333aeba853369ddcaf23a439eef1c7c2e91ca1947dae3591271e80eb",
+      "imports": [
+        "__future__",
+        "torch",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch_geometric.nn"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "models/kg_encoder_rgat.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "3e1bdd547ae02123f169e17f85bbaca79049322c04f56cb02d43709f6d4d021b",
+      "imports": [
+        "__future__",
+        "torch",
+        "torch.nn",
+        "torch.nn.functional",
+        "torch_geometric.nn"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "models/kg_lm_bridge.py",
+      "action": "REMOVE",
+      "reason": "KG-conditioned soft-prompt bridge; no selected caller after integration-base simplification.",
+      "sha256": "43737965a788e7bbcb8a9972c0757178993fc06b16377924fec969d790a96b65",
+      "imports": [
+        "__future__",
+        "models.frozen_lm",
+        "models.kg_lm_projection",
+        "models.lm_kg_projection",
+        "torch",
+        "torch.nn"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "models/kg_lm_projection.py",
+      "action": "REMOVE",
+      "reason": "KG-to-LM prompt projection; independent text retains the separate LM-to-KG projection.",
+      "sha256": "a5dccbaab4b819da8049bfae10361d974da334af668201126fe83cf6eedec6e3",
+      "imports": [
+        "__future__",
+        "torch",
+        "torch.nn"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "models/kg_only_baseline.py",
+      "action": "REMOVE",
+      "reason": "RGCN baseline; selected baseline is KGOnlyBaselineRGAT.",
+      "sha256": "4810506f84b292d932ed93543225bc3a092287ae7a7617917118a23ea567d07f",
+      "imports": [
+        "__future__",
+        "models.kg_encoder",
+        "models.scorer",
+        "torch",
+        "torch.nn"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "models/kg_only_baseline_rgat.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "40c9e95367bfc6f035c637654ca8e871ebff0018f42e59b2c5a68f0fac32442a",
+      "imports": [
+        "__future__",
+        "models.kg_encoder_rgat",
+        "models.scorer",
+        "torch",
+        "torch.nn"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "models/kg_text_integration.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "bb127aada3d99b77f1430676ddb8207b92782fbb3aa836bb9b0c5aa1cda058ae",
+      "imports": [
+        "models.independent_text_bridge",
+        "models.kg_lm_bridge",
+        "torch"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "models/kg_text_refinement.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "4a2ebcb0f6c10d3075c345ad78a7250d50bee84dc67ecc1155b8ad2050c846e7",
+      "imports": [
+        "models.kg_encoder_rgat",
+        "models.kg_text_integration",
+        "models.scorer",
+        "torch",
+        "torch.utils.checkpoint"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "models/lm_kg_projection.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "572ac1a91a26823c75466c2273aec99cd132235cdc59158def20747324fa27a9",
+      "imports": [
+        "__future__",
+        "torch",
+        "torch.nn"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "models/pretrained.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "30b815be12aee91398d1a2b44de36ec42c01699afac1efa0d48e3f86b485b5f8",
+      "imports": [
+        "dataclasses",
+        "hashlib",
+        "huggingface_hub",
+        "json",
+        "os",
+        "pathlib",
+        "safetensors",
+        "shutil",
+        "tempfile",
+        "transformers"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "models/scorer.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "bfa7e7a9d5d827544310c4fee68b55379e772a787d34921f7a24075fc7704bf9",
+      "imports": [
+        "__future__",
+        "torch",
+        "torch.nn"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "notebooks/build_colab_notebook.py",
+      "action": "REMOVE",
+      "reason": "Obsolete generator; historical notebook is protected evidence and must not be regenerated.",
+      "sha256": "be3114b2d304f5c418ae198fb6a5b9645844f61ed25373c65b044e936ac96460",
+      "imports": [
+        "json",
+        "pathlib",
+        "textwrap"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "notebooks/build_full_dataset_notebook.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "1b3ce4202615d0971bd3762e694450d734b0633348b16ebdc8c8e45bf5a2225b",
+      "imports": [
+        "json",
+        "pathlib",
+        "textwrap"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "notebooks/build_warmup_ablation_notebook.py",
+      "action": "REMOVE",
+      "reason": "Obsolete generator; historical notebook is protected evidence and must not be regenerated.",
+      "sha256": "a7aae2d2a35646592c852f2bc0051e5dda7f4838ee41fe292d6c84efe84c6d71",
+      "imports": [
+        "json",
+        "pathlib",
+        "textwrap"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "notebooks/full_dataset_comparison_300.ipynb",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "8326a4ba39a6b50eb11e1f796e5472d29bf860f04e77ec28e57c5de0fcfe856b",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "notebooks/research_pipeline.ipynb",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "24fc8df77eff6473b016c7ee84cc7e1384af88d33924ad8bc5a917501d2270c8",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "notebooks/warmup_ablation_5000.ipynb",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "d5137bc4e16917fb8b46bf641cdbd532815c5bcfa5cc32f1fbfb031e979973f4",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "preprocessing/__init__.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "eb7a50d8fbe6bd38acce1eb7eda0c1ef45825cba913191c782a7747a57a911fc",
+      "imports": [],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "preprocessing/dataset.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "78d75d249805fa7b5a278fd5a4d718ad6c22f2519aca2259f0ab16fe34cc96d0",
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "pathlib",
+        "random",
+        "shutil",
+        "tempfile",
+        "urllib.request"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "preprocessing/entity_text.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "ae65bc28bcb51a4d485c3b8d08a537c65588d2cf7eb0b4b9e9dcbb474121beb7",
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "json",
+        "pathlib",
+        "re",
+        "urllib.request"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "preprocessing/graph_builder.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "ee006b38862aade10ac349d1e738b409723a27a2c5956bb34bade441bf8a384a",
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "preprocessing.dataset"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "preprocessing/induced_subset.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "b3a5687aa0ff68fc7bd7e6b1f67d345af9354f2f78ba35bc6464b1f9fca2ed2f",
+      "imports": [
+        "collections",
+        "preprocessing.dataset",
+        "random"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "preprocessing/relation_text.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "8df357e267c719348f1486a69d85c40ed6ac0c2ae18438894c0ee1a46e957860",
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "pathlib",
+        "urllib.request"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "preprocessing/toy_subset.py",
+      "action": "REMOVE",
+      "reason": "Legacy non-induced toy subset; active full-data loading and shared induced-subset checks do not import it.",
+      "sha256": "6bf9b906d401030cb782fec5072e1a238fc61144d3163d2dd450e13bf522cd93",
+      "imports": [
+        "__future__",
+        "collections",
+        "preprocessing.dataset",
+        "random"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "requirements.txt",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "6bc27bdebeb93bc34613a8fb27fe6017753d8494c01f0dba5c4339ea7d6c2b9a",
+      "imports": [],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "run_complex_scorer_check.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "029a9be0ebd7659f43013caeb2542bc94fe379b12fbeec104f64924d70b3b810",
+      "imports": [
+        "models.scorer",
+        "torch"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "run_entity_text_alignment_check.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "d6ee85326021c59be68de6ee7f296c3236f1e39409cdfe7b44d744ebf27b13a8",
+      "imports": [
+        "preprocessing.dataset",
+        "preprocessing.entity_text"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "run_full_dataset_comparison.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "f66ea07638cbf16ef8595d79e8e5b23e1d56436dd93834999309796ab602d8a9",
+      "imports": [
+        "training.full_study"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "run_long_text_alignment_check.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "c9fba3eece8be0ae2775cf26af783628f2b49b23569e02ce6445f145d6cc9463",
+      "imports": [
+        "preprocessing.dataset",
+        "preprocessing.entity_text"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "run_phase0_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "bf0f0cd64568e46d693b0859bf5cf58fa9865092fb4f2dd8536d44e944740900",
+      "imports": [
+        "__future__",
+        "pathlib",
+        "preprocessing.dataset",
+        "preprocessing.graph_builder",
+        "preprocessing.toy_subset",
+        "sys",
+        "yaml"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase1_full_training.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "a85c644d19ce5c5be04131238495c893a47494614be164bd861e25166f13d390",
+      "imports": [
+        "__future__",
+        "sys",
+        "training.train_kg_baseline",
+        "yaml"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase1_rgat_full_training.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "ae3d847acb237bcf6a570451652f507d223871a6c1a620cfbbfc9516ed1abf05",
+      "imports": [
+        "__future__",
+        "training.train_kg_baseline",
+        "yaml"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase1_rgat_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "aedb86db2c1fe1d6c14f3bd3d9f7b4b4a4fff78acae14d80c47e8b3633c6392c",
+      "imports": [
+        "__future__",
+        "pathlib",
+        "run_phase1_smoke_test",
+        "sys"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase1_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "e9600a2f00081150709543b9d80c61b2ce10ec1dc48692a903c83da94e8c3a8a",
+      "imports": [
+        "__future__",
+        "pathlib",
+        "sys",
+        "torch",
+        "training.model_factory",
+        "training.train_kg_baseline",
+        "yaml"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase2_real_text_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "813c5eaf2df5f4f2807ca03af2ee1156c3adc6fb93791ef95c6a95b116536be1",
+      "imports": [
+        "__future__",
+        "models.kg_lm_bridge",
+        "numpy",
+        "preprocessing.dataset",
+        "preprocessing.entity_text",
+        "random",
+        "torch",
+        "transformers"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase2_relation_text_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "4ed8b8d5f95a7ebdee8533f30eb066134ea64f26649fc1587ce9e5ba2069d5d8",
+      "imports": [
+        "__future__",
+        "models.kg_lm_bridge",
+        "numpy",
+        "preprocessing.dataset",
+        "preprocessing.relation_text",
+        "random",
+        "torch",
+        "transformers"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase2_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "65b2408175d736740e352db04d9ba1fc314ff72146439df8e0bd1006e2f00ee7",
+      "imports": [
+        "__future__",
+        "models.kg_lm_bridge",
+        "numpy",
+        "pathlib",
+        "random",
+        "torch",
+        "transformers",
+        "yaml"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase3_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "eef4b112751999e673750eefd355d0f92df5855b5507f126e57120a4852202bd",
+      "imports": [
+        "argparse",
+        "models.kg_encoder_rgat",
+        "models.kg_text_integration",
+        "models.kg_text_refinement",
+        "pathlib",
+        "preprocessing.dataset",
+        "preprocessing.entity_text",
+        "preprocessing.relation_text",
+        "preprocessing.toy_subset",
+        "random",
+        "torch",
+        "training.losses",
+        "training.model_factory",
+        "training.negative_sampling",
+        "transformers"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase4_smoke_test.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "1d8b597d3970455f2b8c55b78a88446bf0c3ed302328f1edecef905028121106",
+      "imports": [
+        "run_phase3_smoke_test"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase5_comparisons.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "9b2b94775198c69c76bba97a16010049752487e32fcfa2855c6dcfeb555160b8",
+      "imports": [
+        "training.comparisons"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_phase5_training.py",
+      "action": "REMOVE",
+      "reason": "Historical phase-specific launcher/smoke check; only retired workflows import it. Preserved in the pre-cleanup Git revision.",
+      "sha256": "a439c8e74c3bed01ee484f74f40806912c4fb50965a25107660d155b1959a872",
+      "imports": [
+        "evaluation.enriched_scorer",
+        "sys",
+        "training.legacy_phase5",
+        "training.research_cli"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_pretrained_check.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "93d487cbd3d62c2acec60f5c7bc47139caab2cef6b2212849e87113597142351",
+      "imports": [
+        "argparse",
+        "importlib.metadata",
+        "json",
+        "models.pretrained",
+        "os",
+        "pathlib",
+        "sys",
+        "torch"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "run_reevaluate_checkpoint.py",
+      "action": "REMOVE",
+      "reason": "Phase 1/5 legacy checkpoint reevaluator importing removed runners; recover matching historical source to reevaluate those artifacts.",
+      "sha256": "c9dbec16714ec20774e5153ba641fc8eb4c5d917114132ed6e2e14778d65091d",
+      "imports": [
+        "argparse",
+        "evaluation.metrics",
+        "json",
+        "models.kg_text_refinement",
+        "pathlib",
+        "preprocessing.dataset",
+        "preprocessing.entity_text",
+        "preprocessing.graph_builder",
+        "preprocessing.relation_text",
+        "run_phase5_training",
+        "torch",
+        "training.model_factory",
+        "transformers",
+        "types"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_relation_text_alignment_check.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "1e9e877e97b2815bfbc36281213a578a89139b4d7d388817414e7a360b60eeca",
+      "imports": [
+        "__future__",
+        "preprocessing.dataset",
+        "preprocessing.relation_text"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "run_research_baseline.py",
+      "action": "REMOVE",
+      "reason": "Duplicate baseline launcher; main runner supports --single baseline.",
+      "sha256": "e5c8b6fc434590e5e42d5610e4b06e8130c664cbf68c27b3e86a510ea5799f24",
+      "imports": [
+        "training.research_cli"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_resume_diagnostic.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "23893eecb0bbdfbd2080c15154f2b517b95edbce4c606256ffcbcb615fada2a0",
+      "imports": [
+        "argparse",
+        "contextlib",
+        "dataclasses",
+        "json",
+        "models.pretrained",
+        "os",
+        "pathlib",
+        "run_pretrained_check",
+        "sys",
+        "tests.test_research_pipeline",
+        "torch",
+        "training",
+        "training.reproducibility",
+        "unittest.mock"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "run_scratch_smoke_test.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "9221a2a6b1879612dd34b099a71dc18174877ec58568069ba1362489995da1a2",
+      "imports": [
+        "argparse",
+        "gc",
+        "models.pretrained",
+        "os",
+        "preprocessing.dataset",
+        "preprocessing.graph_builder",
+        "run_pretrained_check",
+        "subprocess",
+        "sys",
+        "torch",
+        "training.research_pipeline",
+        "training.variants"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "run_subset_audit.py",
+      "action": "REMOVE",
+      "reason": "Standalone comparison with the retired toy-subset algorithm; saved subset audit remains unchanged.",
+      "sha256": "ea8e49cb8f5b727a62f8bfdeaf4e5491b9d9d927f97d217cea82511540d03221",
+      "imports": [
+        "argparse",
+        "json",
+        "preprocessing.dataset",
+        "preprocessing.induced_subset",
+        "preprocessing.toy_subset",
+        "training.experiment_io"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "run_tie_ranking_check.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "c2d7fb39647d08469c9960e1dd20442074b703af461f6bc4ef10cac37ffe14c8",
+      "imports": [
+        "evaluation.metrics",
+        "torch",
+        "types"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "run_warmup_ablation.py",
+      "action": "REMOVE",
+      "reason": "Retired four-configuration pilot launcher.",
+      "sha256": "f0784715499370a9290a17131bc6a3ec1abb014b3752637d53f67ebdc7643c64",
+      "imports": [
+        "training.comparisons"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "tests/__init__.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "f3c14f575287c72baed300a0472d54be1df2c380ee8fa0de41204b2592545617",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "tests/test_full_study.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "07b3a0f86360a982a0b50b0f4460ca92655f255e944a904590c9be93ffdcf737",
+      "imports": [
+        "ast",
+        "contextlib",
+        "copy",
+        "dataclasses",
+        "hashlib",
+        "inspect",
+        "io",
+        "json",
+        "nbformat",
+        "notebooks.build_full_dataset_notebook",
+        "notebooks.build_warmup_ablation_notebook",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "torch",
+        "training",
+        "training.experiment_io",
+        "training.full_reports",
+        "training.full_study",
+        "training.research_pipeline",
+        "training.text_cache",
+        "training.variants",
+        "types",
+        "unittest",
+        "unittest.mock",
+        "yaml"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "tests/test_notebook.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "11535826405036ca46cdab9749bbc77cf4c35ba6f12965272eb0465158030d69",
+      "imports": [
+        "dataclasses",
+        "hashlib",
+        "inspect",
+        "json",
+        "nbformat",
+        "notebooks",
+        "notebooks.build_warmup_ablation_notebook",
+        "os",
+        "pathlib",
+        "preprocessing.dataset",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "training.ablation_reports",
+        "training.comparisons",
+        "training.experiment_io",
+        "training.research_cli",
+        "training.research_pipeline",
+        "training.variants",
+        "types",
+        "unittest",
+        "unittest.mock"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "tests/test_pretrained.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "53e559837207aa22641a3a339db1221226b6989337372e91911f78043952168c",
+      "imports": [
+        "hashlib",
+        "json",
+        "models",
+        "os",
+        "pathlib",
+        "safetensors.torch",
+        "tempfile",
+        "torch",
+        "types",
+        "unittest",
+        "unittest.mock"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "tests/test_process.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "86df6a0b474a75679b1635d42de52271dfc74473b40f0dd5b5ddc489108f7de9",
+      "imports": [
+        "pathlib",
+        "sys",
+        "tempfile",
+        "training.process",
+        "unittest"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "tests/test_reproducibility.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "9ca4c5b4b07f786dbd294a30395606feb7349e10b66ae3f494a95b9effd84e14",
+      "imports": [
+        "copy",
+        "numpy",
+        "random",
+        "torch",
+        "training.reproducibility",
+        "unittest"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "tests/test_research_pipeline.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "596c49e729b9534e35bdaae6c4a6270505883f70341cb5f90d3eaa9cd25a1235",
+      "imports": [
+        "dataclasses",
+        "evaluation.enriched_scorer",
+        "json",
+        "models.frozen_lm",
+        "models.scorer",
+        "pathlib",
+        "preprocessing.dataset",
+        "preprocessing.graph_builder",
+        "tempfile",
+        "torch",
+        "training",
+        "training.experiment_io",
+        "training.reports",
+        "training.reproducibility",
+        "training.research_pipeline",
+        "training.text_cache",
+        "training.variants",
+        "types",
+        "unittest",
+        "unittest.mock"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "tests/test_warmup_ablation.py",
+      "action": "REMOVE",
+      "reason": "Four-way/soft-prompt tests retired; relevant subset checks retained in tests/test_dataset.py.",
+      "sha256": "f67cb4df238ab6de0ae04260d42bb8b22654e6d0f1e6ae8efba0100d1e3e2a42",
+      "imports": [
+        "copy",
+        "dataclasses",
+        "json",
+        "pathlib",
+        "preprocessing.dataset",
+        "preprocessing.induced_subset",
+        "tempfile",
+        "tests.test_notebook",
+        "tests.test_research_pipeline",
+        "torch",
+        "training",
+        "training.ablation_reports",
+        "training.experiment_io",
+        "training.reproducibility",
+        "training.research_pipeline",
+        "training.variants",
+        "unittest",
+        "unittest.mock"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "training/__init__.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "4029ef7837895fab70f3d487e10cc6b718c5dfaaf44b89c8b4decafc9f09c719",
+      "imports": [],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "training/ablation_reports.py",
+      "action": "REMOVE",
+      "reason": "Retired four-way reporting; METRICS, mean_sd and loss_behavior moved verbatim into training/reports.py.",
+      "sha256": "8855319bfd789ab8095a6cbf0e6429b74071338979290727db8ab6b12017e318",
+      "imports": [
+        "math",
+        "matplotlib",
+        "matplotlib.pyplot",
+        "pathlib",
+        "statistics",
+        "training.experiment_io",
+        "training.reports",
+        "training.variants"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "training/comparisons.py",
+      "action": "REMOVE",
+      "reason": "Pilot/four-way study orchestration replaced by the full-study runner.",
+      "sha256": "9424647430e8365f54745710a11a257786dbba02c761f62b18151afe3d13ff4f",
+      "imports": [
+        "argparse",
+        "datetime",
+        "json",
+        "pathlib",
+        "sys",
+        "training.ablation_reports",
+        "training.experiment_io",
+        "training.process",
+        "training.variants"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "training/experiment_io.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "568cf10c681cfb17f6cf8ba3d1f074b1ef269f5032056be982405ee4692d61ec",
+      "imports": [
+        "hashlib",
+        "importlib.metadata",
+        "json",
+        "os",
+        "pathlib",
+        "platform",
+        "preprocessing.dataset",
+        "preprocessing.graph_builder",
+        "preprocessing.induced_subset",
+        "subprocess",
+        "torch"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "training/full_reports.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "0bce833b5dde0099a9a851e6f827e2f1bb78750c59ef5748d090e4347ffcab74",
+      "imports": [
+        "dataclasses",
+        "math",
+        "matplotlib",
+        "matplotlib.pyplot",
+        "pathlib",
+        "statistics",
+        "training.ablation_reports",
+        "training.experiment_io",
+        "training.full_study",
+        "training.reports"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "training/full_study.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "a7e4bc8ec15eec302716aaca29075fc66eb67826304cc523bea81efb1ac2873d",
+      "imports": [
+        "argparse",
+        "dataclasses",
+        "datetime",
+        "json",
+        "pathlib",
+        "sys",
+        "torch",
+        "training.experiment_io",
+        "training.full_reports",
+        "training.process",
+        "training.research_pipeline"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "training/legacy_phase5.py",
+      "action": "REMOVE",
+      "reason": "Pretrained-baseline Phase 5 training; selected workflows always start from scratch.",
+      "sha256": "b99b7357b9a708f00f64ede616e4365592bce2bd9736560a10df630a40a88586",
+      "imports": [
+        "argparse",
+        "evaluation.enriched_scorer",
+        "evaluation.metrics",
+        "json",
+        "models.kg_text_refinement",
+        "pathlib",
+        "preprocessing.dataset",
+        "preprocessing.entity_text",
+        "preprocessing.graph_builder",
+        "preprocessing.relation_text",
+        "preprocessing.toy_subset",
+        "random",
+        "torch",
+        "training.losses",
+        "training.model_factory",
+        "training.negative_sampling",
+        "transformers",
+        "types"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "training/losses.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "c1dd0d9db03ccc7df00e472955c6712ade30bf6d2df2cd09bbbeb82122b2b70b",
+      "imports": [
+        "__future__",
+        "torch",
+        "torch.nn.functional"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "training/model_factory.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "7c0f95e62beb45b242ba5d55c8fcc7eefd6ca598cde438b050a071f83acd886e",
+      "imports": [
+        "__future__",
+        "models.kg_only_baseline",
+        "models.kg_only_baseline_rgat",
+        "torch.nn"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "training/negative_sampling.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "592597ab6b00430749dd5ab98405853750a39dc5033b5887e3021f210a228c1d",
+      "imports": [
+        "__future__",
+        "random",
+        "torch"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "training/process.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "92e7dc2e1a4089ca8ab0a25aa8c66c55102dcc0e5d7575262a1d08c54347aa59",
+      "imports": [
+        "collections",
+        "pathlib",
+        "shlex",
+        "subprocess"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "training/reports.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "feacdf9e343943329724924b7527c3a451783faae9816e70d1b85ed36c3ae2fa",
+      "imports": [
+        "csv",
+        "json",
+        "matplotlib",
+        "matplotlib.pyplot",
+        "pathlib",
+        "statistics",
+        "training.experiment_io",
+        "training.variants"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "training/reproducibility.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "7c8138989e68a446787439ee10b3d121233ed6918f94b1d5c0e5b26406fe17c7",
+      "imports": [
+        "numpy",
+        "os",
+        "random",
+        "torch",
+        "training.research_pipeline"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "training/research_cli.py",
+      "action": "REMOVE",
+      "reason": "Obsolete single-architecture CLI exposing retired experimental options.",
+      "sha256": "2e1b1c397482f43574ff85bd3a34a708bec69138b31725c673f6af24bac8a229",
+      "imports": [
+        "argparse",
+        "training.research_pipeline",
+        "training.variants"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "training/research_pipeline.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "68eebe304b6537883f28f396b7c93d495ddcb17d0d69d45e3be739f2cf7948d1",
+      "imports": [
+        "dataclasses",
+        "evaluation.enriched_scorer",
+        "evaluation.metrics",
+        "hashlib",
+        "json",
+        "math",
+        "models.pretrained",
+        "models.scorer",
+        "pathlib",
+        "preprocessing.entity_text",
+        "preprocessing.relation_text",
+        "random",
+        "time",
+        "torch",
+        "training.experiment_io",
+        "training.losses",
+        "training.negative_sampling",
+        "training.reports",
+        "training.reproducibility",
+        "training.text_cache",
+        "training.variants",
+        "types"
+      ],
+      "final_action": "MODIFY"
+    },
+    {
+      "path": "training/text_cache.py",
+      "action": "KEEP",
+      "reason": "Selected pipeline/shared verification dependency, or protected historical evidence.",
+      "sha256": "502cf6fe3c2c0ea68fdb07fe465a19d55dc97e04996fa6ca2b5d905861d492ab",
+      "imports": [
+        "hashlib",
+        "importlib.metadata",
+        "pathlib",
+        "torch",
+        "training.experiment_io"
+      ],
+      "final_action": "KEEP"
+    },
+    {
+      "path": "training/train_kg_baseline.py",
+      "action": "REMOVE",
+      "reason": "Legacy configurable RGCN/RGAT baseline trainer; full study owns selected baseline training.",
+      "sha256": "0f9fdb50385dc1d0c2952e3f64d8abae5fbafe95c1c3f95aeac4599d47c1f0e1",
+      "imports": [
+        "__future__",
+        "evaluation.metrics",
+        "pathlib",
+        "preprocessing.dataset",
+        "preprocessing.graph_builder",
+        "preprocessing.toy_subset",
+        "random",
+        "sys",
+        "torch",
+        "training.losses",
+        "training.model_factory",
+        "training.negative_sampling",
+        "yaml"
+      ],
+      "final_action": "REMOVE"
+    },
+    {
+      "path": "training/variants.py",
+      "action": "MODIFY",
+      "reason": "Remove retired branches/references while preserving selected computation or shared verification.",
+      "sha256": "4ec82ff5e410be7cbef7df613e3ed2aadacf4dfaf664fb282736ffc9311a0c3a",
+      "imports": [
+        "models.kg_text_refinement",
+        "training.model_factory"
+      ],
+      "final_action": "MODIFY"
+    }
+  ],
+  "protected_files": [
+    {
+      "path": "experiments/research/full_100_seed0_checks.log",
+      "bytes": 1672,
+      "sha256": "bbfadd8fbf001036720177f932694289d806699444bf11b46b9f47275dffd023"
+    },
+    {
+      "path": "experiments/research/full_stage_static_checks.log",
+      "bytes": 46028,
+      "sha256": "d55e0139052d58ec3961a5cd075a4ad69bf23a26057f2d4b49d9bef20a2b43e3"
+    },
+    {
+      "path": "experiments/research/full_stage_static_checks_final.log",
+      "bytes": 21319,
+      "sha256": "f03337f3c56405fc7c70c94529926205ca95b361b837e51694da27b36e3cd302"
+    },
+    {
+      "path": "experiments/research/full_stage_verification.log",
+      "bytes": 21472,
+      "sha256": "fb6c744f6ecc8e0b6ee5ac06c448a331bc8eabb2dbcbdc398bf55f11f836f8e7"
+    },
+    {
+      "path": "experiments/research/subset_audit_5000.json",
+      "bytes": 1909,
+      "sha256": "493f23e3741ce661d037f1e095fdb8c099a713eebef15ae1eb845e38a3d104c1"
+    },
+    {
+      "path": "experiments/research/warmup_real_roberta_cpu.log",
+      "bytes": 7580,
+      "sha256": "e0c8170218a85eb1497083e269830766c6ba444c170533f80e796fde7d9102ab"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu.log",
+      "bytes": 26970,
+      "sha256": "5e14d3753500379709de1d3bf0ce9fc4a284b606fa187399836cf238ee04c80f"
+    },
+    {
+      "path": "experiments/research/warmup_stage_initial_tests.log",
+      "bytes": 18744,
+      "sha256": "08a7bd440a8c18e004bc8e3ccfe3ddc88a132621c6494bf1dfc4a72921abf3fc"
+    },
+    {
+      "path": "experiments/research/warmup_stage_tests.log",
+      "bytes": 131616,
+      "sha256": "4ec7ac27bca5022f0c417209d61f1ae780e0ba5fb1b8c464d5c5be5ccdbafef2"
+    },
+    {
+      "path": "experiments/research/reliability/offline_tests.log",
+      "bytes": 43244,
+      "sha256": "c03dfe5a7dc5ebcff5e499d8a2f9ec34c2872ef4d128b05b29ff20c57dbe2b1c"
+    },
+    {
+      "path": "experiments/research/reliability/pretrained_cached_cpu.json",
+      "bytes": 6193,
+      "sha256": "03a70c4217f349fe3e136f775b7f2fab9c2f19851226790312ac02e041a61b0f"
+    },
+    {
+      "path": "experiments/research/reliability/pretrained_cached_cpu.log",
+      "bytes": 15066,
+      "sha256": "2644134031ceead67ca4da5c9e0bdcb504d3d7c42eb5a2cdd63fea124492ac1b"
+    },
+    {
+      "path": "experiments/research/reliability/pretrained_cpu.json",
+      "bytes": 6133,
+      "sha256": "83e5a51caf702650c92711e008c6b76c6f37e73bd9ce0d29b4bcf2f1b5cc0757"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu.log",
+      "bytes": 16624,
+      "sha256": "622ce6d9993144e057285d28d8f8b3d5f23bf9b001ea5d19ac5728478f74cba9"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated.log",
+      "bytes": 16518,
+      "sha256": "82ccc0a9f29c0ec14e84d9355f6a57dcbf1b16dd807b7f3517847203417d589d"
+    },
+    {
+      "path": "experiments/research/reliability/real_roberta_cpu.log",
+      "bytes": 11914,
+      "sha256": "2884d0d6c6959780fa91c7df2244e727db73a7164ea7c4252bb5fa6be2d15eab"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/resume_diagnostic.json",
+      "bytes": 2282,
+      "sha256": "e2cf2ecc04dc0cf05f82a245643af5013930f2ab9a02bc60d805e447d53c5a7e"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/checkpoint_resume.json",
+      "bytes": 42024,
+      "sha256": "2e0af5c0a6163fb27ec06dceba6dc4caff1ecba7b879510f831d42e98be0b122"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/uninterrupted_control.json",
+      "bytes": 42024,
+      "sha256": "d00a541908c3673d19807ef57d585846b6ccfaeeae5dab87e6b13521d214e057"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/checkpoint_resume.json",
+      "bytes": 42102,
+      "sha256": "e985665ce2f6f8695cc36f7a80d78d36776fe65ed96fd2905068c9ea096ff341"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/uninterrupted_control.json",
+      "bytes": 42102,
+      "sha256": "3f8909b33d9ab424c97f149882bb43cb9566505f85d20284dc4d64aba16e53e4"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/checkpoint_resume.json",
+      "bytes": 42082,
+      "sha256": "df2dd536f2550ea496ef1db72b2a55ecbed5ab537735867a544117cec2b30743"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/uninterrupted_control.json",
+      "bytes": 42082,
+      "sha256": "21fc66391cdd99cbfd6ff140d02b46004cd6e77adc4e15cbe6e37e7c0d46796d"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/best.pt",
+      "bytes": 65392,
+      "sha256": "e0d3e7ce4eb36e2f0dc2d969eb2074c3ca7fca4936cb9c9480d72d7c1d9c4528"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/config.json",
+      "bytes": 2281,
+      "sha256": "1e08b452d9db0a257cbb68f9a1d9d83c57216f2b345a66362bf0bb8e3cac4450"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/history.csv",
+      "bytes": 881,
+      "sha256": "a10659de072ef4f145f4cbbc8569ef9d93071b02a43027fd98fe1e2e02c0f169"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/history.json",
+      "bytes": 2000,
+      "sha256": "c8a92311f00e2ff7a8896a6423c107a3194d98aadcc902d6bc6c8b5f8d4ac701"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/last.pt",
+      "bytes": 110921,
+      "sha256": "98c0db4f0b32130a0d6b647a8ab917b9c6056128b419e6b77b15993a2abe6d7e"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/metrics.csv",
+      "bytes": 325,
+      "sha256": "09741fece29fd2ff6da1a086c838a06068f40486a42ed7b7b3a8e3064ebed965"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/clean/results.json",
+      "bytes": 7270,
+      "sha256": "0d152ca118f0c47bce243d6d7dd71d677ef7ae2fe735dc87bb1d93c86274d095"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/best.pt",
+      "bytes": 65392,
+      "sha256": "08be215481c709990e5c50702de124520c0988a778890e522257bfab1d9b39f4"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/config.json",
+      "bytes": 2281,
+      "sha256": "1e08b452d9db0a257cbb68f9a1d9d83c57216f2b345a66362bf0bb8e3cac4450"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/history.csv",
+      "bytes": 882,
+      "sha256": "7ba4c6444a1b6b555a6a4e096f7a1e8fac9adbc51e0fdd098e21b11310440de9"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/history.json",
+      "bytes": 2001,
+      "sha256": "7d46c2c1493139082c9c75df6116aabf7d5b4a9acc317e25a028e271045368a0"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/last.pt",
+      "bytes": 110921,
+      "sha256": "14d41890be3071fddd89f61eec296a8dc944471689f2ee93a97031f581594da6"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/metrics.csv",
+      "bytes": 325,
+      "sha256": "09741fece29fd2ff6da1a086c838a06068f40486a42ed7b7b3a8e3064ebed965"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/control/results.json",
+      "bytes": 7272,
+      "sha256": "b8d110214958d8d8f7398177f039658b1c906c4f5268c3c3b5436fb03276c2ac"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/best.pt",
+      "bytes": 65648,
+      "sha256": "03b97398ce54bd25c2f903b8be4b0362f68b92133470c61a8fdda1eb1c57bc93"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/config.json",
+      "bytes": 2281,
+      "sha256": "1e08b452d9db0a257cbb68f9a1d9d83c57216f2b345a66362bf0bb8e3cac4450"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/history.csv",
+      "bytes": 877,
+      "sha256": "d2778fcf203c27d11589012dd1aa7e482674a7d5136b16c35d2e4b80acff0e29"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/history.json",
+      "bytes": 1996,
+      "sha256": "0e14b028cfd3dbdefeaf216482737c950a645ee3c522dca694df714c40e7021c"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/last.pt",
+      "bytes": 111369,
+      "sha256": "aded60c55964e5304703d794451868010f5209700196cc72b38ee778a834a43f"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/metrics.csv",
+      "bytes": 325,
+      "sha256": "09741fece29fd2ff6da1a086c838a06068f40486a42ed7b7b3a8e3064ebed965"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/results.json",
+      "bytes": 7266,
+      "sha256": "ce93fbce118e62ccc080c591f14efe64801067f3ae3f876711846aa618b2ae4a"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_2/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "6d843c641fd00cdb01d8123cbecd6cbc317374eddf0b6bbf9e3198b6fa4b3a7a"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/best.pt",
+      "bytes": 88107,
+      "sha256": "605fcfacd7d350fab82297b8ad9bd55dab3d850dca01386b7b88c82f39ccf706"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/config.json",
+      "bytes": 2281,
+      "sha256": "d47c285339b1cabcfd8fc19d021a58a6d5fd4ab001b6adfdfab0dcaaac6f29bd"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/history.csv",
+      "bytes": 895,
+      "sha256": "94700257628dfbb19aaba6fda14ec5312a9772686b11a4633239634d5f1fe40b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/history.json",
+      "bytes": 2014,
+      "sha256": "cced61b74803ae53468c5b9d2112fec64b02711ce0f66104137854665b4ce8a1"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/last.pt",
+      "bytes": 110857,
+      "sha256": "43c42de1cb27ca5e47d45eb140281b0ff137fbd9cec16fa1e6bd49ff69f42b26"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/metrics.csv",
+      "bytes": 321,
+      "sha256": "d8346de098234cc874b3d485941f72e27501f27b9b129bc9d06a777a858e6255"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/clean/results.json",
+      "bytes": 7283,
+      "sha256": "8054dacb69436f0a90ecb9949eddf9b15a778da05fc60a988db56430c2fb9e41"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/best.pt",
+      "bytes": 88107,
+      "sha256": "53e376660d8f5ac2fe66acd2e8ca3767ac76083a223b9018dcc1236f594686b3"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/config.json",
+      "bytes": 2281,
+      "sha256": "d47c285339b1cabcfd8fc19d021a58a6d5fd4ab001b6adfdfab0dcaaac6f29bd"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/history.csv",
+      "bytes": 888,
+      "sha256": "c35fd3686f6435a0aeac19b1888664beddb058d5c16bb7b919148c62b1d04384"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/history.json",
+      "bytes": 2007,
+      "sha256": "117d37322c24914a561a8cff0323246c126d0ece9167913088af280978cebcde"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/last.pt",
+      "bytes": 110857,
+      "sha256": "2acf7e2c5e52b1070083a0da6cbf09452de9d6f4e90e703d6304057846a2c249"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/metrics.csv",
+      "bytes": 321,
+      "sha256": "d8346de098234cc874b3d485941f72e27501f27b9b129bc9d06a777a858e6255"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/control/results.json",
+      "bytes": 7275,
+      "sha256": "d67728c87f59b1494cddaf2b0b219eec01d5ecf0f533dad7aab5b4920f5c31ea"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/best.pt",
+      "bytes": 88491,
+      "sha256": "0a6107bc3cdfac5df36529cb136fdf75753b18e8eeb4649e32a97ac3a2238ab8"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/config.json",
+      "bytes": 2281,
+      "sha256": "d47c285339b1cabcfd8fc19d021a58a6d5fd4ab001b6adfdfab0dcaaac6f29bd"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/history.csv",
+      "bytes": 893,
+      "sha256": "5042a627d5f3737b557dbcb6f8d97919e15874cc6073f887a70588327f3a5926"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/history.json",
+      "bytes": 2012,
+      "sha256": "7d0dfcf217f7a9a7c1d1be39c2de64288c34a939b8f3e519ad70d6c8c5775fe5"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/last.pt",
+      "bytes": 111241,
+      "sha256": "68cb78f4e54a6416a52f6abbf93de52ed63e8e99604709c515da02ce0fb81d24"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/metrics.csv",
+      "bytes": 321,
+      "sha256": "d8346de098234cc874b3d485941f72e27501f27b9b129bc9d06a777a858e6255"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/results.json",
+      "bytes": 7280,
+      "sha256": "81e5166a5d39bbe039c985c59114337b350f1ecc7af982ad8b812f6f623fc205"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_1/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "9beba439560b402365f4ce471855b2ed7174737be368792561fb12afeeb5e9a6"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/best.pt",
+      "bytes": 87915,
+      "sha256": "d9b7f274b10af867b50df2b4b0d1b269291f25ccf4ac128db73481c17c726b6f"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/config.json",
+      "bytes": 2281,
+      "sha256": "6377f184e960d2cd2d66f027b0333e7b5e8f563464a94be0f0b456f1d9ba859b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/history.csv",
+      "bytes": 860,
+      "sha256": "3a093a2d69f7b98b0f5edb38b73936ea2769e4e0f5dc54b67f49fc9b2d83bbea"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/history.json",
+      "bytes": 1979,
+      "sha256": "3b32a2d787c256e1b6866cc35192455845783bea4c8d20e63012b4ac1a18ea81"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/last.pt",
+      "bytes": 110921,
+      "sha256": "dac644dd4b95c75e67c091c10220a8e5c4482fd620040b5ade6aa93939a73969"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/metrics.csv",
+      "bytes": 312,
+      "sha256": "5c7226b61333e43957b0a3c38c568a5933ec903518e4f9f54515c68eb19822a1"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/clean/results.json",
+      "bytes": 7225,
+      "sha256": "466f812766e9808c01f3293644e4fc878affb469920d880412213951eb92cc39"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/best.pt",
+      "bytes": 87915,
+      "sha256": "4555ca07821cd3219cf81d1d2b82785264fea6c1d89ee96317d2308ae35cfa2f"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/config.json",
+      "bytes": 2281,
+      "sha256": "6377f184e960d2cd2d66f027b0333e7b5e8f563464a94be0f0b456f1d9ba859b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/history.csv",
+      "bytes": 866,
+      "sha256": "ac3a51ba6c2c51027d6928ccb98f06c1f4515662f77ac44920a46f10e83134d7"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/history.json",
+      "bytes": 1985,
+      "sha256": "1242f9e2f373efd0627631a166d8062f8b78004120373e12673297717f8067d8"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/last.pt",
+      "bytes": 110921,
+      "sha256": "ef0814506712a7c8591d9fbdc3af740ad464b47302d894a1d1a2787a117e3c34"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/metrics.csv",
+      "bytes": 312,
+      "sha256": "5c7226b61333e43957b0a3c38c568a5933ec903518e4f9f54515c68eb19822a1"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/control/results.json",
+      "bytes": 7231,
+      "sha256": "a5456f0bfd1b867df94dc69a425212f7c519db742dc518bc247b7cb2d7860b17"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/best.pt",
+      "bytes": 88363,
+      "sha256": "a00e03c675e31f67b755a56cdcd3d25be7fe417a8716915af97e30d0fa4defad"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/config.json",
+      "bytes": 2281,
+      "sha256": "6377f184e960d2cd2d66f027b0333e7b5e8f563464a94be0f0b456f1d9ba859b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/history.csv",
+      "bytes": 863,
+      "sha256": "2c85f689827c98623938114830d074051f6601d9f5ff2831ea4b24ec2522d218"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/history.json",
+      "bytes": 1982,
+      "sha256": "23d4d3fe68d98ec022c45c8707fd1a9a0b4ad07b08498960095733aac0b500df"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/last.pt",
+      "bytes": 111369,
+      "sha256": "4345f40d66be2df158cfdb81a7ed70b60df733474895f4c87451b8471cf8ba8b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/manifest.json",
+      "bytes": 5368,
+      "sha256": "1359a5f465996233989e67a79317b7b95178649547426d5b05d7b261f149ed2b"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/metrics.csv",
+      "bytes": 312,
+      "sha256": "5c7226b61333e43957b0a3c38c568a5933ec903518e4f9f54515c68eb19822a1"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/results.json",
+      "bytes": 7228,
+      "sha256": "bf19c6f8d294b82a9dbc0afeea22e0236b2e12fe67de676de66e03dbd41873dd"
+    },
+    {
+      "path": "experiments/research/warmup_resume_cpu/repeat_0/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "6d843c641fd00cdb01d8123cbecd6cbc317374eddf0b6bbf9e3198b6fa4b3a7a"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/resume_diagnostic.json",
+      "bytes": 1137,
+      "sha256": "a8b1338eaa51f7efe8e78c608afa6314202451d1630ad904d9e5e57b16a8aac0"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/resume_diagnostic.json",
+      "bytes": 1159,
+      "sha256": "da5cb01ab20743ed04e1440a6129c7d8558f2f7b458b182ffc81de05c1008d55"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/resume_diagnostic.json",
+      "bytes": 2318,
+      "sha256": "52a3a39f00de22e0311fe3ec063a53c6a02093b5e59ac9a3227b8f4e4e458d6d"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/checkpoint_resume.json",
+      "bytes": 38847,
+      "sha256": "e1439422a53f044535fc31913674dd4156b3dfa7bbf70528caeb2caf0d3955a1"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/uninterrupted_control.json",
+      "bytes": 38847,
+      "sha256": "891dcb6edde91c4aa5ebd3499a3c47b2d6d04dff38b587127075d940891f0f0b"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/checkpoint_resume.json",
+      "bytes": 38787,
+      "sha256": "071fefc9b0000c0bccd396583e32752a5840c63701e3c7a51942393358399ade"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/uninterrupted_control.json",
+      "bytes": 38787,
+      "sha256": "5ed2ee8e27d9f2f5fffa706b0b729678ce51fc3d01861cc886f3412fd400d60a"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/checkpoint_resume.json",
+      "bytes": 38827,
+      "sha256": "b5bbb810b2538bda889c6ae72dd32ef4a08330601325d0b758d9d9e4b7dcb5ff"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/uninterrupted_control.json",
+      "bytes": 38827,
+      "sha256": "5b9a0b2ab396c42428291cfb8f281e4c5650fc3252c61ebb0f75c9abef1bca3b"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/best.pt",
+      "bytes": 84483,
+      "sha256": "b9aef76251ec91719ba28fe48f9cbba04b1702a32cf9cdeb20351a77f6f32ea6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/config.json",
+      "bytes": 2281,
+      "sha256": "4a4174cad02c83e64eeeae6648e37742f990b758882f2387716cddaec38d89b6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/history.csv",
+      "bytes": 614,
+      "sha256": "a8e5397d818901d99cc2521cdb5d4f7f4eda1d957848960aa845f0526c1ce5a8"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/history.json",
+      "bytes": 1396,
+      "sha256": "711dc1cb702f181bad479819a28dd859258875d74aa0148edffe0da17cc4cddd"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/last.pt",
+      "bytes": 106663,
+      "sha256": "b35a55f5df0b8cf6c13e9f555b481ca02dfda923f9b6e450983cf78ef47e5f1a"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/metrics.csv",
+      "bytes": 298,
+      "sha256": "a42f91e4b0562d7d2dccca0119a03589b98c14a761d3fe7fdd1edae95c1f9612"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/clean/results.json",
+      "bytes": 5315,
+      "sha256": "5c37a19eec89be9a5f50e97c3f48c2775f9c3ef1bc6dfb3ea32de0c7a79efa8e"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/best.pt",
+      "bytes": 84483,
+      "sha256": "104f96fa3ae928769a823f6f324bb00ebc1b638f60a2853e1243f0e6c4714fd5"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/config.json",
+      "bytes": 2281,
+      "sha256": "4a4174cad02c83e64eeeae6648e37742f990b758882f2387716cddaec38d89b6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/history.csv",
+      "bytes": 618,
+      "sha256": "9aac74d5f0b038874b0c7c5d472b1fe82b4667bd8627175c1ceb198480e0fa2d"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/history.json",
+      "bytes": 1400,
+      "sha256": "061b4942918bc55b47c5cdf11ce2e06de7861c5aaf2468908e4a1dac980e5583"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/last.pt",
+      "bytes": 106663,
+      "sha256": "bc36bfe0addf6123928c41f0a4c4da0c5aff9b9399f5aab82487565a5b72cf11"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/metrics.csv",
+      "bytes": 298,
+      "sha256": "a42f91e4b0562d7d2dccca0119a03589b98c14a761d3fe7fdd1edae95c1f9612"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/control/results.json",
+      "bytes": 5320,
+      "sha256": "5ab0d4879ee30a4e85b8c13adfe471b44134de7ad67acdda848ce341156633b4"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/best.pt",
+      "bytes": 84739,
+      "sha256": "43a5fc55be124a40adcc859f849add15890ea305b91f7bdb552f6ffd53ce3df2"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/config.json",
+      "bytes": 2281,
+      "sha256": "4a4174cad02c83e64eeeae6648e37742f990b758882f2387716cddaec38d89b6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/history.csv",
+      "bytes": 617,
+      "sha256": "d7ab342f8d234277025289ded48c6077d7f669a0548476397e8ceeb61e5a872e"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/history.json",
+      "bytes": 1399,
+      "sha256": "c06f9a7025bdf5148b9cf40e72b9083a31763df384a26d6e651dc2a7579aa729"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/last.pt",
+      "bytes": 106919,
+      "sha256": "fb033efab499a7a6735e725371e958a9cc02103171d2571a8c1893d316062e14"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/metrics.csv",
+      "bytes": 298,
+      "sha256": "a42f91e4b0562d7d2dccca0119a03589b98c14a761d3fe7fdd1edae95c1f9612"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/results.json",
+      "bytes": 5318,
+      "sha256": "12b20d1bba396bdefb5b65aaefb6abf30e77b3d14c606a41afe2dadb810bc992"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_2/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "6d843c641fd00cdb01d8123cbecd6cbc317374eddf0b6bbf9e3198b6fa4b3a7a"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/best.pt",
+      "bytes": 64249,
+      "sha256": "f49ee840cf9b8f5b7fa7628ec71cef3684ea8b75a7ad8d37e124b89178c1cb51"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/config.json",
+      "bytes": 2281,
+      "sha256": "82f8562c9aeddfda6c5bafb3afcbbd0c32b635664ca274f93f18d945e37aaab7"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/history.csv",
+      "bytes": 587,
+      "sha256": "9225a46f7717eb1c73f54c508c157b9b3218c29cc771d9a8bdbf0016621238d9"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/history.json",
+      "bytes": 1369,
+      "sha256": "1b9fd44781568d1e981318e02925197b141d89fc5696e727af5c97cbacfd289e"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/last.pt",
+      "bytes": 106599,
+      "sha256": "9e200b8eae21125a740f48a64722580b55aa1fec537140c2eb17bc4029df238a"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/metrics.csv",
+      "bytes": 309,
+      "sha256": "4c0568f12c22d2760f6aa5447c00e6285132609cd218dc768f282d992bf004e6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/clean/results.json",
+      "bytes": 5285,
+      "sha256": "b2410240a9deab47a5b968bff053e3f46f36de185ea231d54fba4334120870c4"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/best.pt",
+      "bytes": 64249,
+      "sha256": "d76b6ee1c07aebfffe3f632b3a44f69477d24416c9f76795662fe220cf7e7201"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/config.json",
+      "bytes": 2281,
+      "sha256": "82f8562c9aeddfda6c5bafb3afcbbd0c32b635664ca274f93f18d945e37aaab7"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/history.csv",
+      "bytes": 587,
+      "sha256": "f6374be95032165afd08dd498cce8a14229d1e9a1dbee27c1576066671d183dd"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/history.json",
+      "bytes": 1369,
+      "sha256": "34dcfd59218f812eef407ca2723bb2642417a8ed0edfad8954c84f960d45fda6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/last.pt",
+      "bytes": 106599,
+      "sha256": "a0b321413cb7a80e983050b7b69ccebae07b2f313495c08d6531ef4f3e515532"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/metrics.csv",
+      "bytes": 309,
+      "sha256": "4c0568f12c22d2760f6aa5447c00e6285132609cd218dc768f282d992bf004e6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/control/results.json",
+      "bytes": 5285,
+      "sha256": "5e33269d48aaf2b344516c707eebf5418b304ce446d4ad16d4df697b8bbaa26e"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/best.pt",
+      "bytes": 84483,
+      "sha256": "64ee368630b57bfda7ecfae7203e8f2309dfffebef17fcb8698711b7903699e9"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/config.json",
+      "bytes": 2281,
+      "sha256": "82f8562c9aeddfda6c5bafb3afcbbd0c32b635664ca274f93f18d945e37aaab7"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/history.csv",
+      "bytes": 587,
+      "sha256": "2e5caec1a550fa71b9de34c3c2d04fc54d60b7757f33b6eb972d0bbcfc29df4c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/history.json",
+      "bytes": 1369,
+      "sha256": "cbe576949ea87c058efbb5a9f475f2b098bf40b06be8fbe0d9eabc24da104d85"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/last.pt",
+      "bytes": 106855,
+      "sha256": "f352a8ed6db10f5a9ac4762113c75833ebf269e5065a2c95e5dc1b251173a341"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/metrics.csv",
+      "bytes": 309,
+      "sha256": "4c0568f12c22d2760f6aa5447c00e6285132609cd218dc768f282d992bf004e6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/results.json",
+      "bytes": 5284,
+      "sha256": "fd65f48851b0d8224aaf619d65050d20d080ad0e3d7b589c1fe86a931cf333d9"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_1/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "9beba439560b402365f4ce471855b2ed7174737be368792561fb12afeeb5e9a6"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/best.pt",
+      "bytes": 84483,
+      "sha256": "a91a17bf979bcf3474abead4cf04a01914f4edfce9676ada7108c121328b4045"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/config.json",
+      "bytes": 2281,
+      "sha256": "9d9bc4cdc19e556993407be1c225bdd6863232f3524416bed5119f10d5e318d0"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/history.csv",
+      "bytes": 617,
+      "sha256": "302da3d0180fa560ca524c22c3ca37d27bce9080317394d0a670b3f595a56796"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/history.json",
+      "bytes": 1399,
+      "sha256": "3c82d245871fba32484ef9017812931fd87f1d0bc6150235d92a5135698ca63f"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/last.pt",
+      "bytes": 106663,
+      "sha256": "9a70a770eec7b100507330c493dd6f28765b798c86235ff0d724f24c348962cc"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/metrics.csv",
+      "bytes": 309,
+      "sha256": "45ff95704bda50360f2b874556ebb1c6c7528a15b215af2f17c968ac2bf14ecd"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/clean/results.json",
+      "bytes": 5329,
+      "sha256": "ca3de3053e5b7eae73abf36ae05b8a547e5186595e818aa1d302de47dda10bd0"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/best.pt",
+      "bytes": 84483,
+      "sha256": "d4126f8fe9132382d5a347b25a09d2606c491ab6a469a8523b01c7310b4a9518"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/config.json",
+      "bytes": 2281,
+      "sha256": "9d9bc4cdc19e556993407be1c225bdd6863232f3524416bed5119f10d5e318d0"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/history.csv",
+      "bytes": 617,
+      "sha256": "7e16292c6eb544f0be264c61e973969459d2cd976b6b3092e94eb8b8948d82eb"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/history.json",
+      "bytes": 1399,
+      "sha256": "c5a3ea150b65971f91b36f39a60788129f58691bb5fb5694b8bfb89fbf20c70f"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/last.pt",
+      "bytes": 106663,
+      "sha256": "2dd53b622799afd9609198781abfe09d326d57922180a991f243fdb38750d109"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/metrics.csv",
+      "bytes": 309,
+      "sha256": "45ff95704bda50360f2b874556ebb1c6c7528a15b215af2f17c968ac2bf14ecd"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/control/results.json",
+      "bytes": 5329,
+      "sha256": "dbea280e8036e1b4333de3370ae8a7d58a6122590241ebe083e46bafcd6b0fac"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/best.pt",
+      "bytes": 84739,
+      "sha256": "b2f6d3e71c970598fae4ba8c37ce36d05978577b8b12b7e1848be6f872309642"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/config.json",
+      "bytes": 2281,
+      "sha256": "9d9bc4cdc19e556993407be1c225bdd6863232f3524416bed5119f10d5e318d0"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/history.csv",
+      "bytes": 617,
+      "sha256": "cadb59f9f36e2ad951fc3f5dc5343555566877dac0806290c0e6428cfaeb102c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/history.json",
+      "bytes": 1399,
+      "sha256": "feb0bb60ea0a7e318d0eec631d2f88212aeafeb78d547c9c95fc04e96141a43b"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/last.pt",
+      "bytes": 106919,
+      "sha256": "d7a65c1f35db5346a59112beb6cf95df52400075054584fa0766a79dbc4a6200"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/metrics.csv",
+      "bytes": 309,
+      "sha256": "45ff95704bda50360f2b874556ebb1c6c7528a15b215af2f17c968ac2bf14ecd"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/results.json",
+      "bytes": 5328,
+      "sha256": "a13f425b5089d56ffc9e9ae7c28ff7f7d6fa29d67934570326ec85105001f5ff"
+    },
+    {
+      "path": "experiments/research/reliability/resume_cpu/repeat_0/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "6d843c641fd00cdb01d8123cbecd6cbc317374eddf0b6bbf9e3198b6fa4b3a7a"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/checkpoint_resume.json",
+      "bytes": 41930,
+      "sha256": "4b85b807818f378f72abbb8385eaac2cf9b5adb90f8cb41d857279fde2652beb"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/uninterrupted_control.json",
+      "bytes": 41930,
+      "sha256": "02ee80ffe88e90b1fa72200c895feb3bf1ab4f1745bb6cce05f5ba2f6fddaba6"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/best.pt",
+      "bytes": 492592,
+      "sha256": "b76615c725ebe6100c56ff796becd7580b46ad55e35f6405332bb76a99f90fda"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/config.json",
+      "bytes": 2282,
+      "sha256": "14dc18da227bb1076b6223da0a9ede341523817fd99114f7b7e250aa6dce259b"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/history.csv",
+      "bytes": 582,
+      "sha256": "6a757c5b195c882886dda1bfdb34870053513869572f75259b8f4e8df2552efc"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/history.json",
+      "bytes": 1364,
+      "sha256": "c4f6358038886442894f62f4e2cafa7ae62b8acbb07e1a9eaf5c3992486014c8"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/last.pt",
+      "bytes": 1361417,
+      "sha256": "badca67b86701f7241a91e6743d7c5b73f3727697164959e408e99396f302067"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/metrics.csv",
+      "bytes": 312,
+      "sha256": "6875b96013f414e7b95be3ab4897901b93c31a247c2b86748b912fdef709a562"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/clean/results.json",
+      "bytes": 5447,
+      "sha256": "fb313a94519d951a3e8047591451d4594beebb8b0c2312f88a195bd412ab6bb2"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/best.pt",
+      "bytes": 492592,
+      "sha256": "113bb4bf788a600cd0e56fa643b632445e8885d4d00350bdb67ffbea24a39e67"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/config.json",
+      "bytes": 2282,
+      "sha256": "14dc18da227bb1076b6223da0a9ede341523817fd99114f7b7e250aa6dce259b"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/history.csv",
+      "bytes": 583,
+      "sha256": "4bb5442ebe61516f87aa4e63c07d68e88f079deb7868f27bb9750b0c4a71dfb1"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/history.json",
+      "bytes": 1365,
+      "sha256": "5bdf4cc2dffbc5980f3e80aec7bfd3ac12cfc67418e14a6b203108ea2ccaebc1"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/last.pt",
+      "bytes": 1361417,
+      "sha256": "db0094a0ab3b2def02a84e9dc59e44b29c3ac4d7530ddf8a00494997853a976a"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/metrics.csv",
+      "bytes": 312,
+      "sha256": "6875b96013f414e7b95be3ab4897901b93c31a247c2b86748b912fdef709a562"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/control/results.json",
+      "bytes": 5448,
+      "sha256": "939086c42bb6fb1b9d11adc5b2f3bed11d505437c39e91516c26ff3d397e78f5"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/best.pt",
+      "bytes": 1020203,
+      "sha256": "894a3751b397ae542a4af35b6f504ee02465ce5c75a907c8b48c1342c56e69cb"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/config.json",
+      "bytes": 2282,
+      "sha256": "14dc18da227bb1076b6223da0a9ede341523817fd99114f7b7e250aa6dce259b"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/history.csv",
+      "bytes": 581,
+      "sha256": "096b0a2f1aedc9ddac59fbc6521464f81d5852e2b39cd392225f12ada4da0d4f"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/history.json",
+      "bytes": 1363,
+      "sha256": "f940ee15be3b829d7a12cedb87ea2033c9597168181263c47a9fd81a8897c81b"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/last.pt",
+      "bytes": 1361737,
+      "sha256": "0f2d3ad06e62e518188c07609d24ebcbf046b5d4a20071c99c43b790e5206db8"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/metrics.csv",
+      "bytes": 312,
+      "sha256": "6875b96013f414e7b95be3ab4897901b93c31a247c2b86748b912fdef709a562"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/results.json",
+      "bytes": 5445,
+      "sha256": "9a30da52484c8164ed201da24e6c094556308c4681dcd916a72948fb78230513"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu_integrated/repeat_0/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "9beba439560b402365f4ce471855b2ed7174737be368792561fb12afeeb5e9a6"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/checkpoint_resume.json",
+      "bytes": 41908,
+      "sha256": "ec57dbb3f7e04f83142fbb96cba4b57c60735e43697db1ebeca93f9b12df4d1f"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/uninterrupted_control.json",
+      "bytes": 41908,
+      "sha256": "c2c01ba5483fa32a5e91cdc17927c8947787816c2553bb7c8d2679847ae045ab"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/best.pt",
+      "bytes": 492592,
+      "sha256": "2d1d6a047a19b6a4594691e594596a49d6df13e84b15ee6d296f3464b8c1d3f5"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/config.json",
+      "bytes": 2282,
+      "sha256": "14dc18da227bb1076b6223da0a9ede341523817fd99114f7b7e250aa6dce259b"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/history.csv",
+      "bytes": 583,
+      "sha256": "b75d3fc8cbcc92bf317ef57f4081ed13724a90b341893b9327d94fd11ffd8d2f"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/history.json",
+      "bytes": 1365,
+      "sha256": "357a37f4f26ed39931c48d461838546877dfb596accd389f84c61b9ac5ff5361"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/last.pt",
+      "bytes": 1361417,
+      "sha256": "38a4c62bbdf64062414deb1fea7d95164fdde2a6d1c11ff4324431f7f020619c"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/metrics.csv",
+      "bytes": 312,
+      "sha256": "6875b96013f414e7b95be3ab4897901b93c31a247c2b86748b912fdef709a562"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/clean/results.json",
+      "bytes": 5447,
+      "sha256": "d0c118f634e112adb5277ea25da2a7fa3543c7d03d2d351803f2eebc2dc38382"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/best.pt",
+      "bytes": 492592,
+      "sha256": "a2699eb482ab816754409158cdd14a1384501d924622c00a0a7366d3ace16ea5"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/config.json",
+      "bytes": 2282,
+      "sha256": "14dc18da227bb1076b6223da0a9ede341523817fd99114f7b7e250aa6dce259b"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/history.csv",
+      "bytes": 580,
+      "sha256": "c643d1ad48b47df68202d549784cb5903fed5e5d0427685df6118d95198cd759"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/history.json",
+      "bytes": 1362,
+      "sha256": "ce8ebec68da5022a93da0a749c6997df5f8a3d02ca733f01ca5ae14dbc5954c1"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/last.pt",
+      "bytes": 1361417,
+      "sha256": "7dea8041fc35bb6f364453c4b7705740cdefa25aaedf42ecb0131189203445e6"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/metrics.csv",
+      "bytes": 312,
+      "sha256": "6875b96013f414e7b95be3ab4897901b93c31a247c2b86748b912fdef709a562"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/control/results.json",
+      "bytes": 5444,
+      "sha256": "c65dcf4a2ca22fbfe899ba0bb02aea5aa7e3df3e1b77a31dcaef704a40508b25"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/best.pt",
+      "bytes": 492784,
+      "sha256": "b44d33ef401d975ebbcd81cb6f8717ea74ddcde5f3d9cc0d31decc6fc4fc02b7"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/config.json",
+      "bytes": 2282,
+      "sha256": "14dc18da227bb1076b6223da0a9ede341523817fd99114f7b7e250aa6dce259b"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/history.csv",
+      "bytes": 583,
+      "sha256": "45727090e94dc8a8b611c51af6dd8660132e991609c7b1fda65e5dd529227509"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/history.json",
+      "bytes": 1365,
+      "sha256": "db931433c5e152b23154734c1ba57d9a5c48ea0caef46dac90a539fea5406534"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/last.pt",
+      "bytes": 1361673,
+      "sha256": "8a9f18c142d48ebb46be604b98e6cb5d82f9262df286b1859113c021adb776a7"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/manifest.json",
+      "bytes": 4647,
+      "sha256": "e79410d606743c75fe5bfad7fa1c0312e92230cce938ad8263fff506a9b8a70c"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/metrics.csv",
+      "bytes": 312,
+      "sha256": "6875b96013f414e7b95be3ab4897901b93c31a247c2b86748b912fdef709a562"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/results.json",
+      "bytes": 5447,
+      "sha256": "7979af4577b494fca6ed8843566f58c96f1f8e70bee336b929fe4972213282df"
+    },
+    {
+      "path": "experiments/research/reliability/real_resume_cpu/repeat_0/resumed/resume_audit.json",
+      "bytes": 286,
+      "sha256": "6d843c641fd00cdb01d8123cbecd6cbc317374eddf0b6bbf9e3198b6fa4b3a7a"
+    },
+    {
+      "path": "notebooks/full_dataset_comparison_300.ipynb",
+      "bytes": 16441,
+      "sha256": "8326a4ba39a6b50eb11e1f796e5472d29bf860f04e77ec28e57c5de0fcfe856b"
+    },
+    {
+      "path": "notebooks/research_pipeline.ipynb",
+      "bytes": 971278,
+      "sha256": "24fc8df77eff6473b016c7ee84cc7e1384af88d33924ad8bc5a917501d2270c8"
+    },
+    {
+      "path": "notebooks/warmup_ablation_5000.ipynb",
+      "bytes": 1596921,
+      "sha256": "d5137bc4e16917fb8b46bf641cdbd532815c5bcfa5cc32f1fbfb031e979973f4"
+    },
+    {
+      "path": "data/raw/fb15k237/test.txt",
+      "bytes": 1499033,
+      "sha256": "e2e35e8e6113de220140b6f44dc71a5207b0fc6872d575e874aefe13259b655b"
+    },
+    {
+      "path": "data/raw/fb15k237/train.txt",
+      "bytes": 21005177,
+      "sha256": "61099230e4439f90885ca9767739e31e8e32f54736fa1c35952b27997bc7c08a"
+    },
+    {
+      "path": "data/raw/fb15k237/valid.txt",
+      "bytes": 1285566,
+      "sha256": "749cbe9d923bac7b9354da5614ecfed2e0220256d442c3e04a6b303db1f273d9"
+    }
+  ],
+  "preservation_verification": {
+    "unchanged_accessible_files": 239,
+    "restricted_raw_files_checked_in_elevated_full_dataset_audit": [
+      "data/raw/fb15k237/test.txt",
+      "data/raw/fb15k237/train.txt",
+      "data/raw/fb15k237/valid.txt"
+    ],
+    "archived_configs_exact": 9
+  }
+}

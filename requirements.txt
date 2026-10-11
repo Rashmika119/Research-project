@@ -7,15 +7,15 @@ matplotlib
 nbformat>=5
 ipython
 
-# Graph encoders (Phase 1+). On Colab, torch-geometric sometimes needs a
+# RGAT encoders. On Colab, torch-geometric sometimes needs a
 # CUDA/torch-version-matched wheel index — if the plain pip install below
 # fails, follow the install snippet at https://pytorch-geometric.readthedocs.io
 # for the exact Colab runtime's torch/cuda version.
 torch-geometric
 
-# Frozen LM conditioning (Phase 2+)
+# Frozen independent RoBERTa text encoding
 transformers
 huggingface-hub>=0.23
 safetensors>=0.4.3
 
-# ComplEx/DistMult are implemented locally in models/scorer.py.
+# ComplEx is implemented locally in models/scorer.py.

@@ -80,8 +80,9 @@ class FullStudyTests(unittest.TestCase):
         self.assertEqual(SEEDS, (0,))
         self.assertEqual(make_config('residual-no-softprompt-warmup', 0).warmup, 10)
         self.assertEqual(make_config('baseline', 0).epochs, 100)
+        self.assertEqual(make_config('baseline', 1).seed, 1)
         with self.assertRaises(ValueError):
-            make_config('baseline', 1)
+            make_config('baseline', -1)
         self.assertEqual(divmod(272115,32768), (8,9971))
         for c in CONFIGURATIONS:
             for seed in SEEDS:
@@ -205,14 +206,12 @@ class FullStudyTests(unittest.TestCase):
             'run_logged':lambda *a,**k:self.fail('Optional training ran automatically')}
         exec(optional,ns)
         with self.assertRaises(FileExistsError):build()
-        from notebooks.build_warmup_ablation_notebook import build as old_build
-        with self.assertRaises(FileExistsError):old_build()
         for path,sha in PROTECTED.items():
             self.assertEqual(hashlib.sha256((ROOT/path).read_bytes()).hexdigest(),sha)
 
     def test_no_training_or_lm_for_baseline_preparation(self):
         from training.variants import build_scratch_model, ARCHITECTURES
-        self.assertIn('no-refinement',ARCHITECTURES)
+        self.assertEqual(ARCHITECTURES, ('residual-no-softprompt',))
         self.assertNotIn('original',ARCHITECTURES)
         with patch('training.variants.KGTextRefinement', side_effect=AssertionError('Baseline used LM')):
             model=build_scratch_model('baseline',3,2)

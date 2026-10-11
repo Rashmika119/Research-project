@@ -3,7 +3,7 @@ import math
 from pathlib import Path
 import statistics as stats
 
-from training.ablation_reports import METRICS, mean_sd, loss_behavior
+from training.reports import METRICS, mean_sd, loss_behavior
 from training.experiment_io import digest, write_json
 from training.reports import write_csv
 
@@ -13,13 +13,13 @@ PLOTS = ('mean_training_loss.png', 'mean_validation_mrr.png', 'mean_validation_h
          'validation_mrr.png', 'validation_hits10.png', 'hits1_hits3.png')
 
 
-def validate_runs(results):
+def validate_runs(results, seed=0):
     from dataclasses import asdict
-    from training.full_study import CONFIGURATIONS, SEEDS, make_config, expected_budget, COUNTS
+    from training.full_study import CONFIGURATIONS, make_config, expected_budget, COUNTS
     actual = [(r['configuration'], r['settings']['seed']) for r in results]
-    expected = {(c, s) for c in CONFIGURATIONS for s in SEEDS}
+    expected = {(c, s) for c in CONFIGURATIONS for s in (seed,)}
     if len(actual) != len(expected) or set(actual) != expected:
-        raise ValueError('Reports require exactly all three unique configuration/seed-0 results')
+        raise ValueError(f'Reports require exactly all three unique configuration/seed-{seed} results')
     for field in ('manifest_sha256', 'dataset_sha256', 'candidate_entities', 'ranking_policy',
                   'environment', 'numerical_policy'):
         if len({digest(r[field]) for r in results}) != 1:
@@ -89,7 +89,7 @@ def validate_runs(results):
                 raise ValueError('Missing or nonfinite ranking/tie metrics')
     if len(numerical_configs) != 1:
         raise ValueError('Settings differ beyond configuration/seed/warmup')
-    for seed in SEEDS:
+    for seed in (seed,):
         paired = [r for r in results if r['settings']['seed'] == seed]
         if len({r['initial_structural_sha256'] for r in paired}) != 1:
             raise ValueError('Initial structural parameters are not paired')
@@ -126,9 +126,9 @@ def behavior(r):
                 (h['validation']['Tie_query_fraction'] >= .5 or h['validation']['Max_tied_candidates'] >= 1454.1)]}
 
 
-def full_report(directory, results):
-    from training.full_study import CONFIGURATIONS, SEEDS, PROTOCOL
-    validate_runs(results)
+def full_report(directory, results, seed=0):
+    from training.full_study import CONFIGURATIONS, PROTOCOL
+    validate_runs(results, seed=seed)
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     summaries, table, individual, ties, epochs, steps = {}, [], [], [], [], []
@@ -176,7 +176,7 @@ def full_report(directory, results):
         names += ['duration_seconds', 'matched_epochs_15_100_mrr_delta_sd', 'first_epoch_at_95pct_observed_best_main_mrr']
         for metric in names:
             av, bv = [], []
-            for seed in SEEDS:
+            for seed in (seed,):
                 def get(c):
                     if metric in behavior_index[c, seed]:
                         return behavior_index[c, seed][metric]
@@ -196,12 +196,12 @@ def full_report(directory, results):
                 'positive_differences': sum(v > 0 for v in differences), 'negative_differences': sum(v < 0 for v in differences),
                 'percent_change_of_means_vs_B': 100*(stats.mean(av)-stats.mean(bv))/stats.mean(bv) if stats.mean(bv) else None})
     winner = max(CONFIGURATIONS, key=lambda c: summaries[c]['validation']['MRR']['mean'])
-    summary = {'protocol': PROTOCOL, 'configurations': summaries, 'seeds': list(SEEDS),
+    summary = {'protocol': PROTOCOL if seed == 0 else PROTOCOL.replace('seed0', f'seed{seed}'), 'configurations': summaries, 'seeds': [seed],
                'selected_by_validation': winner, 'selection_metric': 'mean validation MRR',
                'selected_test_results': summaries[winner]['test'], 'paired_comparisons': paired_summary,
                'dataset_sha256': results[0]['dataset_sha256'], 'manifest_sha256': results[0]['manifest_sha256'],
                'candidate_entities': 14541,
-               'interpretation': 'Seed 0 only: descriptive effects, not evidence of statistical significance. '
+               'interpretation': f'Seed {seed} only: descriptive effects, not evidence of statistical significance. '
                    'Across-seed standard deviations are unavailable (null), and consistency across seeds is untested. '
                    'Higher ranking metrics are better; lower duration/instability/convergence epoch may be better. '
                    'Convergence thresholds use each run\'s observed best and are not equal absolute targets. '
@@ -231,8 +231,9 @@ def write_analysis(directory, summary, behaviors, ties):
     """Descriptive answers derived only from completed, validated run records."""
     def deviation(value):
         return 'N/A (one seed)' if value is None else f'{value:.6f}'
+    seed = summary['seeds'][0]
     lines = ['# Research analysis', '',
-             'Selection uses seed-0 validation MRR. These are single-seed descriptive comparisons, '
+             f'Selection uses seed-{seed} validation MRR. These are single-seed descriptive comparisons, '
              'not evidence of statistical significance.', '',
              'Across-seed standard deviation and consistency cannot be assessed from one seed.', '',
              f"Selected configuration: **{summary['selected_by_validation']}**.", '',
@@ -241,7 +242,7 @@ def write_analysis(directory, summary, behaviors, ties):
         if p['metric'] == 'validation_MRR':
             direction = 'higher' if p['mean'] > 0 else 'lower' if p['mean'] < 0 else 'equal'
             lines.append(f"- {p['A']} versus {p['B']}: mean validation MRR is {direction}; "
-                         f"seed-0 delta {p['mean']:+.6f}, across-seed SD {deviation(p['std'])}.")
+                         f"seed-{seed} delta {p['mean']:+.6f}, across-seed SD {deviation(p['std'])}.")
     lines += ['', '## Convergence and ranking instability', '',
               'Convergence compares the epoch reaching 95% of each run\'s own observed best; '
               'it does not compare equal absolute ranking targets. Instability is the sample SD '
@@ -278,7 +279,7 @@ def write_analysis(directory, summary, behaviors, ties):
                          f"{t['optimistic_minus_corrected_MRR']:.6f}; severe flag {t['severe_ties']}.")
     lines += ['', '## Test results after validation selection', '']
     for c, s in summary['configurations'].items():
-        lines.append(f"- {c}: seed-0 test MRR {s['test']['MRR']['mean']:.6f}; "
+        lines.append(f"- {c}: seed-{seed} test MRR {s['test']['MRR']['mean']:.6f}; "
                      f"test Hits@10 {s['test']['Hits@10']['mean']:.6f}; across-seed SD unavailable.")
     (directory / 'research_analysis.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
@@ -320,7 +321,7 @@ def plot_results(directory, results, summaries):
             if not per_seed or c.endswith('-warmup') and not c.endswith('-no-warmup'):
                 ax.axvline(90 if use_steps else 10, color='grey', alpha=.3)
             ax.set(xlabel='Optimizer updates' if use_steps else 'Epoch', ylabel=metric or 'BCE loss',
-                   title=c if per_seed else 'Seed 0; dashed warmup / solid integrated / dotted baseline; no across-seed SD')
+                   title=c if per_seed else f'Seed {results[0]["settings"]["seed"]}; dashed warmup / solid integrated / dotted baseline; no across-seed SD')
             ax.grid(alpha=.2); ax.legend(fontsize=7)
         finish(fig, name)
     for name, split, metric in [('test_mrr.png', 'test', 'MRR'), ('test_hits10.png', 'test', 'Hits@10'),
@@ -332,7 +333,7 @@ def plot_results(directory, results, summaries):
         errors = [v['std']/scale for v in values] if all(v['std'] is not None for v in values) else None
         ax.bar(list(CONFIGURATIONS), [v['mean']/scale for v in values], yerr=errors, capsize=4)
         ax.tick_params(axis='x', rotation=12)
-        ax.set(ylabel='GiB' if scale != 1 else metric, title=f'{split or "Execution"} {metric}: seed 0; no across-seed SD')
+        ax.set(ylabel='GiB' if scale != 1 else metric, title=f'{split or "Execution"} {metric}: seed {results[0]["settings"]["seed"]}; no across-seed SD')
         finish(fig, name)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     for ax, (split, metric) in zip(axes.flat, [(s,m) for s in ('validation','test') for m in ('Hits@1','Hits@3')]):

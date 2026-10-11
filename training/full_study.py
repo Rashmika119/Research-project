@@ -1,7 +1,7 @@
 """Full FB15k-237 study: three configurations, seed 0, 100 total epochs.
 
 No preliminary training is performed. Each child initializes its own model;
-only its own last.pt may resume it. The pilot registry remains unchanged.
+only its own last.pt may resume it. Seed 0 remains the approved default.
 """
 import argparse
 from dataclasses import asdict
@@ -28,8 +28,8 @@ COUNTS = (14541, 237, 272115, 17535, 20466)
 
 def make_config(identifier, seed, *, raw_dir='data/raw/fb15k237',
                 text_dir='data/text/fb15k237', text_batch_size=256, eval_batch_size=512):
-    if identifier not in CONFIGURATIONS or seed not in SEEDS:
-        raise ValueError('The full study requires one of three configurations and seed 0')
+    if identifier not in CONFIGURATIONS or type(seed) is not int or not 0 <= seed < 2**32:
+        raise ValueError('The full study requires a selected configuration and a nonnegative 32-bit seed')
     architecture, warmup = CONFIGURATIONS[identifier]
     cfg = ExperimentConfig(variant=architecture, max_entities=0, epochs=100,
         warmup=warmup, seed=seed, subset_seed=0, lr=.001, num_negatives=4,
@@ -59,7 +59,7 @@ def build_commands(args, root, manifest):
     runner = Path(__file__).resolve().parents[1] / 'run_full_dataset_comparison.py'
     commands = []
     for identifier in CONFIGURATIONS:
-        for seed in SEEDS:
+        for seed in (getattr(args, 'seed', 0),):
             directory = root / f'{identifier}_seed{seed}'
             command = [sys.executable, '-u', str(runner), '--single', identifier, '--seed', str(seed),
                        '--manifest', str(manifest), '--output-dir', str(directory)]
@@ -83,18 +83,20 @@ def main():
     parser.add_argument('--skip-completed', action='store_true')
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--single', choices=CONFIGURATIONS, help='One independent child; also useful for explicit manual launch')
-    parser.add_argument('--seed', type=int, choices=SEEDS, default=0)
+    parser.add_argument('--seed', type=int, default=0, help='Independent study seed; approved default: 0. Use a fresh output directory for another seed.')
     parser.add_argument('--manifest')
     parser.add_argument('--report-only', action='store_true', help='Regenerate reports from all three completed results; no training')
     args = parser.parse_args()
+    if not 0 <= args.seed < 2**32:
+        parser.error('--seed must be a nonnegative 32-bit integer')
     root = Path(args.output_dir)
     from training.full_reports import full_report
     if args.report_only:
         if args.single:
             parser.error('--report-only requires a complete study directory')
         results = [json.loads((root / f'{c}_seed{s}' / 'results.json').read_text(encoding='utf-8'))
-                   for c in CONFIGURATIONS for s in SEEDS]
-        full_report(root, results)
+                   for c in CONFIGURATIONS for s in (args.seed,)]
+        full_report(root, results, seed=args.seed)
         return
     if not torch.cuda.is_available():
         raise RuntimeError('Full research training requires CUDA; no CPU fallback or smoke training was started')
@@ -106,8 +108,8 @@ def main():
                        skip_completed=args.skip_completed, resume=args.resume)
         return
     manifest_path = root / 'dataset_manifest.json'
-    configs = {c: asdict(make_config(c, 0, **cfg_kwargs)) for c in CONFIGURATIONS}
-    config = {'protocol': PROTOCOL, 'seeds': list(SEEDS), 'configurations': configs,
+    configs = {c: asdict(make_config(c, args.seed, **cfg_kwargs)) for c in CONFIGURATIONS}
+    config = {'protocol': PROTOCOL if args.seed == 0 else PROTOCOL.replace('seed0', f'seed{args.seed}'), 'seeds': [args.seed], 'configurations': configs,
               'cache_dir': str(args.cache_dir)}
     config_path = root / 'comparison_config.json'
     if config_path.exists():
@@ -129,7 +131,7 @@ def main():
         run_logged(command, root / 'logs' / f'{identifier}_seed{seed}_{stamp}.log')
         results.append(json.loads((directory / 'results.json').read_text(encoding='utf-8')))
         write_json(root / 'runs.json', results)
-    summary = full_report(root, results)
+    summary = full_report(root, results, seed=args.seed)
     print('Selected by mean validation MRR:', summary['selected_by_validation'], flush=True)
     print('Reports:', root, flush=True)
 
