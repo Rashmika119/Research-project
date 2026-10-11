@@ -16,10 +16,10 @@ def code(source):
 
 
 md('''
-# Full FB15k-237: three models, 300 epochs, three seeds
-Nine independent scratch runs: RGAT + ComplEx baseline; Residual No-Softprompt
-with 30 warmup epochs; identical No-Softprompt with no warmup. Each run performs
-2,700 optimizer updates. Existing notebooks and results are historical artifacts.
+# Full FB15k-237: three models, 100 epochs, seed 0
+Three independent scratch runs: RGAT + ComplEx baseline; Residual No-Softprompt
+with 10 warmup epochs; identical No-Softprompt with no warmup. Each run performs
+900 optimizer updates. Existing notebooks and results are historical artifacts.
 
 Run Sections 1–4 for non-training setup and integrity checks. Optional training
 tests in Section 5 are disabled. Real training begins only when you execute the
@@ -44,15 +44,15 @@ assert torch.cuda.is_available(), 'Select Runtime > Change runtime type > T4 GPU
 print('GPU:', torch.cuda.get_device_name(0))
 print('Total GPU GiB:', torch.cuda.get_device_properties(0).total_memory / 2**30)
 print('Free / total bytes:', torch.cuda.mem_get_info())
-print('Keep GPU, packages and numerical policy consistent across all nine runs.')
+print('Keep GPU, packages and numerical policy consistent across all three runs.')
 ''')
 md('## 2. Drive, repository and dependencies')
 code('''
 from google.colab import drive
 drive.mount('/content/drive')
 SHARED_ROOT = Path('/content/drive/MyDrive/Research/scratch_pipeline_v1')
-STAGE_ROOT = Path('/content/drive/MyDrive/Research/full_dataset_comparison_300')
-RUN_TAG = 'full_fb15k237_300_v1_run1'  # Use the SAME tag to resume; a NEW tag for changed settings.
+STAGE_ROOT = Path('/content/drive/MyDrive/Research/full_dataset_comparison_100')
+RUN_TAG = 'full_fb15k237_100_seed0_v1_run1'  # Use the SAME tag to resume; a NEW tag for changed settings.
 RUN_ROOT = STAGE_ROOT / RUN_TAG
 RUN_ROOT.mkdir(parents=True, exist_ok=True)
 os.environ['RESEARCH_MODEL_BACKUP'] = str(SHARED_ROOT / 'verified_roberta_backup')
@@ -98,9 +98,9 @@ from training.experiment_io import write_json, environment
 from training.process import run_logged
 
 MAX_ENTITIES = 0
-SEEDS = [0, 1, 2]
-TOTAL_EPOCHS = 300
-WARMUP_EPOCHS = 30
+SEEDS = [0]
+TOTAL_EPOCHS = 100
+WARMUP_EPOCHS = 10
 TRAIN_BATCH_SIZE = 32768
 TEXT_BATCH_SIZE = 256
 EVAL_BATCH_SIZE = 512
@@ -112,7 +112,7 @@ RUN_OFFLINE_TRAINING_TESTS = False
 RUN_REAL_LM_SMOKE_TRAINING = False
 RUN_CUDA_RESUME_SMOKE_TRAINING = False
 RUN_SYNTHETIC_TRAINING_TESTS = False
-assert (MAX_ENTITIES, SEEDS, TOTAL_EPOCHS, WARMUP_EPOCHS, TRAIN_BATCH_SIZE, MAX_TEXT_LENGTH, EVAL_EVERY) == (0, list(APPROVED_SEEDS), 300, 30, 32768, 64, 5)
+assert (MAX_ENTITIES, SEEDS, TOTAL_EPOCHS, WARMUP_EPOCHS, TRAIN_BATCH_SIZE, MAX_TEXT_LENGTH, EVAL_EVERY) == (0, list(APPROVED_SEEDS), 100, 10, 32768, 64, 5)
 assert TEXT_BATCH_SIZE > 0 and EVAL_BATCH_SIZE > 0
 EXPERIMENT_DIR = RUN_ROOT / 'runs'
 MANIFEST = EXPERIMENT_DIR / 'dataset_manifest.json'
@@ -121,16 +121,16 @@ TEXT_DIR = SHARED_ROOT / 'data' / 'text'
 POOLED_CACHE = SHARED_ROOT / 'pooled_text_cache'
 LOG_DIR = RUN_ROOT / 'logs' / datetime.now().strftime('%Y%m%d_%H%M%S_%f')
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-protocol = yaml.safe_load(Path('experiments/configs/full_dataset_300.yaml').read_text())
+protocol = yaml.safe_load(Path('experiments/configs/full_dataset_100.yaml').read_text())
 assert list(CONFIGURATIONS) == list(protocol['configurations'])
 rows = []
 for identifier in CONFIGURATIONS:
     cfg = make_config(identifier, 0, raw_dir=RAW_DIR, text_dir=TEXT_DIR,
                       text_batch_size=TEXT_BATCH_SIZE, eval_batch_size=EVAL_BATCH_SIZE)
     rows.append({'configuration': identifier, 'warmup_epochs': cfg.warmup,
-                 'main_epochs': 300-cfg.warmup, **expected_budget(identifier)})
+                 'main_epochs': 100-cfg.warmup, **expected_budget(identifier)})
 display(pd.DataFrame(rows))
-print('9 runs; 24,300 committed updates; full graph recomputed for every optimizer step.')
+print('3 runs; 2,700 committed updates; full graph recomputed for every optimizer step.')
 write_json(LOG_DIR / 'environment.json', environment())
 with (LOG_DIR / 'pip_freeze.txt').open('w') as f:
     subprocess.run([sys.executable, '-m', 'pip', 'freeze'], stdout=f, check=True)
@@ -183,15 +183,15 @@ print('Optional test flags:', RUN_OFFLINE_TRAINING_TESTS, RUN_REAL_LM_SMOKE_TRAI
       RUN_CUDA_RESUME_SMOKE_TRAINING, RUN_SYNTHETIC_TRAINING_TESTS)
 ''')
 md('''
-## 6. Execute the nine real research runs
+## 6. Execute the three real research runs
 Execute the following cell when ready to train. It performs no preliminary training.
 Every completed epoch prints loss, phase, elapsed time and peak GPU memory; epochs
-5,10,...,300 also print validation MRR/Hits@10. Full traces are streamed and saved.
+5,10,...,100 also print validation MRR/Hits@10. Full traces are streamed and saved.
 
 Structural validation cannot select integrated weights. The initial integrated
-evaluation at epoch 0 or the epoch-30 boundary is diagnostic only. Baseline and
-no-warmup selection start at epoch 5; warmup integrated selection starts at 35.
-All runs finish 300 epochs and evaluate their validation-selected model on test.
+evaluation at epoch 0 or the epoch-10 boundary is diagnostic only. Baseline and
+no-warmup selection start at epoch 5; warmup integrated selection starts at 15.
+All runs finish 100 epochs and evaluate their validation-selected model on test.
 ''')
 code('''
 command = [sys.executable, '-u', 'run_full_dataset_comparison.py',
@@ -209,7 +209,7 @@ md('''
 Reconnect with the same RUN_TAG, exact source commit, package versions, GPU and
 settings. Rerun setup and the training cell. Completed runs are verified/skipped;
 partial runs restore their own atomic epoch-end last.pt. The unfinished epoch
-is replayed (up to nine updates); committed budget remains 2,700. No mid-epoch
+is replayed (up to nine updates); committed budget remains 900. No mid-epoch
 resume or cross-hardware exact-reproducibility claim is made.
 
 Each run saves config.json, manifest.json, best.pt, last.pt, history.json/CSV,
@@ -233,14 +233,14 @@ display(pd.DataFrame(status))
 ''')
 md('''
 ## 8. Final comparison and research analysis
-Select by mean validation MRR, then report test metrics separately. Tables include
-sample SD, paired seed effects, Hits@1/3/10, ties, memory, time and best/final epochs.
+Select by mean validation MRR, then report test metrics separately. Across-seed SD is unavailable with one seed. Tables include
+seed-0 differences, Hits@1/3/10, ties, memory, time and best/final epochs.
 Dashed warmup, solid integrated and dotted baseline curves represent distinct phases.
-Loss versus updates includes all 2,700 step losses; epoch loss is the mean of nine
+Loss versus updates includes all 900 step losses; epoch loss is the mean of nine
 update losses. The 9,971-positive last batch has a separate example-weighted diagnostic.
 
-Paired signs show whether improvements agree across seeds. Ranking instability
-compares MRR changes over matched epochs 35–300. A falling loss and stalled/worsening
+Seed-0 differences are descriptive; consistency across seeds cannot be assessed. Ranking instability
+compares MRR changes over matched epochs 15–100. A falling loss and stalled/worsening
 validation is an overfitting warning, not proof. Observed-best convergence thresholds
 are descriptive, not equal absolute performance targets. No significance claims.
 ''')
@@ -263,7 +263,7 @@ if all(p.is_file() for p in result_paths):
     for filename in PLOTS:
         display(Image(filename=str(EXPERIMENT_DIR / filename)))
 else:
-    print('Complete all nine runs before making a configuration comparison.')
+    print('Complete all three runs before making a configuration comparison.')
 print('Persistent results:', EXPERIMENT_DIR)
 print('Logs:', LOG_DIR)
 ''')

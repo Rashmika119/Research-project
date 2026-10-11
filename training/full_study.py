@@ -1,4 +1,4 @@
-"""Approved full FB15k-237 study: three configurations, nine independent runs.
+"""Full FB15k-237 study: three configurations, seed 0, 100 total epochs.
 
 No preliminary training is performed. Each child initializes its own model;
 only its own last.pt may resume it. The pilot registry remains unchanged.
@@ -16,11 +16,11 @@ from training.experiment_io import digest, prepare_data, write_json
 from training.process import run_logged
 from training.research_pipeline import ExperimentConfig, run_experiment
 
-PROTOCOL = 'full_fb15k237_three_models_300_v1'
-SEEDS = (0, 1, 2)
+PROTOCOL = 'full_fb15k237_three_models_100_seed0_v1'
+SEEDS = (0,)
 CONFIGURATIONS = {
     'baseline': ('baseline', 0),
-    'residual-no-softprompt-warmup': ('residual-no-softprompt', 30),
+    'residual-no-softprompt-warmup': ('residual-no-softprompt', 10),
     'residual-no-softprompt-no-warmup': ('residual-no-softprompt', 0),
 }
 COUNTS = (14541, 237, 272115, 17535, 20466)
@@ -29,9 +29,9 @@ COUNTS = (14541, 237, 272115, 17535, 20466)
 def make_config(identifier, seed, *, raw_dir='data/raw/fb15k237',
                 text_dir='data/text/fb15k237', text_batch_size=256, eval_batch_size=512):
     if identifier not in CONFIGURATIONS or seed not in SEEDS:
-        raise ValueError('The full study requires one of three configurations and seed 0, 1 or 2')
+        raise ValueError('The full study requires one of three configurations and seed 0')
     architecture, warmup = CONFIGURATIONS[identifier]
-    cfg = ExperimentConfig(variant=architecture, max_entities=0, epochs=300,
+    cfg = ExperimentConfig(variant=architecture, max_entities=0, epochs=100,
         warmup=warmup, seed=seed, subset_seed=0, lr=.001, num_negatives=4,
         train_batch_size=32768, text_batch_size=text_batch_size, max_text_length=64,
         eval_every=5, eval_batch_size=eval_batch_size, raw_dir=str(raw_dir), text_dir=str(text_dir),
@@ -42,10 +42,10 @@ def make_config(identifier, seed, *, raw_dir='data/raw/fb15k237',
 
 def expected_budget(identifier):
     architecture, warm = CONFIGURATIONS[identifier]
-    return {'steps_per_epoch': 9, 'optimizer_steps': 2700,
+    return {'steps_per_epoch': 9, 'optimizer_steps': 900,
             'structural_optimizer_steps': warm * 9,
-            'baseline_optimizer_steps': 2700 if architecture == 'baseline' else 0,
-            'integrated_optimizer_steps': 0 if architecture == 'baseline' else (300 - warm) * 9}
+            'baseline_optimizer_steps': 900 if architecture == 'baseline' else 0,
+            'integrated_optimizer_steps': 0 if architecture == 'baseline' else (100 - warm) * 9}
 
 
 def verify_manifest(manifest):
@@ -85,7 +85,7 @@ def main():
     parser.add_argument('--single', choices=CONFIGURATIONS, help='One independent child; also useful for explicit manual launch')
     parser.add_argument('--seed', type=int, choices=SEEDS, default=0)
     parser.add_argument('--manifest')
-    parser.add_argument('--report-only', action='store_true', help='Regenerate reports from all nine completed results; no training')
+    parser.add_argument('--report-only', action='store_true', help='Regenerate reports from all three completed results; no training')
     args = parser.parse_args()
     root = Path(args.output_dir)
     from training.full_reports import full_report
@@ -124,7 +124,7 @@ def main():
     print('Full dataset:', manifest['statistics'], '\nManifest:', manifest['sha256'], flush=True)
     results = []
     for identifier, seed, directory, command in build_commands(args, root, manifest_path):
-        print(f'Run {len(results)+1}/9: {identifier}; seed={seed}; {expected_budget(identifier)}', flush=True)
+        print(f'Run {len(results)+1}/3: {identifier}; seed={seed}; {expected_budget(identifier)}', flush=True)
         stamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         run_logged(command, root / 'logs' / f'{identifier}_seed{seed}_{stamp}.log')
         results.append(json.loads((directory / 'results.json').read_text(encoding='utf-8')))

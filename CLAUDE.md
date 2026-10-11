@@ -1,17 +1,17 @@
 # Current instructions: approved full-data study
 
-Read README.md, docs/FULL_DATASET_300.md and experiments/configs/full_dataset_300.yaml.
+Read README.md, docs/FULL_DATASET_300.md and experiments/configs/full_dataset_100.yaml.
 Previous instructions are archived byte-for-byte in docs/WARMUP_STAGE_INSTRUCTIONS.md.
 Historical stage results/protocols remain preserved; they are not current defaults.
 
 ## Protocol
 
-Exactly three configurations, seeds 0,1,2 (nine independent runs):
-- baseline: first RGAT + ComplEx; 300 baseline epochs, 2,700 baseline updates.
-- residual-no-softprompt-warmup: 30 structural + 270 integrated epochs;
-  270 structural + 2,430 integrated updates.
-- residual-no-softprompt-no-warmup: identical architecture; 300 integrated epochs,
-  2,700 integrated updates.
+Exactly three configurations, seed 0 only (three independent runs):
+- baseline: first RGAT + ComplEx; 100 baseline epochs, 900 baseline updates.
+- residual-no-softprompt-warmup: 10 structural + 90 integrated epochs;
+  90 structural + 810 integrated updates.
+- residual-no-softprompt-no-warmup: identical architecture; 100 integrated epochs,
+  900 integrated updates.
 
 Full FB15k-237: max_entities=0, 14541 entities, 237 relations,
 272115/17535/20466 train/valid/test triples. Keep original mappings/splits,
@@ -20,7 +20,7 @@ No synthetic fallback. Verify full manifest/fingerprints; reject changed data.
 Negative filtering uses training facts only; evaluation filtering uses all splits.
 Correct exact-tie rank: 1+higher+(equal-1)/2; optimistic MRR/ties are diagnostics.
 
-300 epochs, training batch32768, final batch9971; nine updates/epoch. No dropping,
+100 epochs, training batch32768, final batch9971; nine updates/epoch. No dropping,
 accumulation, early stopping or hidden budget changes. Adam .001, weight decay
 .00001, gradient clip1, four negatives, BCE, full precision, width32,
 two-layer/one-head RGAT/dropout .2, projection dropout .1, text batch256,
@@ -51,15 +51,15 @@ or delete shared mathematical/historical checkpoint inspection code.
 ## Evaluation
 
 Every five epochs. New study selection_policy=scheduled_only: initial integrated
-validation at epoch0/boundary30 is diagnostic only. Warmup structural validation
+validation at epoch0/boundary10 is diagnostic only. Warmup structural validation
 cannot select integrated weights. Baseline/no-warmup selection starts5; warmup
-integrated selection starts35. Earliest equal best wins. Preserve the historical
+integrated selection starts15. Earliest equal best wins. Preserve the historical
 initial_and_scheduled default for older workflows. After training, evaluate the
 best validation checkpoint on test; select configuration by mean validation MRR,
-never test. Report sample SD, paired seed effects, ties, memory/time, best/final
-metrics and phase-separated learning curves. No significance claims from three seeds.
+never test. Report seed-0 differences and unavailable across-seed SD, ties, memory/time, best/final
+metrics and phase-separated learning curves. No significance claims or across-seed consistency claims from one seed.
 Keep epoch loss as mean update losses; additionally record example-weighted loss
-and all2700 step losses, without altering optimization.
+and all900 step losses, without altering optimization.
 
 ## Notebook protection and execution
 
@@ -68,7 +68,7 @@ notebooks/warmup_ablation_5000.ipynb. Both contain manual edits and saved output
 Generators must refuse overwriting them. New notebook:
 notebooks/full_dataset_comparison_300.ipynb; separate generator:
 notebooks/build_full_dataset_notebook.py (also refuses overwrite).
-New Drive root: Research/full_dataset_comparison_300. New entrypoint:
+New Drive root: Research/full_dataset_comparison_100. New entrypoint:
 run_full_dataset_comparison.py; --report-only never trains.
 The full-study registry is separate from the retained pilot registry.
 

@@ -5,15 +5,23 @@ The researcher approved this protocol after source inspection. Open
 protected historical artifacts, including their manual edits and saved outputs.
 This is a new study. Earlier 100-epoch baseline scores are not equivalent controls.
 
+Updated at the researcher's request: **100 total epochs, 10 warmup epochs, seed 0
+only (three experiments)**. The notebook and guide retain their `_300` filenames
+for existing links; their active settings are now 100/10. The new run tag is
+`full_fb15k237_100_seed0_v1_run1` under `Research/full_dataset_comparison_100`.
+Old 300-epoch artifacts remain untouched and cannot resume under these changed
+settings. Use the old source revision to finish an old run. The old 300-epoch
+YAML remains as a historical reference; current YAML is `full_dataset_100.yaml`.
+
 ## Fixed protocol
 
 | Configuration | Warmup epochs/updates | Main epochs/updates |
 | --- | ---: | ---: |
-| baseline | 0 / 0 | 300 / 2,700 baseline |
-| residual-no-softprompt-warmup | 30 / 270 | 270 / 2,430 integrated |
-| residual-no-softprompt-no-warmup | 0 / 0 | 300 / 2,700 integrated |
+| baseline | 0 / 0 | 100 / 900 baseline |
+| residual-no-softprompt-warmup | 10 / 90 | 90 / 810 integrated |
+| residual-no-softprompt-no-warmup | 0 / 0 | 100 / 900 integrated |
 
-Three seeds 0,1,2 per configuration; nine runs. Each run initializes all trainable
+Seed 0 only per configuration; three runs. Each run initializes all trainable
 parameters from scratch. Same-seed No-Softprompt pairs have matching complete
 trainable fingerprints; all three share their initial structural fingerprint.
 No transfer from another configuration, seed, baseline or historical checkpoint.
@@ -24,9 +32,9 @@ The same run's Adam moments and structural parameters continue through warmup.
 - Original mappings/splits; train-only graph plus inverses: 544,230 message edges
   and 474 message relation types. No held-out message edges. Negative filtering
   uses known training facts; evaluation filtering uses all splits.
-- 300 epochs, 32,768 positive triples per optimizer batch: eight full batches
+- 100 epochs, 32,768 positive triples per optimizer batch: eight full batches
   and one 9,971-positive batch. No drop-last, accumulation or early stopping.
-  Exactly nine updates/epoch, 2,700 committed updates/run, 24,300 across the study.
+  Exactly nine updates/epoch, 900 committed updates/run, 2,700 across the study.
 - Adam LR .001, weight decay .00001, gradient clipping 1, four negatives/positive,
   existing positive BCE + negative BCE; no scheduler or gradient scaler.
 - Full precision; width 32 (16 real + 16 imaginary ComplEx coordinates),
@@ -38,7 +46,7 @@ The same run's Adam moments and structural parameters continue through warmup.
 - Strict deterministic algorithms; Python/NumPy/Torch CPU/all-CUDA RNG,
   separate negative-sampling RNG and shuffle generator retained.
 
-`experiments/configs/full_dataset_300.yaml` documents this protocol;
+`experiments/configs/full_dataset_100.yaml` documents this protocol;
 `training/full_study.py` constructs and validates it. YAML alone does not override
 the runner. Fixed epochs/budgets cannot be changed accidentally by CLI flags.
 No-Refinement and soft-prompt Residual remain available outside this study;
@@ -69,20 +77,20 @@ a forward/backward. Actual text training retains the existing strict loader.
 
 ## Validation and selection
 
-Validation runs at epochs 5,10,...,300. Baseline and no-warmup eligible checkpoints
-start at epoch 5. Warmup diagnostics at 5..30 are structural-only; the initial
-integrated boundary evaluation after epoch 30 is diagnostic-only. Its first
-eligible integrated checkpoint is epoch 35. Initial no-warmup epoch-0 evaluation
+Validation runs at epochs 5,10,...,100. Baseline and no-warmup eligible checkpoints
+start at epoch 5. Warmup diagnostics at 5..10 are structural-only; the initial
+integrated boundary evaluation after epoch 10 is diagnostic-only. Its first
+eligible integrated checkpoint is epoch 15. Initial no-warmup epoch-0 evaluation
 is also diagnostic-only. The result records this evaluation separately with its
 boundary epoch. It is committed with the first main epoch, so a disconnection
 before that commit can repeat the boundary evaluation without changing learning.
 
 `selection_policy=scheduled_only` implements this approved change; historical
 runners retain `initial_and_scheduled`. Equal validation MRR keeps the earliest
-eligible checkpoint. After all 300 epochs, reload the selected model, reevaluate
+eligible checkpoint. After all 100 epochs, reload the selected model, reevaluate
 validation and evaluate test. Test never selects checkpoints/configurations.
-Select configuration by mean selected validation MRR across three seeds; exact
-ties use configured order. Report mean and sample SD and paired seed differences,
+Select configuration by mean selected validation MRR for seed 0; exact
+ties use configured order. Report seed-0 differences; across-seed SD is null and error bars are omitted,
 without significance claims. Corrected ranking uses 1+higher+(equal-1)/2.
 
 ## Launch and resume
@@ -93,10 +101,10 @@ without significance claims. Corrected ranking uses 1+higher+(equal-1)/2.
 3. Run Sections 1–4. They mount Drive, install/record dependencies, validate
    dataset counts/manifest and pretrained file integrity. No training occurs.
 4. Leave all four Section 5 optional training flags false.
-5. Execute Section 6 when ready to start the real nine-run study.
+5. Execute Section 6 when ready to start the real three-run study.
 6. Inspect Section 7 checkpoints and Section 8 complete reports.
 
-Default output: `MyDrive/Research/full_dataset_comparison_300/<RUN_TAG>/runs/`.
+Default output: `MyDrive/Research/full_dataset_comparison_100/<RUN_TAG>/runs/`.
 Each configuration/seed has its own directory. Old artifacts are never overwritten.
 Shared raw/text files, verified model backup and frozen representation caches
 may be reused. The notebook records a dependency lock for relevant packages,
@@ -107,7 +115,7 @@ the runtime; the notebook checks this. Colab's Python/CUDA runtime must also mat
 Equivalent CLI (CUDA required):
 
 ```bash
-python run_full_dataset_comparison.py --output-dir experiments/research/full_300_run1 --skip-completed --resume
+python run_full_dataset_comparison.py --output-dir experiments/research/full_100_run1 --skip-completed --resume
 ```
 
 For Drive resources provide `--raw-dir`, `--text-dir` and `--cache-dir` as in the
@@ -118,7 +126,7 @@ After disconnect, use the same run tag, source, packages, GPU and settings and
 rerun setup and Section 6. Completed-run identities and checkpoint checksums are
 verified; partial runs restore only their own atomic epoch-end `last.pt`. An
 uncommitted epoch may be replayed (up to nine optimizer steps); the completed
-model still has 2,700 committed updates. Replayed compute is not part of the
+model still has 900 committed updates. Replayed compute is not part of the
 committed time/update counter. No mid-epoch resume or exact cross-device
 reproducibility is claimed. Code changes require a new output directory; use the
 historical commit to resume older-stage checkpoints.
@@ -139,7 +147,7 @@ python run_full_dataset_comparison.py --single baseline --seed 0 --output-dir ex
 Regenerate reports without training or evaluation:
 
 ```bash
-python run_full_dataset_comparison.py --report-only --output-dir experiments/research/full_300_run1
+python run_full_dataset_comparison.py --report-only --output-dir experiments/research/full_100_run1
 ```
 
 ## Output and interpretation
@@ -149,7 +157,7 @@ MRR and Hits@10. All validation/test metrics include Hits@1/3/10, optimistic MRR
 tied-query fraction and mean/max ties. Full subprocess output and tracebacks are
 streamed and saved. No child survives a completed run, releasing its GPU allocations.
 
-The report validates all nine identities, budgets, phases, initial fingerprints,
+The report validates all three identities, budgets, phases, initial fingerprints,
 step histories and selection before comparing results. Baseline intentionally has
 no LM identity; both text configurations must share one and matching cache keys.
 Outputs: summary.json, runs.json, comparison.csv, runs.csv, epochs.csv, steps.csv,
@@ -162,19 +170,19 @@ Thirteen PNG plots: mean_training_loss, mean_validation_mrr,
 mean_validation_hits10, test_mrr, test_hits10, per_seed_loss,
 per_seed_validation_mrr, training_time, gpu_memory, optimizer_steps_loss,
 validation_mrr, validation_hits10, hits1_hits3. Warmup is dashed, integrated solid,
-baseline dotted. No mean mixes training phases. All 2,700 step losses are retained.
+baseline dotted. No mean mixes training phases. All 900 step losses are retained.
 Epoch loss preserves the mean of nine update losses; an additional example-weighted
 loss accounts for the smaller final batch, without changing optimization.
 
 Paired reports compare warmup/no-warmup and each text configuration against baseline
 for validation/test MRR/Hits, duration, ranking instability and descriptive convergence.
-Percent changes are null for zero denominators. Positive/negative seed counts show
-consistency. Ranking instability uses MRR-change sample SD over matched epochs
-35..300. Convergence epoch is the first eligible validation reaching 95% of that
+Percent changes are null for zero denominators. Positive/negative counts describe only seed 0; they cannot establish
+consistency across seeds. Ranking instability uses MRR-change sample SD over matched epochs
+15..100. Convergence epoch is the first eligible validation reaching 95% of that
 run's observed best, not an equal absolute target. Loss diagnostics include
 phase-local slope, fluctuations and spikes. Best-before-final, best-to-final MRR
 drop and falling-loss/stalled-validation flags describe possible overfitting;
-they cannot establish it or statistical significance with three seeds.
+they cannot establish it or statistical significance with one seed.
 
 Total duration includes setup/cache, validation/test and checkpoint I/O; training
 intervals and individual epoch times are also reported. Cache hits make later
@@ -199,16 +207,22 @@ memory dominates; smaller text/eval chunks cannot solve that allocation. An
 actual OOM stops the run with diagnostics. A larger GPU or separately reviewed
 activation checkpointing may be needed; no automatic methodological changes.
 
-The budget is 90x the pilot optimizer updates and ~3.76x its graph edges.
+The budget is 30x the pilot optimizer updates and ~3.76x its graph edges.
 Full graph encoding repeats nine times/epoch; Python negative sampling and
 evaluation filtering are additional bottlenecks. No runtime or full-data scores
 are promised. Preliminary training is disabled, including CPU/synthetic/LM/resume
 smokes. Only static, mocked and non-training checks run during this implementation.
 Report fixtures contain fabricated numbers and are never research results.
 
-Implementation verification: **14 non-training checks passed, 0 failed** on the
+The 100/10, seed-0 revision passed **10 non-training study checks, 0 failed**,
+including the three-run budget, single-seed reports and plots, notebook schema
+and mocked execution, and both historical notebook hashes. Log:
+`experiments/research/full_100_seed0_checks.log` (ignored local artifact).
+No training was launched for this revision.
+
+Original implementation verification: **14 non-training checks passed, 0 failed** on the
 local CPU environment, plus syntax checks for 78 Python files and `git diff
---check`. Checks cover all nine child configurations, parent orchestration,
+--check`. Checks cover all three child configurations, parent orchestration,
 changed-setting rejection, full-data manifest constraints, both selection
 schedules, cached-feature reuse without LM encoding, baseline construction
 without LM, statistical/report guards, all 13 PNGs, generated research answers,
@@ -237,7 +251,7 @@ preview if future manual edits need reconciliation.
 ## Files and preservation
 
 Created: full-study runner, training/full_study.py, training/full_reports.py,
-experiments/configs/full_dataset_300.yaml, new notebook/generator,
+experiments/configs/full_dataset_100.yaml, new notebook/generator,
 tests/test_full_study.py, this guide, STAGE2_RESULTS.md and archived warmup-stage
 README/instructions. Modified: research_pipeline.py, text_cache.py, pilot
 generator protection, notebook tests, README.md and CLAUDE.md.

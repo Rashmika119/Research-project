@@ -45,7 +45,7 @@ def fixture_results():
         for seed in SEEDS:
             cfg = make_config(c, seed)
             history = []
-            for e in range(1, 301):
+            for e in range(1, 101):
                 h = {'epoch': e, 'phase': 'structural_warmup' if e <= cfg.warmup else 'main',
                      'loss': 1.5-e*.001, 'example_weighted_loss': 1.5-e*.001,
                      'optimizer_steps': e*9, 'train_seconds': 1., 'epoch_seconds': 2.,
@@ -53,7 +53,7 @@ def fixture_results():
                                       'positive_count': 32768 if s < 8 else 9971} for s in range(9)]}
                 if e % 5 == 0:
                     h['validation'] = metrics(.8 if e <= cfg.warmup else
-                        .05 + index*.01 + seed*.001 + (min(e,250)-max(0,e-250)*.1)*.0001)
+                        .05 + index*.01 + seed*.001 + (min(e,75)-max(0,e-75)*.1)*.0001)
                     h['validation_model'] = 'baseline' if c == 'baseline' else 'structural' if e <= cfg.warmup else 'integrated'
                 history.append(h)
             results.append({'configuration': c, 'architecture': cfg.variant, 'settings': asdict(cfg),
@@ -65,8 +65,8 @@ def fixture_results():
                 'text_cache_keys': None if c == 'baseline' else {'entities': 'fixture', 'relations': 'fixture'},
                 'initial_structural_sha256': f'paired-structural-{seed}',
                 'initial_trainable_sha256': f'{cfg.variant}-{seed}',
-                'warmup_epochs': cfg.warmup, 'main_epochs': 300-cfg.warmup,
-                **expected_budget(c), 'best_epoch': 250, 'validation': history[249]['validation'],
+                'warmup_epochs': cfg.warmup, 'main_epochs': 100-cfg.warmup,
+                **expected_budget(c), 'best_epoch': 75, 'validation': history[74]['validation'],
                 'test': metrics(.2-index*.01), 'final_epoch_validation': history[-1]['validation'],
                 'initial_validation': None if c == 'baseline' else metrics(.9),
                 'duration_seconds': 700.+index*100+seed, 'peak_gpu_memory_bytes': (index+1)*2**30,
@@ -77,17 +77,22 @@ def fixture_results():
 
 class FullStudyTests(unittest.TestCase):
     def test_configs_budgets_schedule_and_pairing(self):
+        self.assertEqual(SEEDS, (0,))
+        self.assertEqual(make_config('residual-no-softprompt-warmup', 0).warmup, 10)
+        self.assertEqual(make_config('baseline', 0).epochs, 100)
+        with self.assertRaises(ValueError):
+            make_config('baseline', 1)
         self.assertEqual(divmod(272115,32768), (8,9971))
         for c in CONFIGURATIONS:
             for seed in SEEDS:
                 cfg = make_config(c, seed)
-                self.assertEqual([e for e in range(1,301) if validation_due(cfg,e,cfg.warmup)], list(range(5,301,5)))
+                self.assertEqual([e for e in range(1,101) if validation_due(cfg,e,cfg.warmup)], list(range(5,101,5)))
                 self.assertFalse(can_select_initial(cfg))
-                self.assertEqual(sum(expected_budget(c)[k] for k in ('baseline_optimizer_steps','structural_optimizer_steps','integrated_optimizer_steps')),2700)
+                self.assertEqual(sum(expected_budget(c)[k] for k in ('baseline_optimizer_steps','structural_optimizer_steps','integrated_optimizer_steps')),900)
         self.assertTrue(can_select_initial(ExperimentConfig()))
         a,b = (asdict(make_config(c,0)) for c in list(CONFIGURATIONS)[1:])
         self.assertEqual({k for k in a if a[k] != b[k]}, {'warmup'})
-        protocol = yaml.safe_load((ROOT/'experiments/configs/full_dataset_300.yaml').read_text())
+        protocol = yaml.safe_load((ROOT/'experiments/configs/full_dataset_100.yaml').read_text())
         self.assertEqual(list(protocol['configurations']), list(CONFIGURATIONS))
         for key in ('epochs','train_batch_size','lr','weight_decay','num_negatives','model','text_batch_size','eval_batch_size','max_text_length','eval_every','selection_policy','record_step_losses'):
             self.assertEqual(asdict(make_config('baseline',0))[key],protocol[key])
@@ -99,12 +104,12 @@ class FullStudyTests(unittest.TestCase):
         m['statistics']['entities'] = 5000
         with self.assertRaises(ValueError): verify_manifest(m)
 
-    def test_nine_independent_commands_and_child_configs(self):
+    def test_three_independent_commands_and_child_configs(self):
         args = SimpleNamespace(raw_dir='raw',text_dir='text',cache_dir='cache',text_batch_size=256,
                                eval_batch_size=512,skip_completed=True,resume=True)
         commands = build_commands(args,Path('fresh'),Path('fresh/dataset_manifest.json'))
-        self.assertEqual(len(commands),9)
-        self.assertEqual(len({str(x[2]) for x in commands}),9)
+        self.assertEqual(len(commands),3)
+        self.assertEqual(len({str(x[2]) for x in commands}),3)
         from training.full_study import main
         for c,s,d,command in commands:
             self.assertNotIn('--checkpoint',command)
@@ -121,13 +126,13 @@ class FullStudyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             summary = full_report(directory,runs)
             self.assertEqual(summary['selected_by_validation'],'residual-no-softprompt-no-warmup')
-            self.assertAlmostEqual(summary['configurations']['baseline']['validation']['MRR']['std'],.001)
+            self.assertIsNone(summary['configurations']['baseline']['validation']['MRR']['std'])
             self.assertEqual(len(summary['paired_comparisons']),33)
             for name in PLOTS:
                 p=Path(directory)/name
                 self.assertGreater(p.stat().st_size,1000)
                 self.assertEqual(p.read_bytes()[:8],b'\x89PNG\r\n\x1a\n')
-            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),24301)
+            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),2701)
             self.assertIn('not evidence of statistical significance', (Path(directory)/'research_analysis.md').read_text())
             behavior=json.loads((Path(directory)/'training_behavior.json').read_text())
             self.assertTrue(all(r['best_before_final'] for r in behavior))
@@ -154,24 +159,24 @@ class FullStudyTests(unittest.TestCase):
                   patch('training.full_reports.full_report',return_value={'selected_by_validation':'fixture'}) as report,
                   redirect_stdout(io.StringIO())):
                 main()
-                self.assertEqual(launch.call_count,9)
-                self.assertEqual(len(report.call_args.args[1]),9)
+                self.assertEqual(launch.call_count,3)
+                self.assertEqual(len(report.call_args.args[1]),3)
                 self.assertTrue((Path(directory)/'comparison_config.json').exists())
                 with patch('sys.argv',argv+['--eval-batch-size','256']):
                     with self.assertRaisesRegex(ValueError,'settings changed'):main()
-                self.assertEqual(launch.call_count,9)
+                self.assertEqual(launch.call_count,3)
                 with patch('sys.argv',['runner','--output-dir',directory,'--report-only']), \
                      patch('torch.cuda.is_available',return_value=False):
                     main()
-                self.assertEqual(launch.call_count,9)
+                self.assertEqual(launch.call_count,3)
 
     def test_reports_reject_mixed_or_incomplete_results(self):
         original=fixture_results()
         mutations = [lambda r:r.pop(), lambda r:r[0].update(manifest_sha256='other'),
-            lambda r:r[3].update(initial_trainable_sha256='other'),
-            lambda r:r[3].update(lm_identity={'revision':'other'}),
-            lambda r:r[0].update(integrated_optimizer_steps=2700),
-            lambda r:r[3].update(best_epoch=30),
+            lambda r:r[1].update(initial_trainable_sha256='other'),
+            lambda r:r[1].update(lm_identity={'revision':'other'}),
+            lambda r:r[0].update(integrated_optimizer_steps=900),
+            lambda r:r[1].update(best_epoch=10),
             lambda r:r[0]['settings'].update(train_batch_size=16384),
             lambda r:r[0]['history'][0]['step_losses'].pop(),
             lambda r:r[0]['history'][0].update(validation=r[0]['validation'])]
@@ -273,7 +278,7 @@ class FullStudyTests(unittest.TestCase):
                     if cell['cell_type']!='code':continue
                     source=cell['source'].replace("Path('/content/Research-project')",f'Path({str(ROOT)!r})')
                     source=source.replace("Path('/content/drive/MyDrive/Research/scratch_pipeline_v1')",f'Path({str(Path(directory)/"shared")!r})')
-                    source=source.replace("Path('/content/drive/MyDrive/Research/full_dataset_comparison_300')",f'Path({str(Path(directory)/"stage")!r})')
+                    source=source.replace("Path('/content/drive/MyDrive/Research/full_dataset_comparison_100')",f'Path({str(Path(directory)/"stage")!r})')
                     exec(compile(source,f'full_cell_{i}','exec'),scope)
                     if i<12:
                         self.assertFalse(any('run_full_dataset_comparison.py' in c for c in calls))

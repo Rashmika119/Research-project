@@ -19,7 +19,7 @@ def validate_runs(results):
     actual = [(r['configuration'], r['settings']['seed']) for r in results]
     expected = {(c, s) for c in CONFIGURATIONS for s in SEEDS}
     if len(actual) != len(expected) or set(actual) != expected:
-        raise ValueError('Reports require exactly all nine unique configuration/seed results')
+        raise ValueError('Reports require exactly all three unique configuration/seed-0 results')
     for field in ('manifest_sha256', 'dataset_sha256', 'candidate_entities', 'ranking_policy',
                   'environment', 'numerical_policy'):
         if len({digest(r[field]) for r in results}) != 1:
@@ -48,13 +48,13 @@ def validate_runs(results):
                               ('entities', 'relations', 'train_triples', 'valid_triples', 'test_triples'))
         if actual_counts != COUNTS:
             raise ValueError('Wrong dataset split counts')
-        if r['warmup_epochs'] != cfg['warmup'] or r['main_epochs'] != 300 - cfg['warmup']:
+        if r['warmup_epochs'] != cfg['warmup'] or r['main_epochs'] != 100 - cfg['warmup']:
             raise ValueError('Wrong phase epoch budgets')
         for k, v in expected_budget(identifier).items():
             if r[k] != v:
                 raise ValueError('Wrong update budget: ' + k)
         history = r['history']
-        if [h['epoch'] for h in history] != list(range(1, 301)):
+        if [h['epoch'] for h in history] != list(range(1, 101)):
             raise ValueError('Incomplete epoch history')
         eligible = []
         for h in history:
@@ -107,19 +107,19 @@ def behavior(r):
     main = [h for h in histories if h['phase'] == 'main']
     validation = [h for h in main if 'validation' in h]
     # Compare the same epochs for all models, independently of warmup eligibility.
-    matched = [h for h in validation if h['epoch'] >= 35]
+    matched = [h for h in validation if h['epoch'] >= 15]
     deltas = [b['validation']['MRR'] - a['validation']['MRR'] for a, b in zip(matched, matched[1:])]
     tail = validation[-6:]
     return {'configuration': r['configuration'], 'seed': r['settings']['seed'],
             'warmup_loss': loss_behavior([h for h in histories if h['phase'] == 'structural_warmup']),
             'main_loss': loss_behavior(main), 'main_model': 'baseline' if r['architecture'] == 'baseline' else 'integrated',
-            'best_epoch': r['best_epoch'], 'best_before_final': r['best_epoch'] < 300,
+            'best_epoch': r['best_epoch'], 'best_before_final': r['best_epoch'] < 100,
             'best_to_final_validation_mrr_drop': r['validation']['MRR'] - r['final_epoch_validation']['MRR'],
             'loss_falls_while_validation_stalls_last_6_evaluations':
                 len(tail) > 1 and tail[-1]['loss'] < tail[0]['loss'] and
                 max(h['validation']['MRR'] for h in tail[1:]) <= tail[0]['validation']['MRR'] + 1e-6,
-            'matched_epochs_35_300_mrr_delta_sd': stats.stdev(deltas),
-            'matched_epochs_35_300_ranking_declines': sum(x < 0 for x in deltas),
+            'matched_epochs_15_100_mrr_delta_sd': stats.stdev(deltas),
+            'matched_epochs_15_100_ranking_declines': sum(x < 0 for x in deltas),
             'first_epoch_at_95pct_observed_best_main_mrr': next(h['epoch'] for h in validation
                 if h['validation']['MRR'] >= .95 * r['validation']['MRR']),
             'severe_tie_evaluations': [h['epoch'] for h in histories if 'validation' in h and
@@ -173,7 +173,7 @@ def full_report(directory, results):
     behavior_index = {(r['configuration'], r['seed']): r for r in behaviors}
     for question, a, b in contrasts:
         names = [f'{split}_{m}' for split in ('validation', 'test') for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')]
-        names += ['duration_seconds', 'matched_epochs_35_300_mrr_delta_sd', 'first_epoch_at_95pct_observed_best_main_mrr']
+        names += ['duration_seconds', 'matched_epochs_15_100_mrr_delta_sd', 'first_epoch_at_95pct_observed_best_main_mrr']
         for metric in names:
             av, bv = [], []
             for seed in SEEDS:
@@ -201,7 +201,8 @@ def full_report(directory, results):
                'selected_test_results': summaries[winner]['test'], 'paired_comparisons': paired_summary,
                'dataset_sha256': results[0]['dataset_sha256'], 'manifest_sha256': results[0]['manifest_sha256'],
                'candidate_entities': 14541,
-               'interpretation': 'Descriptive paired effects only; three seeds do not establish significance. '
+               'interpretation': 'Seed 0 only: descriptive effects, not evidence of statistical significance. '
+                   'Across-seed standard deviations are unavailable (null), and consistency across seeds is untested. '
                    'Higher ranking metrics are better; lower duration/instability/convergence epoch may be better. '
                    'Convergence thresholds use each run\'s observed best and are not equal absolute targets. '
                    'Loss falling while validation worsens is an overfitting warning, not proof. '
@@ -213,7 +214,7 @@ def full_report(directory, results):
                    'training_seconds sums training epoch intervals. Cache-hit setup is cheaper. '
                    'Interrupted uncommitted work is not included in committed duration or step counts.',
                'validation_policy': 'Every five epochs; structural and initial integrated diagnostics cannot select. '
-                   'Baseline/no-warmup selection starts at 5; warmup integrated selection starts at 35.'}
+                   'Baseline/no-warmup selection starts at 5; warmup integrated selection starts at 15.'}
     write_json(directory / 'summary.json', summary)
     write_json(directory / 'runs.json', results)
     write_json(directory / 'training_behavior.json', behaviors)
@@ -228,30 +229,29 @@ def full_report(directory, results):
 
 def write_analysis(directory, summary, behaviors, ties):
     """Descriptive answers derived only from completed, validated run records."""
+    def deviation(value):
+        return 'N/A (one seed)' if value is None else f'{value:.6f}'
     lines = ['# Research analysis', '',
-             'Selection uses mean validation MRR. These are descriptive comparisons across three seeds, '
+             'Selection uses seed-0 validation MRR. These are single-seed descriptive comparisons, '
              'not evidence of statistical significance.', '',
+             'Across-seed standard deviation and consistency cannot be assessed from one seed.', '',
              f"Selected configuration: **{summary['selected_by_validation']}**.", '',
              '## Does independent text improve ranking, and does warmup help?', '']
     for p in summary['paired_comparisons']:
         if p['metric'] == 'validation_MRR':
             direction = 'higher' if p['mean'] > 0 else 'lower' if p['mean'] < 0 else 'equal'
             lines.append(f"- {p['A']} versus {p['B']}: mean validation MRR is {direction}; "
-                         f"paired delta {p['mean']:+.6f}, sample SD {p['std']:.6f}. "
-                         f"Positive in {p['positive_differences']}/3 seeds and negative in "
-                         f"{p['negative_differences']}/3. Improvement is "
-                         + ('consistent in all three seeds.' if p['positive_differences'] == 3 else
-                            'not positive in all three seeds.'))
+                         f"seed-0 delta {p['mean']:+.6f}, across-seed SD {deviation(p['std'])}.")
     lines += ['', '## Convergence and ranking instability', '',
               'Convergence compares the epoch reaching 95% of each run\'s own observed best; '
               'it does not compare equal absolute ranking targets. Instability is the sample SD '
-              'of validation-MRR changes at matched epochs 35–300. Lower values indicate earlier '
+              'of validation-MRR changes at matched epochs 15–100. Lower values indicate earlier '
               'threshold attainment or less fluctuation, respectively.', '']
     for p in summary['paired_comparisons']:
         if p['question'] == 'warmup_effect' and p['metric'] in (
-                'first_epoch_at_95pct_observed_best_main_mrr', 'matched_epochs_35_300_mrr_delta_sd'):
+                'first_epoch_at_95pct_observed_best_main_mrr', 'matched_epochs_15_100_mrr_delta_sd'):
             lines.append(f"- {p['metric']}: warmup minus no-warmup {p['mean']:+.6f} "
-                         f"(sample SD {p['std']:.6f}); negative in {p['negative_differences']}/3 seeds.")
+                         f"(across-seed SD {deviation(p['std'])}).")
     lines += ['', '## Does validation peak early; is there evidence suggesting overfitting?', '',
               'Falling training loss with stalled/worsening validation is a warning, not proof of overfitting.', '']
     for b in behaviors:
@@ -264,7 +264,7 @@ def write_analysis(directory, summary, behaviors, ties):
               'cache hits make later preparation cheaper. Epoch training intervals are also reported.', '']
     for c, s in summary['configurations'].items():
         lines.append(f"- {c}: mean total {s['duration_seconds']['mean']:.1f}s "
-                     f"(sample SD {s['duration_seconds']['std']:.1f}s), "
+                     f"(across-seed SD {deviation(s['duration_seconds']['std'])}), "
                      f"mean training intervals {s['training_seconds']['mean']:.1f}s, "
                      f"mean peak allocated GPU {s['peak_gpu_memory_bytes']['mean']/2**30:.2f} GiB.")
     lines += ['', '## Are scores affected by ties?', '',
@@ -278,9 +278,8 @@ def write_analysis(directory, summary, behaviors, ties):
                          f"{t['optimistic_minus_corrected_MRR']:.6f}; severe flag {t['severe_ties']}.")
     lines += ['', '## Test results after validation selection', '']
     for c, s in summary['configurations'].items():
-        lines.append(f"- {c}: test MRR {s['test']['MRR']['mean']:.6f} +/- {s['test']['MRR']['std']:.6f}; "
-                     f"test Hits@10 {s['test']['Hits@10']['mean']:.6f} +/- {s['test']['Hits@10']['std']:.6f} "
-                     '(mean +/- sample SD).')
+        lines.append(f"- {c}: seed-0 test MRR {s['test']['MRR']['mean']:.6f}; "
+                     f"test Hits@10 {s['test']['Hits@10']['mean']:.6f}; across-seed SD unavailable.")
     (directory / 'research_analysis.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
@@ -314,13 +313,14 @@ def plot_results(directory, results, summaries):
                         ax.plot(x, y, style, label=f"seed {r['settings']['seed']} / {phase}", color=plt.get_cmap('tab10')(r['settings']['seed']))
                 if grouped and not per_seed:
                     means = [stats.mean(v) for v in zip(*grouped)]
-                    sd = [stats.stdev(v) for v in zip(*grouped)]
                     ax.plot(x, means, style, label=c+' / '+phase, color=colors[c])
-                    ax.fill_between(x, [m-s for m,s in zip(means, sd)], [m+s for m,s in zip(means, sd)], color=colors[c], alpha=.1)
+                    if len(grouped) > 1:
+                        sd = [stats.stdev(v) for v in zip(*grouped)]
+                        ax.fill_between(x, [m-s for m,s in zip(means, sd)], [m+s for m,s in zip(means, sd)], color=colors[c], alpha=.1)
             if not per_seed or c.endswith('-warmup') and not c.endswith('-no-warmup'):
-                ax.axvline(270 if use_steps else 30, color='grey', alpha=.3)
+                ax.axvline(90 if use_steps else 10, color='grey', alpha=.3)
             ax.set(xlabel='Optimizer updates' if use_steps else 'Epoch', ylabel=metric or 'BCE loss',
-                   title=c if per_seed else 'Mean +/- sample SD; dashed warmup / solid integrated / dotted baseline')
+                   title=c if per_seed else 'Seed 0; dashed warmup / solid integrated / dotted baseline; no across-seed SD')
             ax.grid(alpha=.2); ax.legend(fontsize=7)
         finish(fig, name)
     for name, split, metric in [('test_mrr.png', 'test', 'MRR'), ('test_hits10.png', 'test', 'Hits@10'),
@@ -329,13 +329,15 @@ def plot_results(directory, results, summaries):
         fig, ax = plt.subplots(figsize=(12, 6))
         values = [summaries[c][split][metric] if split else summaries[c][metric] for c in CONFIGURATIONS]
         scale = 2**30 if metric == 'peak_gpu_memory_bytes' else 1
-        ax.bar(list(CONFIGURATIONS), [v['mean']/scale for v in values], yerr=[v['std']/scale for v in values], capsize=4)
+        errors = [v['std']/scale for v in values] if all(v['std'] is not None for v in values) else None
+        ax.bar(list(CONFIGURATIONS), [v['mean']/scale for v in values], yerr=errors, capsize=4)
         ax.tick_params(axis='x', rotation=12)
-        ax.set(ylabel='GiB' if scale != 1 else metric, title=f'{split or "Execution"} {metric}: mean +/- sample SD')
+        ax.set(ylabel='GiB' if scale != 1 else metric, title=f'{split or "Execution"} {metric}: seed 0; no across-seed SD')
         finish(fig, name)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     for ax, (split, metric) in zip(axes.flat, [(s,m) for s in ('validation','test') for m in ('Hits@1','Hits@3')]):
         v = [summaries[c][split][metric] for c in CONFIGURATIONS]
-        ax.bar(range(3), [x['mean'] for x in v], yerr=[x['std'] for x in v], capsize=4)
+        errors = [x['std'] for x in v] if all(x['std'] is not None for x in v) else None
+        ax.bar(range(3), [x['mean'] for x in v], yerr=errors, capsize=4)
         ax.set_xticks(range(3), ['Baseline', 'Text + warmup', 'Text no warmup']); ax.set_title(split+' '+metric)
     finish(fig, 'hits1_hits3.png')
