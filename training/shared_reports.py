@@ -6,7 +6,8 @@ import statistics
 
 from training.experiment_io import digest, write_json
 from training.reports import METRICS, write_csv
-from training.shared_study import CONFIGURATIONS, PROTOCOL, make_config, expected_budget
+from training.shared_study import (CONFIGURATIONS, PROTOCOL, make_config, expected_budget,
+                                   MAX_ENTITIES, TOTAL_EPOCHS, WARMUP_EPOCHS)
 
 PLOTS = ('training_loss.png', 'validation_mrr.png', 'validation_hits10.png',
          'selected_metrics.png', 'time_memory.png', 'gate_effects.png')
@@ -34,23 +35,23 @@ def validate_runs(results, seed=0):
         numerical.add(digest({k: v for k, v in cfg.items() if k != 'variant'}))
         counts = r['subset_statistics']
         if (r['status'] != 'complete' or r['initialization'] != 'scratch' or r['baseline_checkpoint_used']
-                or r['architecture'] != c or r['dataset_scope'] != 'subset' or r['candidate_entities'] != 1000
-                or counts['entities'] != 1000 or counts['relations'] != 237
+                or r['architecture'] != c or r['dataset_scope'] != 'subset' or r['candidate_entities'] != MAX_ENTITIES
+                or counts['entities'] != MAX_ENTITIES or counts['relations'] != 237
                 or any(counts[k] < 1 for k in ('train_triples', 'valid_triples', 'test_triples'))
-                or r['ranking_policy'] != 'average_exact_ties' or r['warmup_epochs'] != 5 or r['main_epochs'] != 25):
+                or r['ranking_policy'] != 'average_exact_ties' or r['warmup_epochs'] != WARMUP_EPOCHS or r['main_epochs'] != TOTAL_EPOCHS - WARMUP_EPOCHS):
             raise ValueError('Invalid scope, initialization, ranking or phase budgets')
         budget = expected_budget(c, counts['train_triples'])
         if any(r[k] != v for k, v in budget.items()):
             raise ValueError('Invalid optimizer budget')
         history = r['history']
-        if [h['epoch'] for h in history] != list(range(1, 31)):
+        if [h['epoch'] for h in history] != list(range(1, TOTAL_EPOCHS + 1)):
             raise ValueError('Incomplete epoch history')
         steps = budget['steps_per_epoch']
         batch_counts = [32768] * (steps-1) + [counts['train_triples'] - 32768*(steps-1)]
         eligible = []
         for h in history:
             e = h['epoch']
-            warm = e <= 5
+            warm = e <= WARMUP_EPOCHS
             if h['phase'] != ('structural_warmup' if warm else 'main') or h['optimizer_steps'] != e*steps:
                 raise ValueError('Invalid phase/progress')
             updates = h['step_losses']
@@ -147,7 +148,7 @@ def plot_results(directory, indexed, rows, effects):
                 h = [h for h in r['history'] if h['phase'] == phase and (metric is None or 'validation' in h)]
                 ax.plot([h['epoch'] for h in h], [h['validation'][metric] if metric else h['loss'] for h in h],
                         style, marker='o' if metric else None, color=plt.get_cmap('tab10')(i), label=f'{c}: {phase}')
-        ax.axvline(5, color='grey', alpha=.5)
+        ax.axvline(WARMUP_EPOCHS, color='grey', alpha=.5)
         ax.set(xlabel='Epoch', ylabel=metric or 'BCE loss', title='Dashed: structural warmup; solid: integrated')
         ax.legend(fontsize=6); ax.grid(alpha=.2)
         finish(fig, name)

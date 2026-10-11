@@ -1,16 +1,18 @@
 # KG research experiments
 
-The new study runs **six shared-RGAT experiments** on a **1,000-entity subset**,
-with **30 total epochs, 5 warmup epochs, and seed 0**. A reuses layer 1, B splits
+The new study runs **six shared-RGAT experiments** on a **2,000-entity subset**,
+with **50 total epochs, 10 warmup epochs, and seed 0**. A reuses layer 1, B splits
 the two layers around text fusion, and C reuses both layers. Each is tested with
 and without the refinement gate; the residual addition remains in both cases.
 
 Open [the six-experiment Colab notebook](notebooks/shared_rgat_1000.ipynb) and
 read [the shared-RGAT guide](docs/SHARED_RGAT_1000.md). Push this source and set
 REPO_REF to its exact commit before running Colab. Use a fresh RUN_TAG.
+The notebook retains its historical `_1000` filename; it now runs 2,000 entities
+and 10 warmup + 40 integrated epochs in all six experiments.
 
 ```bash
-python run_shared_rgat_comparison.py --output-dir experiments/research/shared_rgat_1000_run1 --skip-completed --resume
+python run_shared_rgat_comparison.py --output-dir experiments/research/shared_rgat_2000_50_10_run1 --skip-completed --resume
 ```
 
 The earlier full-dataset workflow below is preserved with its existing settings.

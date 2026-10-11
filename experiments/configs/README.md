@@ -11,5 +11,6 @@ Optional future seeds use the main runner's `--seed N` with fresh outputs;
 all architecture and optimization settings remain the same.
 
 `shared_rgat_1000.yaml` documents the separately approved six-run A/B/C gate
-study: 1000 entities, 30 epochs including 5 warmup, seed 0. Its runner is
+study: 2000 entities, 50 epochs including 10 warmup, seed 0. The YAML keeps
+its historical `_1000` filename. Its runner is
 `run_shared_rgat_comparison.py`; see [the guide](../../docs/SHARED_RGAT_1000.md).

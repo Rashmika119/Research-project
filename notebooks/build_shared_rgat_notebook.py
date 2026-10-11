@@ -9,7 +9,7 @@ def notebook():
     nb = copy.deepcopy(full_notebook())
     def source(index, text):
         nb['cells'][index]['source'] = text.strip() + '\n'
-    source(0, """# Six shared-RGAT experiments: 1,000 entities, 30 epochs, 5 warmup
+    source(0, """# Six shared-RGAT experiments: 2,000 entities, 50 epochs, 10 warmup
 A: L1 -> fusion -> same L1 -> L2. B: L1 -> fusion -> L2.
 C: L1 -> L2 -> fusion -> same L1 -> same L2.
 Each runs with a learned refinement gate and without it. Ungated is U + V;
@@ -20,8 +20,8 @@ No preliminary training runs automatically. GPU execution is not locally verifie
 """)
     nb['cells'][2]['source'] = nb['cells'][2]['source'].replace('all three runs', 'all six runs')
     setup = nb['cells'][4]['source']
-    setup = setup.replace('full_dataset_comparison_100', 'shared_rgat_1000')
-    setup = setup.replace('full_fb15k237_100_seed0_v1_run1', 'shared_rgat_1000_30_5_seed0_v1_run1')
+    setup = setup.replace('full_dataset_comparison_100', 'shared_rgat_2000')
+    setup = setup.replace('full_fb15k237_100_seed0_v1_run1', 'shared_rgat_2000_50_10_seed0_v1_run1')
     setup = setup.replace('run_full_dataset_comparison.py', 'run_shared_rgat_comparison.py')
     setup = setup.replace('Select the commit containing this full study.', 'Push/select the commit containing the six-run shared RGAT study.')
     source(4, setup)
@@ -36,15 +36,15 @@ from training.experiment_io import write_json, environment
 from training.process import run_logged
 
 SEED = 0
-MAX_ENTITIES = 1000
-TOTAL_EPOCHS = 30
-WARMUP_EPOCHS = 5
+MAX_ENTITIES = 2000
+TOTAL_EPOCHS = 50
+WARMUP_EPOCHS = 10
 TEXT_BATCH_SIZE = 256
 EVAL_BATCH_SIZE = 512
 SKIP_COMPLETED = True
 RESUME_INTERRUPTED = True
 RUN_STATIC_CHECKS = False  # Optional, CPU-only, no optimizer steps.
-assert (SEED, MAX_ENTITIES, TOTAL_EPOCHS, WARMUP_EPOCHS) == (0, 1000, 30, 5)
+assert (SEED, MAX_ENTITIES, TOTAL_EPOCHS, WARMUP_EPOCHS) == (0, 2000, 50, 10)
 EXPERIMENT_DIR = RUN_ROOT / 'runs'
 MANIFEST = EXPERIMENT_DIR / 'dataset_manifest.json'
 RAW_DIR = SHARED_ROOT / 'data' / 'fb15k237'
@@ -54,7 +54,7 @@ LOG_DIR = RUN_ROOT / 'logs' / datetime.now().strftime('%Y%m%d_%H%M%S_%f')
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 protocol = yaml.safe_load(Path('experiments/configs/shared_rgat_1000.yaml').read_text())
 assert list(CONFIGURATIONS) == list(protocol['configurations'])
-assert (protocol['epochs'], protocol['warmup'], protocol['max_entities'], protocol['seeds']) == (30, 5, 1000, [0])
+assert (protocol['epochs'], protocol['warmup'], protocol['max_entities'], protocol['seeds']) == (50, 10, 2000, [0])
 configs = [make_config(c, SEED, raw_dir=RAW_DIR, text_dir=TEXT_DIR,
                       text_batch_size=TEXT_BATCH_SIZE, eval_batch_size=EVAL_BATCH_SIZE) for c in CONFIGURATIONS]
 display(pd.DataFrame([{'configuration': c.variant, 'warmup_epochs': c.warmup,
@@ -65,15 +65,15 @@ with (LOG_DIR / 'pip_freeze.txt').open('w') as f:
     subprocess.run([sys.executable, '-m', 'pip', 'freeze'], stdout=f, check=True)
 """)
     source(7, """## 4. Non-training subset and model-file verification
-Select 1,000 entities using training facts only, then retain all induced facts
+Select 2,000 entities using training facts only, then retain all induced facts
 from each original split. All six runs use this exact manifest. Candidate set:
-1,000 entities, not the full dataset. Cached text is keyed by subset/token identity.
+2,000 entities, not the full dataset. Cached text is keyed by subset/token identity.
 This cell downloads/verifies inputs but performs no forward/backward or training.
 """)
     source(8, """from training.experiment_io import prepare_data
 from models.pretrained import prepare_pretrained
 
-data, graph, known_train, manifest = prepare_data(str(RAW_DIR), 1000, 0, MANIFEST)
+data, graph, known_train, manifest = prepare_data(str(RAW_DIR), MAX_ENTITIES, SEED, MANIFEST)
 verify_manifest(manifest)
 assert len(graph.edge_index) == 2 * len(data.train)
 assert set(data.train) == set(known_train)
@@ -95,10 +95,10 @@ else:
     print('Optional checks disabled. No preliminary training is required.')
 """)
     source(11, """## 6. Execute all six experiments
-Each child starts from scratch and runs 5 structural + 25 integrated epochs.
+Each child starts from scratch and runs 10 structural + 40 integrated epochs.
 Every epoch prints loss, phase, elapsed time and peak GPU memory. Validation
-prints every five epochs. Epoch 5 structural validation and initial integrated
-validation are diagnostic only; eligible selection epochs are 10,15,20,25,30.
+prints every five epochs. Epochs 5 and 10 structural validation and initial integrated
+validation are diagnostic only; eligible selection epochs are 15,20,25,30,35,40,45,50.
 The selected checkpoint is evaluated on test. No baseline weights are reused.
 """)
     source(12, """command = [sys.executable, '-u', 'run_shared_rgat_comparison.py',

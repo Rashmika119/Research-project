@@ -14,12 +14,15 @@ B L1/fusion/L2; C L1/L2/fusion/shared L1/shared L2. Each has gated and ungated
 refinement. Ungated is U+V, retaining the skip and both text gates. L1 includes
 ReLU/dropout at every call; L2 has no added activation. Warmup uses only the
 structural path: one layer for A/B, two for C. Preserve real parameter sharing.
-All six: train-induced 1000 entities, subset seed 0, model seed 0, 30 total epochs,
-5 warmup + 25 integrated. Keep batch32768, lr .001, four negatives, width32,
+All six: train-induced 2000 entities, subset seed 0, model seed 0, 50 total epochs,
+10 warmup + 40 integrated. Keep batch32768, lr .001, four negatives, width32,
 text256/length64, eval512/every5. Report actual subset update budget.
 Keep the original full-data registry and model state layout unchanged. Do not
 restore retired soft-prompt architectures. New registry is SHARED_CONFIGURATIONS.
-Protect all existing notebooks and results; the new generator refuses overwrite.
+The shared-study notebook/config/guide retain their historical `_1000` filenames.
+The user authorized updating the shared notebook to 2000/50/10; its new output
+tag is shared_rgat_2000_50_10_seed0_v1_run1 under Research/shared_rgat_2000.
+Protect other notebooks and saved results; the generator still refuses overwrite.
 Validate using non-training tests only; users launch real training in Colab.
 
 ## Preserved full-dataset protocol

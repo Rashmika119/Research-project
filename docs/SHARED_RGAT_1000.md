@@ -1,15 +1,18 @@
-# Six shared-RGAT experiments
+# Six shared-RGAT experiments: 2,000 entities, 50 epochs, 10 warmup
 
 This new study is separate from the preserved full-dataset three-model comparison.
-Open `notebooks/shared_rgat_1000.ipynb`. None of the older notebooks is modified.
+Open `notebooks/shared_rgat_1000.ipynb`. The notebook, YAML and this guide retain
+their historical `_1000` filenames; their current protocol is 2000/50/10.
+The original full-data and pilot notebooks are unchanged. Previous 1000/30/5
+results require their matching historical source and must not resume here.
 
 ## Protocol
 
-- One deterministic, training-selected 1,000-entity induced FB15k-237 subset;
+- One deterministic, training-selected 2,000-entity induced FB15k-237 subset;
   subset seed 0, experiment seed 0. Keep all 237 relation IDs and all induced
   facts from their original train/validation/test split. No manufactured facts.
-- Six independent scratch runs, 30 total epochs including 5 structural warmup
-  and 25 integrated epochs. No baseline/checkpoint transfer between runs.
+- Six independent scratch runs, 50 total epochs including 10 structural warmup
+  and 40 integrated epochs. No baseline/checkpoint transfer between runs.
 - The previous numerical defaults are retained: train batch 32768, Adam .001,
   weight decay .00001, gradient clip 1, four filtered negatives, BCE, width 32,
   RGAT one head/dropout .2, projection dropout .1, full precision/determinism,
@@ -17,17 +20,17 @@ Open `notebooks/shared_rgat_1000.ipynb`. None of the older notebooks is modified
 - Updates per epoch are ceil(induced training triples / 32768). All six have
   equal optimizer budgets, with the smaller final batch retained. This is not
   an equal graph-compute budget: layer calls differ between arrangements.
-- Validation every five epochs. Structural validation at epoch 5 and integrated
-  boundary validation before epoch 6 are diagnostic only. Eligible checkpoints
-  are epochs 10,15,20,25,30; highest corrected filtered validation MRR wins,
+- Validation every five epochs. Structural validation at epochs 5/10 and integrated
+  boundary validation before epoch 11 are diagnostic only. Eligible checkpoints
+  are epochs 15,20,25,30,35,40,45,50; highest corrected filtered validation MRR wins,
   earliest exact tie wins. Test is evaluated only on the selected model.
-- Ranking candidates are the 1,000 selected entities. These MRR/Hits scores are
+- Ranking candidates are the 2,000 selected entities. These MRR/Hits scores are
   not directly comparable with full-dataset rankings over 14,541 entities.
 
-The local dataset audit found **2,118 train / 55 validation / 86 test triples**,
-one connected component and 4,236 directed training message edges including
-inverses. This means **one update per epoch, 30 per run and 180 across six runs**.
-See `shared_rgat_subset_audit.json` for dataset/manifest fingerprints. Colab
+The local dataset audit found **6,128 train / 208 validation / 257 test triples**,
+one connected component and 12,256 directed training message edges including
+inverses. This means **one update per epoch, 50 per run and 300 across six runs**.
+See `shared_rgat_2000_subset_audit.json` for dataset/manifest fingerprints. Colab
 rebuilds and prints its own manifest and budgets from the actual input files.
 
 ## Six configurations
@@ -90,13 +93,13 @@ entity graph layers. Warmup bypasses text/refinement, using structural relations
 6. Section 7 shows checkpoint status; Section 8 displays comparison tables,
    gate effects, research analysis and six PNG plots.
 
-Default Drive root: `MyDrive/Research/shared_rgat_1000/`.
-Default tag: `shared_rgat_1000_30_5_seed0_v1_run1`.
+Default Drive root: `MyDrive/Research/shared_rgat_2000/`.
+Default tag: `shared_rgat_2000_50_10_seed0_v1_run1`.
 Shared raw/text resources, verified RoBERTa backups and content-keyed pooled
 caches reuse the earlier resource root. Experiments use separate output folders.
 
 ```bash
-python run_shared_rgat_comparison.py --output-dir experiments/research/shared_rgat_1000_run1 --skip-completed --resume
+python run_shared_rgat_comparison.py --output-dir experiments/research/shared_rgat_2000_50_10_run1 --skip-completed --resume
 ```
 
 To run one configuration explicitly:
@@ -112,7 +115,7 @@ separate folder for an independently launched single run.
 Report regeneration only (no training or model evaluation):
 
 ```bash
-python run_shared_rgat_comparison.py --report-only --output-dir experiments/research/shared_rgat_1000_run1
+python run_shared_rgat_comparison.py --report-only --output-dir experiments/research/shared_rgat_2000_50_10_run1
 ```
 
 ## Resume and results
@@ -138,7 +141,7 @@ difference, including initial scaling, not only the existence of a free paramete
 
 ## Verification
 
-Implementation verification: **31 non-training checks passed** via
+Updated-protocol verification: **31 non-training checks passed** via
 `python run_static_checks.py`, including execution of all notebook cells with
 external actions mocked. The real dataset subset audit also completed; its
 counts above are measured from the repository's FB15k-237 files.

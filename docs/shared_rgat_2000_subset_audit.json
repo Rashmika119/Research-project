@@ -1,0 +1,29 @@
+{
+  "statistics": {
+    "entities": 2000,
+    "relations": 237,
+    "train_triples": 6128,
+    "valid_triples": 208,
+    "test_triples": 257,
+    "isolated_entity_ids": [],
+    "components": 1,
+    "component_sizes": [
+      2000
+    ],
+    "unique_undirected_pairs": 4422,
+    "undirected_density": 0.0022121060530265134,
+    "mean_undirected_degree": 4.422,
+    "train_triples_per_entity": 3.064,
+    "definition": "Weak connectivity; undirected simple density excludes self-loops and duplicate relation pairs"
+  },
+  "manifest_sha256": "46192c0fcb10a9bfab7d564056bb19db26a4840750243b6f012158a30677d606",
+  "dataset_sha256": "e465b6f9eee2bc96d507ed6903116fe73b920e5f35163dc7d812455c10b70dfe",
+  "budget": {
+    "steps_per_epoch": 1,
+    "optimizer_steps": 50,
+    "structural_optimizer_steps": 10,
+    "integrated_optimizer_steps": 40,
+    "baseline_optimizer_steps": 0
+  },
+  "message_edges": 12256
+}

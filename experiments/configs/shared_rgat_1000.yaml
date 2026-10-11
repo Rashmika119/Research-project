@@ -1,34 +1,34 @@
-protocol: shared_rgat_1000_30_5_seed0_v1
+protocol: shared_rgat_2000_50_10_seed0_v1
 dataset: FB15k-237
-max_entities: 1000
+max_entities: 2000
 seeds:
 - 0
 configurations:
   shared-a-gated:
     arrangement: a
     refinement_gated: true
-    warmup: 5
+    warmup: 10
   shared-a-ungated:
     arrangement: a
     refinement_gated: false
-    warmup: 5
+    warmup: 10
   shared-b-gated:
     arrangement: b
     refinement_gated: true
-    warmup: 5
+    warmup: 10
   shared-b-ungated:
     arrangement: b
     refinement_gated: false
-    warmup: 5
+    warmup: 10
   shared-c-gated:
     arrangement: c
     refinement_gated: true
-    warmup: 5
+    warmup: 10
   shared-c-ungated:
     arrangement: c
     refinement_gated: false
-    warmup: 5
-epochs: 30
+    warmup: 10
+epochs: 50
 train_batch_size: 32768
 lr: 0.001
 weight_decay: 1.0e-05
@@ -57,9 +57,9 @@ ranking_policy: average_exact_ties
 skip_completed: true
 resume_interrupted: true
 preliminary_training_tests: false
-warmup: 5
+warmup: 10
 subset_seed: 0
-entities: 1000
+entities: 2000
 relations: 237
 selection_strategy: train_bfs_induced_v1
 steps_per_epoch: ceil(induced_train_triples / 32768)

@@ -40,17 +40,17 @@ def fixtures():
         r = copy.deepcopy(template)
         cfg = make_config(c, 0)
         history = []
-        for e in range(1, 31):
-            h = {'epoch': e, 'phase': 'structural_warmup' if e <= 5 else 'main',
+        for e in range(1, 51):
+            h = {'epoch': e, 'phase': 'structural_warmup' if e <= 10 else 'main',
                  'loss': 1-e*.01, 'optimizer_steps': e, 'train_seconds': 1.,
                  'step_losses': [{'optimizer_step': e, 'positive_count': 1234, 'loss': 1-e*.01}]}
             if e % 5 == 0:
                 h['validation'] = {**template['validation'], 'MRR': .1+i*.01+(20-abs(e-20))*.001}
-                h['validation_model'] = 'structural' if e <= 5 else 'integrated'
+                h['validation_model'] = 'structural' if e <= 10 else 'integrated'
             history.append(h)
-        r.update(configuration=c, architecture=c, settings=asdict(cfg), candidate_entities=1000,
-                 dataset_scope='subset', warmup_epochs=5, main_epochs=25,
-                 subset_statistics={'entities': 1000, 'relations': 237, 'train_triples': 1234,
+        r.update(configuration=c, architecture=c, settings=asdict(cfg), candidate_entities=2000,
+                 dataset_scope='subset', warmup_epochs=10, main_epochs=40,
+                 subset_statistics={'entities': 2000, 'relations': 237, 'train_triples': 1234,
                                     'valid_triples': 40, 'test_triples': 50},
                  **expected_budget(c, 1234), history=history, best_epoch=20,
                  validation=history[19]['validation'], final_epoch_validation=history[-1]['validation'],
@@ -152,10 +152,10 @@ class SharedStudyTests(unittest.TestCase):
         self.assertEqual(list(CONFIGURATIONS), list(protocol['configurations']))
         for c in CONFIGURATIONS:
             cfg = make_config(c, 0)
-            self.assertEqual((cfg.max_entities, cfg.epochs, cfg.warmup, cfg.seed), (1000, 30, 5, 0))
+            self.assertEqual((cfg.max_entities, cfg.epochs, cfg.warmup, cfg.seed), (2000, 50, 10, 0))
             for key in ('model', 'lr', 'train_batch_size', 'text_batch_size', 'eval_batch_size', 'eval_every'):
                 self.assertEqual(asdict(cfg)[key], protocol[key])
-        self.assertEqual(expected_budget('shared-a-gated', 32769)['optimizer_steps'], 60)
+        self.assertEqual(expected_budget('shared-a-gated', 32769)['optimizer_steps'], 100)
         args = SimpleNamespace(seed=0, raw_dir='raw', text_dir='text', cache_dir='cache',
                                text_batch_size=256, eval_batch_size=512, resume=True, skip_completed=True)
         commands = build_commands(args, Path('fresh'), Path('manifest.json'))
@@ -174,7 +174,7 @@ class SharedStudyTests(unittest.TestCase):
             self.assertEqual(len(summary['gate_effects']), 3)
             for plot in PLOTS:
                 self.assertGreater((Path(directory)/plot).stat().st_size, 1000)
-            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()), 181)
+            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()), 301)
         mutations = [lambda r: r.pop(), lambda r: r[0]['settings'].update(seed=1),
                      lambda r: r[0].update(best_epoch=5), lambda r: r[0].update(initial_structural_sha256='wrong'),
                      lambda r: r[0]['history'][0]['step_losses'].clear(), lambda r: r[0]['learned_gates'].pop('refinement_gate')]
@@ -185,8 +185,8 @@ class SharedStudyTests(unittest.TestCase):
     def test_parent_runner_and_report_only_do_not_launch_extra_runs(self):
         with tempfile.TemporaryDirectory() as directory:
             def prepare(*args):
-                return None, None, None, {'statistics': {'entities': 1000, 'relations': 237,
-                    'train_triples': 1234, 'valid_triples': 40, 'test_triples': 50}, 'max_entities': 1000,
+                return None, None, None, {'statistics': {'entities': 2000, 'relations': 237,
+                    'train_triples': 1234, 'valid_triples': 40, 'test_triples': 50}, 'max_entities': 2000,
                     'subset_seed': 0, 'selection_strategy': 'train_bfs_induced_v1', 'sha256': 'fixture'}
             runs = {r['configuration']: r for r in fixtures()}
             def child(command, log):
@@ -226,9 +226,9 @@ class SharedStudyTests(unittest.TestCase):
                     return str(torch.__version__)
                 return '' if 'status' in command else 'fixture-commit'
             def fake_prepare(raw, count, seed, manifest_path):
-                self.assertEqual(count,1000)
-                m={'statistics':dict(zip(('entities','relations','train_triples','valid_triples','test_triples'),(1000,237,1234,40,50))),
-                   'max_entities':1000,'subset_seed':0,'selection_strategy':'train_bfs_induced_v1','sha256':'fixture','dataset_sha256':'fixture'}
+                self.assertEqual(count,2000)
+                m={'statistics':dict(zip(('entities','relations','train_triples','valid_triples','test_triples'),(2000,237,1234,40,50))),
+                   'max_entities':2000,'subset_seed':0,'selection_strategy':'train_bfs_induced_v1','sha256':'fixture','dataset_sha256':'fixture'}
                 write_json(manifest_path,m)
                 return SimpleNamespace(train=[(0,0,1)]*1234),SimpleNamespace(edge_index=range(2468)),[(0,0,1)],m
             def fake_research(command, log_path, **kwargs):
@@ -253,7 +253,7 @@ class SharedStudyTests(unittest.TestCase):
                     if cell['cell_type']!='code':continue
                     source=cell['source'].replace("Path('/content/Research-project')",f'Path({str(ROOT)!r})')
                     source=source.replace("Path('/content/drive/MyDrive/Research/scratch_pipeline_v1')",f'Path({str(Path(directory)/"shared")!r})')
-                    source=source.replace("Path('/content/drive/MyDrive/Research/shared_rgat_1000')",f'Path({str(Path(directory)/"stage")!r})')
+                    source=source.replace("Path('/content/drive/MyDrive/Research/shared_rgat_2000')",f'Path({str(Path(directory)/"stage")!r})')
                     exec(compile(source,f'full_cell_{i}','exec'),scope)
                     if i<12:
                         self.assertFalse(any('run_shared_rgat_comparison.py' in c for c in calls))
