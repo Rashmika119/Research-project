@@ -1,10 +1,25 @@
-# Full FB15k-237 research comparison
+# KG research experiments
 
-Current approved stage: **RGAT + ComplEx baseline**, **Residual No-Softprompt
+The new study runs **six shared-RGAT experiments** on a **1,000-entity subset**,
+with **30 total epochs, 5 warmup epochs, and seed 0**. A reuses layer 1, B splits
+the two layers around text fusion, and C reuses both layers. Each is tested with
+and without the refinement gate; the residual addition remains in both cases.
+
+Open [the six-experiment Colab notebook](notebooks/shared_rgat_1000.ipynb) and
+read [the shared-RGAT guide](docs/SHARED_RGAT_1000.md). Push this source and set
+REPO_REF to its exact commit before running Colab. Use a fresh RUN_TAG.
+
+```bash
+python run_shared_rgat_comparison.py --output-dir experiments/research/shared_rgat_1000_run1 --skip-completed --resume
+```
+
+The earlier full-dataset workflow below is preserved with its existing settings.
+
+Preserved full-dataset stage: **RGAT + ComplEx baseline**, **Residual No-Softprompt
 with warmup**, and **Residual No-Softprompt without warmup**, using the complete
 dataset and seed **0** only: three independent scratch runs.
 
-Open [the new Colab notebook](notebooks/full_dataset_comparison_300.ipynb).
+Open [the preserved full-dataset Colab notebook](notebooks/full_dataset_comparison_300.ipynb).
 Read [the complete protocol and launch/resume guide](docs/FULL_DATASET_300.md).
 
 | Setting | Value |
@@ -77,7 +92,7 @@ Historical YAMLs are preserved under [docs/archive/configs](docs/archive/configs
 See the [cleanup and compatibility report](docs/CLEANUP.md) and
 [history/recovery index](docs/archive/README.md).
 
-The main training entrypoint is `run_full_dataset_comparison.py`. It exposes only
+The preserved full-dataset entrypoint is `run_full_dataset_comparison.py`. It exposes
 `baseline`, `residual-no-softprompt-warmup`, and
 `residual-no-softprompt-no-warmup`. The default remains seed 0, three runs.
 A future independent seed uses `--seed N` and a new output directory; this still

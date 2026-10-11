@@ -1,10 +1,28 @@
-# Current instructions: approved full-data study
+# Current instructions: shared-RGAT and preserved full-data studies
 
 Read README.md, docs/FULL_DATASET_300.md and experiments/configs/full_dataset_100.yaml.
 Previous instructions are archived byte-for-byte in docs/WARMUP_STAGE_INSTRUCTIONS.md.
 Historical stage results/protocols remain preserved; they are not current defaults.
 
-## Protocol
+## Newly approved shared-RGAT study
+
+The user's latest instruction authorizes six additional experiments. Read
+`docs/SHARED_RGAT_1000.md` and `experiments/configs/shared_rgat_1000.yaml`.
+Use `run_shared_rgat_comparison.py` and `notebooks/shared_rgat_1000.ipynb`.
+Exactly two unique RGAT layers per model: A L1/fusion/shared L1/L2;
+B L1/fusion/L2; C L1/L2/fusion/shared L1/shared L2. Each has gated and ungated
+refinement. Ungated is U+V, retaining the skip and both text gates. L1 includes
+ReLU/dropout at every call; L2 has no added activation. Warmup uses only the
+structural path: one layer for A/B, two for C. Preserve real parameter sharing.
+All six: train-induced 1000 entities, subset seed 0, model seed 0, 30 total epochs,
+5 warmup + 25 integrated. Keep batch32768, lr .001, four negatives, width32,
+text256/length64, eval512/every5. Report actual subset update budget.
+Keep the original full-data registry and model state layout unchanged. Do not
+restore retired soft-prompt architectures. New registry is SHARED_CONFIGURATIONS.
+Protect all existing notebooks and results; the new generator refuses overwrite.
+Validate using non-training tests only; users launch real training in Colab.
+
+## Preserved full-dataset protocol
 
 Exactly three configurations; approved default seed 0 (three independent runs):
 - baseline: first RGAT + ComplEx; 100 baseline epochs, 900 baseline updates.
@@ -44,14 +62,15 @@ anew once per optimizer update, sharing the encoding for positive/negative score
 
 Baseline must never construct RoBERTa or require text resources. Text models
 construct frozen LM once per child, keep it CPU on pooled-cache hits, and move it
-to GPU only for missing encodings. Frozen LM stays eval. Only the baseline and
-residual-no-softprompt implementations remain. Do not restore soft prompts,
+to GPU only for missing encodings. Frozen LM stays eval. The preserved full-data
+registry contains baseline and residual-no-softprompt; the new study adds the
+separate shared-layer implementation described above. Do not restore soft prompts,
 No-Refinement, Original, RGCN or DistMult. Both text schedules share one class.
 Retain the minimal integration base and parameter order for checkpoint keys.
 
 ## Evaluation
 
-Every five epochs. New study selection_policy=scheduled_only: initial integrated
+Every five epochs. Full-data study selection_policy=scheduled_only: initial integrated
 validation at epoch0/boundary10 is diagnostic only. Warmup structural validation
 cannot select integrated weights. Baseline/no-warmup selection starts5; warmup
 integrated selection starts15. Earliest equal best wins. Preserve the historical
@@ -71,7 +90,7 @@ notebooks/full_dataset_comparison_300.ipynb; separate generator:
 notebooks/build_full_dataset_notebook.py (also refuses overwrite).
 New Drive root: Research/full_dataset_comparison_100. New entrypoint:
 run_full_dataset_comparison.py; --report-only never trains.
-The full-study runner is the only research-training entrypoint. Retired source
+The full-study runner remains available alongside the separately authorized shared-RGAT study. Retired source
 is recoverable at d9348c744da7c30c47e585de9e9ed4674a889399; historical YAMLs
 are in docs/archive/configs. See docs/CLEANUP.md for the audit and verification.
 Optional future seeds use --seed N with a new output directory; default stays 0.

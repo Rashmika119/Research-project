@@ -26,7 +26,8 @@ from training.experiment_io import (digest, environment, file_digest, prepare_da
 from training.losses import bce_loss
 from training.negative_sampling import sample_negatives
 from training.text_cache import lm_identity, pooled_text
-from training.variants import MODEL_CONFIG, VARIANTS, build_scratch_model, warmup_epochs, configuration_id
+from training.variants import (MODEL_CONFIG, ALL_ARCHITECTURES, independent_text,
+                               build_scratch_model, warmup_epochs, configuration_id)
 from training.reproducibility import (seed_everything, capture_rng, numerical_policy,
                                       restore_training_state)
 
@@ -59,7 +60,7 @@ class ExperimentConfig:
     def validate(self):
         if self.selection_policy not in ('initial_and_scheduled', 'scheduled_only'):
             raise ValueError('Unknown checkpoint-selection policy')
-        if self.variant not in (*VARIANTS, 'baseline'):
+        if self.variant not in (*ALL_ARCHITECTURES, 'baseline'):
             raise ValueError('Unknown architecture')
         if (self.max_entities < 0 or self.max_entities == 1 or self.lr <= 0
                 or self.weight_decay < 0 or self.num_negatives < 1
@@ -191,7 +192,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                                 cfg.model, cfg.lm_name, lm_revision)
     # Keep independent frozen text on CPU on cache hits. Moving the rest of
     # the model preserves every registered parameter/buffer and its identity.
-    if cfg.variant == 'residual-no-softprompt':
+    if independent_text(cfg.variant):
         frozen_lm = model.bridge.lm
         model.bridge.lm = None
         try:
@@ -206,7 +207,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     lm_info = None if cfg.variant == 'baseline' else lm_identity(model.bridge.lm)
     entity_pooled = relation_pooled = None
     cache_keys = None
-    if cfg.variant == 'residual-no-softprompt':
+    if independent_text(cfg.variant):
         entity_pooled, ek = pooled_text(model.bridge.lm, tokens[0], cfg.text_batch_size, device, cache_dir)
         relation_pooled, rk = pooled_text(model.bridge.lm, tokens[1], cfg.text_batch_size, device, cache_dir)
         cache_keys = {'entities': ek, 'relations': rk}

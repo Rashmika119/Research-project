@@ -1,0 +1,68 @@
+protocol: shared_rgat_1000_30_5_seed0_v1
+dataset: FB15k-237
+max_entities: 1000
+seeds:
+- 0
+configurations:
+  shared-a-gated:
+    arrangement: a
+    refinement_gated: true
+    warmup: 5
+  shared-a-ungated:
+    arrangement: a
+    refinement_gated: false
+    warmup: 5
+  shared-b-gated:
+    arrangement: b
+    refinement_gated: true
+    warmup: 5
+  shared-b-ungated:
+    arrangement: b
+    refinement_gated: false
+    warmup: 5
+  shared-c-gated:
+    arrangement: c
+    refinement_gated: true
+    warmup: 5
+  shared-c-ungated:
+    arrangement: c
+    refinement_gated: false
+    warmup: 5
+epochs: 30
+train_batch_size: 32768
+lr: 0.001
+weight_decay: 1.0e-05
+optimizer: Adam
+num_negatives: 4
+grad_clip: 1.0
+model:
+  encoder_type: rgat
+  scorer_type: complex
+  dim: 32
+  num_layers: 2
+  heads: 1
+  dropout: 0.2
+  num_bases: null
+text_batch_size: 256
+eval_batch_size: 512
+max_text_length: 64
+eval_every: 5
+selection_policy: scheduled_only
+record_step_losses: true
+deterministic: true
+precision: float32
+lm_name: roberta-base
+lm_revision: e2da8e2f811d1448a5b465c236feacd80ffbac7b
+ranking_policy: average_exact_ties
+skip_completed: true
+resume_interrupted: true
+preliminary_training_tests: false
+warmup: 5
+subset_seed: 0
+entities: 1000
+relations: 237
+selection_strategy: train_bfs_induced_v1
+steps_per_epoch: ceil(induced_train_triples / 32768)
+refinement_without_gate: U + V (skip connection retained)
+layer1: RGATConv -> ReLU -> Dropout(0.2), at every use
+layer2: RGATConv, without an added activation

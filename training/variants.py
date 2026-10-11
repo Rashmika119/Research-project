@@ -5,6 +5,16 @@ from training.model_factory import build_model
 
 ARCHITECTURES = ('residual-no-softprompt',)
 VARIANTS = ARCHITECTURES  # compatibility name for architecture-oriented callers
+# Separate study registry; existing full-data configurations remain unchanged.
+SHARED_CONFIGURATIONS = {
+    f'shared-{arrangement}-{gate}': (arrangement, gate == 'gated')
+    for arrangement in ('a', 'b', 'c') for gate in ('gated', 'ungated')
+}
+ALL_ARCHITECTURES = (*ARCHITECTURES, *SHARED_CONFIGURATIONS)
+
+
+def independent_text(variant):
+    return variant == 'residual-no-softprompt' or variant in SHARED_CONFIGURATIONS
 # Architecture and warmup are independent; no duplicate model classes.
 CONFIGURATIONS = {
     'baseline': ('baseline', False),
@@ -18,7 +28,7 @@ MODEL_CONFIG = {'encoder_type': 'rgat', 'scorer_type': 'complex', 'dim': 32,
 def warmup_epochs(variant, total_epochs, requested):
     if total_epochs < 1 or requested < 0:
         raise ValueError('Epoch counts must be positive (warmup may be zero)')
-    if variant not in (*ARCHITECTURES, 'baseline'):
+    if variant not in (*ALL_ARCHITECTURES, 'baseline'):
         raise ValueError('Unknown architecture: ' + variant)
     actual = 0 if variant == 'baseline' else requested
     if actual >= total_epochs:
@@ -27,6 +37,8 @@ def warmup_epochs(variant, total_epochs, requested):
 
 
 def configuration_id(architecture, warmup):
+    if architecture in SHARED_CONFIGURATIONS:
+        return architecture
     if architecture == 'baseline':
         return 'baseline'
     return architecture + ('-warmup' if warmup > 0 else '-no-warmup')
@@ -42,8 +54,16 @@ def configuration_settings(identifier, requested_warmup=10):
 def build_scratch_model(variant, num_entities, num_relations,
                         model_config=None, lm_name='roberta-base', lm_revision=None):
     """No checkpoint or embedding-cache parameter: KG weights always start fresh."""
-    if variant not in (*VARIANTS, 'baseline'):
+    if variant not in (*ALL_ARCHITECTURES, 'baseline'):
         raise ValueError('Unknown variant: ' + variant)
+    if variant in SHARED_CONFIGURATIONS:
+        from models.shared_rgat import SharedStructuralRGAT, SharedRGATRefinement
+        settings = dict(model_config or MODEL_CONFIG)
+        if settings.pop('encoder_type', 'rgat') != 'rgat' or settings.get('scorer_type') != 'complex':
+            raise ValueError('Shared study requires RGAT + ComplEx')
+        arrangement, gated = SHARED_CONFIGURATIONS[variant]
+        structural = SharedStructuralRGAT(num_entities, num_relations, arrangement=arrangement, **settings)
+        return SharedRGATRefinement(structural, refinement_gated=gated, lm_name=lm_name, lm_revision=lm_revision)
     structural = build_model(model_config or MODEL_CONFIG, num_entities, num_relations)
     if variant == 'baseline':
         return structural
