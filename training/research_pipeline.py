@@ -127,6 +127,40 @@ def completed_result(output, run_id):
 
 def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                    skip_completed=False, resume=False, full_dataset=None, tokens=None):
+    """Shared training entrypoint, with setup/training/evaluation OOM diagnostics."""
+    progress = {'configuration': configuration_id(cfg.variant, cfg.warmup),
+                'architecture': cfg.variant, 'seed': cfg.seed, 'epoch': 0,
+                'phase': 'setup', 'operation': 'initialization', 'optimizer_steps': 0}
+    try:
+        return _run_experiment(cfg, output_dir, manifest_path=manifest_path, cache_dir=cache_dir,
+                               skip_completed=skip_completed, resume=resume,
+                               full_dataset=full_dataset, tokens=tokens, progress=progress)
+    except torch.cuda.OutOfMemoryError as error:
+        write_json(Path(output_dir) / 'failure.json', {
+            'reason': 'CUDA out of memory', 'error': str(error), **progress,
+            'settings': asdict(cfg),
+            'advice': 'No settings were changed. Preserve checkpoints and logs. '
+                      'Use a GPU with sufficient memory; any different numerical or '
+                      'activation-checkpointing policy requires a new declared study.'})
+        raise
+
+
+def model_diagnostics(model):
+    """Read-only parameter inventory; no forward pass or RNG consumption."""
+    from torch_geometric.nn import RGATConv
+    structural = getattr(model, 'structural', model)
+    arrangement = getattr(structural, 'arrangement', None)
+    structural_calls = 1 if arrangement in ('a', 'b') else len(structural.encoder.layers)
+    refinement_calls = (1 if arrangement == 'b' else 2) if arrangement else (
+        len(model.refiner.layers) if hasattr(model, 'refiner') else 0)
+    return {'trainable_parameters': sum(p.numel() for p in model.parameters() if p.requires_grad),
+            'unique_rgat_layers': sum(isinstance(m, RGATConv) for m in model.modules()),
+            'warmup_layer_executions': structural_calls,
+            'integrated_layer_executions': structural_calls + refinement_calls}
+
+
+def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
+                    skip_completed=False, resume=False, full_dataset=None, tokens=None, progress):
     """Run without accepting any baseline or pilot initialization checkpoint.
 
     Resume loads ONLY last.pt from this run after verifying its complete identity.
@@ -159,6 +193,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
             tokens = text_inputs(data, cfg, lm_revision)
         identity['tokens_sha256'] = token_identity(tokens)
     run_id = digest(identity)
+    progress['run_id'] = run_id
     output = Path(output_dir)
     if (output / 'results.json').exists():
         result = completed_result(output, run_id)
@@ -181,7 +216,10 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     seed_everything(cfg.seed, cfg.deterministic)
     started = time.perf_counter()
+    gpu_memory_start = None
     if device.type == 'cuda':
+        free, total = torch.cuda.mem_get_info(device)
+        gpu_memory_start = {'free_bytes': free, 'total_bytes': total}
         torch.cuda.reset_peak_memory_stats(device)
     identifier = configuration_id(cfg.variant, cfg.warmup)
     print(f'Device: {device}; configuration={identifier}; architecture={cfg.variant}; '
@@ -204,6 +242,10 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     structural = model if cfg.variant == 'baseline' else model.structural
     initial_structural_sha = state_fingerprint(structural)
     initial_trainable_sha = state_dict_fingerprint(trainable_state(model))
+    initial_projection_sha = (state_fingerprint(model.bridge.lm_to_kg)
+                              if cfg.variant != 'baseline' else None)
+    architecture_diagnostics = model_diagnostics(model)
+    print('Model inventory:', architecture_diagnostics, '| GPU start:', gpu_memory_start, flush=True)
     lm_info = None if cfg.variant == 'baseline' else lm_identity(model.bridge.lm)
     entity_pooled = relation_pooled = None
     cache_keys = None
@@ -238,6 +280,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     history, best_mrr, best_epoch, start_epoch, optimizer_steps = [], -1., -1, 1, 0
     best_state = None
     initial_validation, elapsed_before, previous_peak = None, 0., 0
+    previous_reserved = 0
 
     def encode(structural_only=False):
         if structural_only or cfg.variant == 'baseline':
@@ -247,6 +290,7 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                      entity_pooled=entity_pooled, relation_pooled=relation_pooled)
 
     def evaluate(split, structural_only=False):
+        progress['operation'] = 'evaluation'
         model.eval()
         with torch.no_grad():
             e, r = encode(structural_only)
@@ -263,6 +307,9 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
 
     def peak_memory():
         return max(previous_peak, torch.cuda.max_memory_allocated(device) if device.type == 'cuda' else 0)
+
+    def peak_reserved():
+        return max(previous_reserved, torch.cuda.max_memory_reserved(device) if device.type == 'cuda' else 0)
 
     def save(name, epoch, selected_state=None):
         nonlocal best_state
@@ -286,8 +333,12 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
             'optimizer_steps': optimizer_steps, 'initial_validation': initial_validation,
             'initial_structural_sha256': initial_structural_sha, 'lm_identity': lm_info,
             'initial_trainable_sha256': initial_trainable_sha,
+            'initial_projection_sha256': initial_projection_sha,
+            'architecture_diagnostics': architecture_diagnostics,
+            'gpu_memory_start': gpu_memory_start,
             'elapsed_seconds': elapsed_before + time.perf_counter() - started,
             'peak_gpu_memory_bytes': peak_memory(),
+            'peak_gpu_reserved_bytes': peak_reserved(),
             'checkpoint_boundary': 'epoch_end' if name == 'last.pt' else 'selection_only',
             'module_modes': {n: m.training for n, m in model.named_modules()},
             'scheduler_state': None, 'grad_scaler_state': None,
@@ -306,96 +357,108 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
         initial_validation = saved['initial_validation']
         initial_structural_sha = saved['initial_structural_sha256']
         initial_trainable_sha = saved.get('initial_trainable_sha256', initial_trainable_sha)
+        initial_projection_sha = saved.get('initial_projection_sha256', initial_projection_sha)
+        gpu_memory_start = saved.get('gpu_memory_start', gpu_memory_start)
+        previous_reserved = saved.get('peak_gpu_reserved_bytes', 0)
         best_state = saved['best_model_state']
         elapsed_before, previous_peak = saved['elapsed_seconds'], saved['peak_gpu_memory_bytes']
         # last.pt is the epoch commit. It carries the selected weights so a
         # disconnect between the two atomic checkpoint writes is recoverable.
         if best_state is not None:
             save('best.pt', best_epoch, selected_state=best_state)
+        progress.update(epoch=saved['epoch'], optimizer_steps=optimizer_steps)
         print('Resuming this run at epoch', start_epoch, flush=True)
 
-    try:
-        for epoch in range(start_epoch, cfg.epochs + 1):
-            structural_only = epoch <= warm
-            if cfg.variant != 'baseline' and not structural_only and initial_validation is None:
-                initial_validation = evaluate(data.valid)
-                if can_select_initial(cfg):
-                    best_mrr, best_epoch = initial_validation['MRR'], epoch - 1
-                    save('best.pt', best_epoch)
-                print('Initial integrated validation (selection policy: '
-                      + cfg.selection_policy + '):', initial_validation, flush=True)
-            epoch_started = time.perf_counter()
-            model.train()
-            permutation = torch.randperm(len(positives_cpu), generator=shuffle_rng)
-            total_loss, steps = 0., 0
-            step_losses = []
-            weighted_loss = 0.
-            for offset in range(0, len(permutation), batch_size):
-                positive_cpu = positives_cpu[permutation[offset:offset + batch_size]]
-                positive = positive_cpu.to(device)
-                negative = sample_negatives(positive_cpu, data.num_entities, known,
-                                            cfg.num_negatives, negative_rng).to(device)
-                optimizer.zero_grad(set_to_none=True)
-                e, r = encode(structural_only)
-                def score(triples):
-                    return ComplExScorer.score_vectors(e[triples[:, 0]], r[triples[:, 1]], e[triples[:, 2]])
-                loss = bce_loss(score(positive), score(negative.reshape(-1, 3)).reshape(
-                    len(positive), cfg.num_negatives))
-                if not torch.isfinite(loss):
-                    raise RuntimeError('Non-finite loss')
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
-                if cfg.variant != 'baseline' and any(p.grad is not None for p in model.bridge.lm.parameters()):
-                    raise AssertionError('Frozen LM received parameter gradients')
-                optimizer.step()
-                loss_value = loss.item()
-                total_loss += loss_value
-                weighted_loss += loss_value * len(positive_cpu)
-                optimizer_steps += 1
-                steps += 1
-                if cfg.record_step_losses:
-                    step_losses.append({'optimizer_step': optimizer_steps,
-                                        'positive_count': len(positive_cpu), 'loss': loss_value})
-                del e, r, loss, positive, negative
-            row = {'epoch': epoch, 'phase': 'structural_warmup' if structural_only else 'main',
-                   'loss': total_loss / steps, 'optimizer_steps': optimizer_steps,
-                   'train_seconds': time.perf_counter() - epoch_started}
+    for epoch in range(start_epoch, cfg.epochs + 1):
+        structural_only = epoch <= warm
+        progress.update(epoch=epoch, phase='structural_warmup' if structural_only else 'main',
+                        optimizer_steps=optimizer_steps, operation='training')
+        if cfg.variant != 'baseline' and not structural_only and initial_validation is None:
+            initial_validation = evaluate(data.valid)
+            if can_select_initial(cfg):
+                best_mrr, best_epoch = initial_validation['MRR'], epoch - 1
+                save('best.pt', best_epoch)
+            print('Initial integrated validation (selection policy: '
+                  + cfg.selection_policy + '):', initial_validation, flush=True)
+        epoch_started = time.perf_counter()
+        model.train()
+        permutation = torch.randperm(len(positives_cpu), generator=shuffle_rng)
+        total_loss, steps = 0., 0
+        step_losses = []
+        weighted_loss = 0.
+        for offset in range(0, len(permutation), batch_size):
+            progress['operation'] = 'training'
+            positive_cpu = positives_cpu[permutation[offset:offset + batch_size]]
+            positive = positive_cpu.to(device)
+            negative = sample_negatives(positive_cpu, data.num_entities, known,
+                                        cfg.num_negatives, negative_rng).to(device)
+            optimizer.zero_grad(set_to_none=True)
+            e, r = encode(structural_only)
+            def score(triples):
+                return ComplExScorer.score_vectors(e[triples[:, 0]], r[triples[:, 1]], e[triples[:, 2]])
+            loss = bce_loss(score(positive), score(negative.reshape(-1, 3)).reshape(
+                len(positive), cfg.num_negatives))
+            if not torch.isfinite(loss):
+                raise RuntimeError('Non-finite loss')
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
+            if cfg.variant != 'baseline' and any(p.grad is not None for p in model.bridge.lm.parameters()):
+                raise AssertionError('Frozen LM received parameter gradients')
+            optimizer.step()
+            loss_value = loss.item()
+            total_loss += loss_value
+            weighted_loss += loss_value * len(positive_cpu)
+            optimizer_steps += 1
+            progress['optimizer_steps'] = optimizer_steps
+            steps += 1
             if cfg.record_step_losses:
-                row.update(step_losses=step_losses,
-                           example_weighted_loss=weighted_loss / len(positives_cpu))
-            if validation_due(cfg, epoch, warm):
-                val = evaluate(data.valid, structural_only)
-                row['validation'] = val
-                row['validation_model'] = ('baseline' if cfg.variant == 'baseline' else
-                                           'structural' if structural_only else 'integrated')
-            row['epoch_seconds'] = time.perf_counter() - epoch_started
-            row['elapsed_seconds'] = elapsed_before + time.perf_counter() - started
-            row['gpu_memory_bytes'] = torch.cuda.memory_allocated(device) if device.type == 'cuda' else None
-            row['peak_gpu_memory_bytes'] = peak_memory() if device.type == 'cuda' else None
-            history.append(row)
-            print(f"Epoch {epoch:03d}/{cfg.epochs} | {row['phase']} | loss={row['loss']:.6f}"
-                  + (f" | val_MRR={row['validation']['MRR']:.6f}"
-                     f" | val_Hits@10={row['validation']['Hits@10']:.6f}" if 'validation' in row else '')
-                  + f" | GPU_peak={row['peak_gpu_memory_bytes']} bytes | elapsed={row['elapsed_seconds']:.1f}s", flush=True)
-            if not structural_only and 'validation' in row and row['validation']['MRR'] > best_mrr:
-                best_mrr, best_epoch = row['validation']['MRR'], epoch
-                save('best.pt', epoch)
-            save('last.pt', epoch)
-            write_json(output / 'history.json', history)
-            if cfg.record_step_losses:
-                from training.reports import write_csv
-                write_csv(output / 'steps.csv', [dict(epoch=h['epoch'], phase=h['phase'], **s)
-                          for h in history for s in h.get('step_losses', [])])
-        chosen = torch.load(output / 'best.pt', map_location='cpu', weights_only=True)
-        if chosen['run_id'] != run_id:
-            raise ValueError('Best checkpoint belongs to a different run')
-        load_model_state(model, chosen['model_state'])
-        validation, test = evaluate(data.valid), evaluate(data.test)
-    except torch.cuda.OutOfMemoryError:
-        write_json(output / 'failure.json', {'reason': 'CUDA out of memory', 'run_id': run_id,
-                   'advice': 'Use a larger GPU or a new run with smaller text/evaluation batches. '
-                             'Full-graph RGAT memory also depends on graph size; text batching cannot fix that.'})
-        raise
+                step_losses.append({'optimizer_step': optimizer_steps,
+                                    'positive_count': len(positive_cpu), 'loss': loss_value})
+            del e, r, loss, positive, negative
+        row = {'epoch': epoch, 'phase': 'structural_warmup' if structural_only else 'main',
+               'loss': total_loss / steps, 'optimizer_steps': optimizer_steps,
+               'train_seconds': time.perf_counter() - epoch_started}
+        if cfg.record_step_losses:
+            row.update(step_losses=step_losses,
+                       example_weighted_loss=weighted_loss / len(positives_cpu))
+        if validation_due(cfg, epoch, warm):
+            val = evaluate(data.valid, structural_only)
+            row['validation'] = val
+            row['validation_model'] = ('baseline' if cfg.variant == 'baseline' else
+                                       'structural' if structural_only else 'integrated')
+        row['epoch_seconds'] = time.perf_counter() - epoch_started
+        row['elapsed_seconds'] = elapsed_before + time.perf_counter() - started
+        row['gpu_memory_bytes'] = torch.cuda.memory_allocated(device) if device.type == 'cuda' else None
+        row['peak_gpu_memory_bytes'] = peak_memory() if device.type == 'cuda' else None
+        row['peak_gpu_reserved_bytes'] = peak_reserved() if device.type == 'cuda' else None
+        row['learned_gates'] = {n: float(p.detach().tanh().cpu()) for n, p in model.named_parameters()
+                                if n.endswith('_gate')}
+        history.append(row)
+        print(f"Epoch {epoch:03d}/{cfg.epochs} | {row['phase']} | loss={row['loss']:.6f}"
+              + (f" | val_MRR={row['validation']['MRR']:.6f}"
+                 f" | val_Hits@10={row['validation']['Hits@10']:.6f}" if 'validation' in row else '')
+              + f" | GPU_peak={row['peak_gpu_memory_bytes']} bytes | elapsed={row['elapsed_seconds']:.1f}s", flush=True)
+        print(f"Configuration={identifier} | seed={cfg.seed} | updates={optimizer_steps}"
+              f" | GPU_reserved_peak={row['peak_gpu_reserved_bytes']} bytes", flush=True)
+        if not structural_only and 'validation' in row and row['validation']['MRR'] > best_mrr:
+            best_mrr, best_epoch = row['validation']['MRR'], epoch
+            save('best.pt', epoch)
+            print(f'Best validation checkpoint: epoch={best_epoch}, MRR={best_mrr:.6f}', flush=True)
+        save('last.pt', epoch)
+        write_json(output / 'history.json', history)
+        from training.reports import write_csv
+        write_csv(output / 'history.csv', [
+            {**{k: v for k, v in h.items() if k not in ('validation', 'step_losses')},
+             **{'val_'+k: v for k, v in h.get('validation', {}).items()}} for h in history])
+        if cfg.record_step_losses:
+            write_csv(output / 'steps.csv', [dict(epoch=h['epoch'], phase=h['phase'], **s)
+                      for h in history for s in h.get('step_losses', [])])
+    chosen = torch.load(output / 'best.pt', map_location='cpu', weights_only=True)
+    if chosen['run_id'] != run_id:
+        raise ValueError('Best checkpoint belongs to a different run')
+    load_model_state(model, chosen['model_state'])
+    progress.update(phase='selected_checkpoint_evaluation', operation='evaluation')
+    validation, test = evaluate(data.valid), evaluate(data.test)
     result = {'status': 'complete', 'run_id': run_id, 'settings': asdict(cfg),
               'configuration': identifier, 'architecture': cfg.variant,
               'initialization': 'scratch', 'baseline_checkpoint_used': False,
@@ -415,6 +478,11 @@ def run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
               'subset_statistics': manifest['statistics'],
               'history': history, 'duration_seconds': elapsed_before + time.perf_counter() - started,
               'peak_gpu_memory_bytes': peak_memory() if device.type == 'cuda' else None,
+              'peak_gpu_reserved_bytes': peak_reserved() if device.type == 'cuda' else None,
+              'gpu_memory_start': gpu_memory_start,
+              'architecture_diagnostics': architecture_diagnostics,
+              'initial_projection_sha256': initial_projection_sha,
+              'final_epoch': cfg.epochs,
               'initial_structural_sha256': initial_structural_sha, 'lm_identity': lm_info,
               'initial_trainable_sha256': initial_trainable_sha,
               'text_cache_keys': cache_keys, 'environment': provenance,

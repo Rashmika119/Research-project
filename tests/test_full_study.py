@@ -217,7 +217,7 @@ class FullStudyTests(unittest.TestCase):
             model=build_scratch_model('baseline',3,2)
             self.assertFalse(hasattr(model,'bridge'))
         from training import research_pipeline
-        source=inspect.getsource(research_pipeline.run_experiment)
+        source=inspect.getsource(research_pipeline._run_experiment)
         self.assertIn("if can_select_initial(cfg):",source)
         self.assertIn("'baseline_optimizer_steps': optimizer_steps if cfg.variant == 'baseline' else 0",source)
 

@@ -4,6 +4,21 @@ Read README.md, docs/FULL_DATASET_300.md and experiments/configs/full_dataset_10
 Previous instructions are archived byte-for-byte in docs/WARMUP_STAGE_INSTRUCTIONS.md.
 Historical stage results/protocols remain preserved; they are not current defaults.
 
+## Final approved residual versus Shared C comparison
+
+The latest user-approved task matches the existing architectures. Use
+`docs/FINAL_RESIDUAL_VS_SHARED_C.md`, `run_final_comparison.py`, and the NEW
+`notebooks/final_residual_vs_shared_c_full.ipynb`. Exactly residual-no-softprompt-warmup,
+shared-c-gated, shared-c-ungated; seed 0; full FB15k-237 max_entities=0;
+100 epochs including 10 warmup; 900 updates/run (90 warmup + 810 integrated).
+Preserve all numerical/model defaults, same-seed structural/projection pairing,
+independent/shared layer identities, actual cached frozen RoBERTa and evaluation.
+The final study adds diagnostics/reports, not new model mathematics. Earlier
+registries remain unchanged. Protect ALL four earlier notebooks and results.
+No actual training during implementation; static/mocked/derivative checks only.
+New root Research/final_three_architectures_100; new seed0 run tag; no transfers.
+See the final guide for exact-source resume and GPU limitations.
+
 ## Newly approved shared-RGAT study
 
 The user's latest instruction authorizes six additional experiments. Read

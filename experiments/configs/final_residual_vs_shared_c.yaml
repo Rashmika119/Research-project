@@ -1,0 +1,67 @@
+protocol: full_fb15k237_residual_vs_shared_c_100_10_v1
+dataset: FB15k-237
+max_entities: 0
+entities: 14541
+relations: 237
+splits:
+  train: 272115
+  valid: 17535
+  test: 20466
+seeds:
+- 0
+configurations:
+  residual-no-softprompt-warmup:
+    architecture: residual-no-softprompt
+    warmup: 10
+    unique_rgat_layers: 4
+    integrated_layer_executions: 4
+    structural_updates: 90
+    integrated_updates: 810
+  shared-c-gated:
+    architecture: shared-c-gated
+    warmup: 10
+    unique_rgat_layers: 2
+    integrated_layer_executions: 4
+    structural_updates: 90
+    integrated_updates: 810
+  shared-c-ungated:
+    architecture: shared-c-ungated
+    warmup: 10
+    unique_rgat_layers: 2
+    integrated_layer_executions: 4
+    structural_updates: 90
+    integrated_updates: 810
+epochs: 100
+train_batch_size: 32768
+steps_per_epoch: 9
+optimizer_steps: 900
+lr: 0.001
+weight_decay: 1.0e-05
+optimizer: Adam
+num_negatives: 4
+grad_clip: 1.0
+model:
+  encoder_type: rgat
+  scorer_type: complex
+  dim: 32
+  num_layers: 2
+  heads: 1
+  dropout: 0.2
+  num_bases: null
+text_batch_size: 256
+eval_batch_size: 512
+max_text_length: 64
+eval_every: 5
+selection_policy: scheduled_only
+record_step_losses: true
+deterministic: true
+precision: float32
+lm_name: roberta-base
+lm_revision: e2da8e2f811d1448a5b465c236feacd80ffbac7b
+ranking_policy: average_exact_ties
+skip_completed: true
+resume_interrupted: true
+preliminary_training_tests: false
+warmup: 10
+projection_dropout: 0.1
+activation_checkpointing: false

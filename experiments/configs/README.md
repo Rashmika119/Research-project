@@ -14,3 +14,9 @@ all architecture and optimization settings remain the same.
 study: 2000 entities, 50 epochs including 10 warmup, seed 0. The YAML keeps
 its historical `_1000` filename. Its runner is
 `run_shared_rgat_comparison.py`; see [the guide](../../docs/SHARED_RGAT_1000.md).
+
+`final_residual_vs_shared_c.yaml` is the final full-data three-run comparison:
+Residual No-Softprompt warmup / Shared C gated / Shared C ungated, seed 0,
+100 total epochs including 10 warmup, 900 optimizer updates each. Runner:
+`run_final_comparison.py`. See [the final guide](../../docs/FINAL_RESIDUAL_VS_SHARED_C.md).
+Earlier config files remain unchanged.

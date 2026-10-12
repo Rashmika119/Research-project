@@ -1,5 +1,22 @@
 # KG research experiments
 
+The final full-dataset study compares **Residual No-Softprompt with warmup**,
+**Shared C gated**, and **Shared C ungated**, using seed **0**: three scratch
+runs, each **100 total epochs = 10 warmup + 90 integrated**, **900 updates**.
+The requested architectures match the existing implementations.
+
+Open [the final Colab notebook](notebooks/final_residual_vs_shared_c_full.ipynb)
+and read [the final protocol and run/resume guide](docs/FINAL_RESIDUAL_VS_SHARED_C.md).
+Push the code and set the notebook's exact `REPO_REF` commit before running.
+Only Section 6 starts training. GPU capacity remains unverified.
+
+```bash
+python run_final_comparison.py --output-dir experiments/research/final_three_run1 --seeds 0 --skip-completed --resume
+python run_final_comparison.py --report-only --output-dir experiments/research/final_three_run1 --seeds 0
+```
+
+Earlier workflows below remain preserved, with their own settings and outputs.
+
 The new study runs **six shared-RGAT experiments** on a **2,000-entity subset**,
 with **50 total epochs, 10 warmup epochs, and seed 0**. A reuses layer 1, B splits
 the two layers around text fusion, and C reuses both layers. Each is tested with
