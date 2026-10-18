@@ -1,5 +1,22 @@
 # Current instructions: baseline versus Shared C gated
 
+## Latest approved experiment: FB15K baseline
+
+The user approved docs/FB15K_BASELINE_300.md and
+experiments/configs/fb15k_baseline_300.yaml. Use run_baseline_fb15k.py and
+notebooks/fb15k_baseline_300.ipynb for this baseline-only study. Keep the existing
+RGAT + ComplEx class: seed0, width100 (complex50), 2 layers, 1 head, dropout.2,
+10 negatives, 300 epochs, warmup0, batch32768 (15 updates/epoch, last24390),
+4500 updates total. Validate every10 epochs with eval batch512. Adam lr.001,
+weight decay.00001, clip1, float32, strict determinism; no scheduler/early stopping.
+Full original FB15K counts:14951 entities,1345 relations,483142/50000/59071 splits.
+Explicit dataset identity must reject FB15k-237. No LM/text downloads for this run.
+Use the new output root/tag; fetch main and record the resolved commit. Do not
+alter Shared C's earlier FB15k-237 protocol or compare cross-dataset scores.
+No training during implementation; offline/mock/derivative checks only.
+
+## Retained FB15k-237 comparison
+
 Read README.md, docs/BASELINE_SHARED_C.md and experiments/configs/baseline_shared_c.yaml.
 The latest user selected only baseline and shared-c-gated. Other implementations,
 study launchers and choices are retired. docs/archive is historical evidence,

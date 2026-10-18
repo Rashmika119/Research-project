@@ -1,5 +1,31 @@
 # KG-only baseline versus Shared C gated
 
+## New: FB15K baseline, 300 epochs
+
+For the latest baseline experiment, open
+[fb15k_baseline_300.ipynb](notebooks/fb15k_baseline_300.ipynb).
+It fetches **main** and runs only the existing RGAT + ComplEx baseline:
+full **FB15K**, seed **0**, width **100** (50 complex dimensions), **10 negatives**,
+**300 epochs**, no warmup, positive batch **32,768**, **15 updates/epoch**,
+validation every **10 epochs**, evaluation batch **512**, Adam lr **0.001**.
+The model architecture and BCE/sampling equations are unchanged.
+
+Run notebook sections 1–4 for setup and verification; **section 5 starts training**.
+Commit and push these changes to main first. Results/checkpoints persist in the
+new `Research/fb15k_baseline_300/` Drive folder. No RoBERTa weights are downloaded.
+
+```bash
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0 --resume --skip-completed
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0 --report-only
+```
+
+See [the FB15K guide](docs/FB15K_BASELINE_300.md) and
+[configuration](experiments/configs/fb15k_baseline_300.yaml). This is a separate
+baseline study; the FB15k-237 two-model comparison below retains its settings.
+Scores from the two datasets must not be directly compared.
+
+## Existing FB15k-237 comparison
+
 This repository compares exactly two knowledge-graph link-prediction models on
 full FB15k-237. Both use RGAT and ComplEx. Shared C gated adds frozen RoBERTa text
 features and gated refinement using the same two RGAT layers twice.

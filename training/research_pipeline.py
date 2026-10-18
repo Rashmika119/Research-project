@@ -34,6 +34,7 @@ from training.reproducibility import (seed_everything, capture_rng, numerical_po
 
 @dataclass
 class ExperimentConfig:
+    dataset: str = 'fb15k237'
     variant: str = 'shared-c-gated'
     max_entities: int = 0  # zero means the complete original dataset
     epochs: int = 100  # INCLUDES warmup
@@ -58,6 +59,10 @@ class ExperimentConfig:
     record_step_losses: bool = True
 
     def validate(self):
+        if self.dataset not in ('fb15k237', 'fb15k'):
+            raise ValueError('Unknown dataset')
+        if self.dataset == 'fb15k' and self.variant != 'baseline':
+            raise ValueError('The approved FB15K protocol supports the baseline only')
         if self.selection_policy not in ('initial_and_scheduled', 'scheduled_only'):
             raise ValueError('Unknown checkpoint-selection policy')
         if self.variant not in (*ALL_ARCHITECTURES, 'baseline'):
@@ -167,7 +172,8 @@ def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     """
     cfg.validate()
     data, graph, known_train, manifest = prepare_data(
-        cfg.raw_dir, cfg.max_entities, cfg.subset_seed, manifest_path, full_dataset)
+        cfg.raw_dir, cfg.max_entities, cfg.subset_seed, manifest_path, full_dataset,
+        dataset=cfg.dataset)
     provenance = environment()
     seed_everything(cfg.seed, cfg.deterministic)
     identity = {'protocol': 'scratch_v2_complete_rng', 'config': asdict(cfg),

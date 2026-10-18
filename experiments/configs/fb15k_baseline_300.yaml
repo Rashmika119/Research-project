@@ -1,0 +1,52 @@
+protocol: fb15k_rgat_complex_dim100_neg10_300_seed0_v1
+description: Existing RGAT + ComplEx baseline on full FB15K; no text
+counts:
+  entities: 14951
+  relations: 1345
+  train_triples: 483142
+  valid_triples: 50000
+  test_triples: 59071
+config:
+  dataset: fb15k
+  variant: baseline
+  max_entities: 0
+  epochs: 300
+  warmup: 0
+  seed: 0
+  subset_seed: 0
+  lr: 0.001
+  weight_decay: 1.0e-05
+  num_negatives: 10
+  grad_clip: 1.0
+  train_batch_size: 32768
+  text_batch_size: 256
+  max_text_length: 64
+  eval_every: 10
+  eval_batch_size: 512
+  lm_name: ''
+  raw_dir: data/raw/fb15k
+  text_dir: ''
+  model:
+    encoder_type: rgat
+    scorer_type: complex
+    dim: 100
+    num_layers: 2
+    heads: 1
+    dropout: 0.2
+    num_bases: null
+  deterministic: true
+  selection_policy: scheduled_only
+  record_step_losses: true
+budget:
+  steps_per_epoch: 15
+  optimizer_steps: 4500
+  baseline_optimizer_steps: 4500
+  structural_optimizer_steps: 0
+  integrated_optimizer_steps: 0
+  last_batch_size: 24390
+optimizer: Adam
+precision: float32
+early_stopping: false
+scheduler: null
+gradient_accumulation: false
+activation_checkpointing: false

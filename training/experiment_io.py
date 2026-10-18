@@ -9,7 +9,7 @@ from pathlib import Path
 
 import torch
 
-from preprocessing.dataset import load_dataset
+from preprocessing.dataset import load_dataset, load_fb15k, validate_fb15k
 from preprocessing.graph_builder import build_train_graph, assert_no_leakage
 from preprocessing.induced_subset import make_induced_subset, graph_statistics, STRATEGY
 
@@ -74,12 +74,19 @@ def validate_fb15k237(data):
         raise ValueError(f'Expected real FB15k-237 {expected}, received {actual}; no synthetic fallback')
 
 
-def prepare_data(raw_dir, max_entities, subset_seed, manifest_path=None, full_dataset=None):
-    """Injected datasets are for offline tests; CLI always validates real FB15k-237."""
+def prepare_data(raw_dir, max_entities, subset_seed, manifest_path=None, full_dataset=None,
+                 *, dataset='fb15k237'):
+    """Explicit dataset identity; injected datasets are only for offline tests."""
+    if dataset not in ('fb15k237', 'fb15k'):
+        raise ValueError('Unknown dataset: ' + dataset)
     full = full_dataset
     if full is None:
-        full = load_dataset(raw_dir, download_if_missing=True, use_synthetic_fallback=False)
-        validate_fb15k237(full)
+        if dataset == 'fb15k':
+            full = load_fb15k(raw_dir)
+            validate_fb15k(full)
+        else:
+            full = load_dataset(raw_dir, download_if_missing=True, use_synthetic_fallback=False)
+            validate_fb15k237(full)
     data = full if max_entities == 0 else make_induced_subset(full, max_entities, subset_seed)
     if not data.train or not data.valid or not data.test:
         raise ValueError('Empty split. Increase the subset size; never manufacture held-out facts.')
@@ -87,7 +94,7 @@ def prepare_data(raw_dir, max_entities, subset_seed, manifest_path=None, full_da
     known_train = [(original_to_local[h], r, original_to_local[t]) for h, r, t in full.train
                    if h in original_to_local and t in original_to_local]
     payload = dataset_payload(data)
-    manifest = {'schema': 2, 'dataset_sha256': digest(dataset_payload(full)),
+    manifest = {'schema': 2, 'dataset': dataset, 'dataset_sha256': digest(dataset_payload(full)),
                 'selection_strategy': STRATEGY if max_entities else 'full_original_splits',
                 'statistics': graph_statistics(data),
                 'original_entity_ids': [full.entity2id[name] for name in data.entity2id],

@@ -1,36 +1,9 @@
-"""Dataset loading and entity/relation ID mapping for FB15k-237.
+"""FB15k-237 and original FB15K TSV loading with deterministic ID mapping.
 
-Loads the standard FB15k-237 train/valid/test triple files and converts them
-into integer-ID triples plus entity2id / relation2id vocabularies built in
-train-first order, so IDs are reproducible and independent of how valid/test
-happen to be ordered on disk.
-
-FB15k-237 (Freebase-derived) is this project's primary dataset per explicit
-supervisor direction — see CLAUDE.md non-negotiable rule #6 for the history
-of this decision (WN18RR -> WN18 -> FB15k-237) and why Freebase-style data,
-with its much richer per-entity text, is a better fit for testing whether
-language-model semantics actually help than WordNet-style data (WN18/WN18RR)
-is.
-
-Column order: assumed "head \\t relation \\t tail" (the conventional order
-most modern KGE codebases distribute FB15k-237 in) — UNVERIFIED from this
-dev machine (no network access here). This is NOT a safe assumption to trust
-blindly: WN18's original release turned out to use a different column order
-than expected, silently producing a nonsense relation count that still
-passed every consistency check. Before trusting this loader's output,
-compare `KGDataset.num_relations` against the published FB15k-237 statistics
-(14,541 entities / 237 relations / 272,115 train / 17,535 valid / 20,466
-test triples) — if the relation count is wildly off, inspect a raw
-downloaded line the same way this project did for WN18 and fix
-`_read_triples` accordingly.
-
-If the raw FB15k-237 files aren't present and can't be downloaded (no
-network, blocked host, etc.), `load_synthetic_toy_graph` produces a small
-deterministic fake knowledge graph with the same shape/contract as a real
-`KGDataset`, so the rest of the Phase 0 pipeline (ID mapping, adjacency
-building, leakage checks) can still be smoke-tested offline. It is not meant
-to be trained on for real results — only for exercising the data-handling
-code.
+Research callers select the dataset explicitly and validate its exact counts.
+FB15K uses a separate directory and staged download, with no synthetic fallback.
+Both parse head/relation/tail columns and assign IDs in train-first order.
+Synthetic toy graphs are only for offline mechanics tests, never research results.
 """
 
 from __future__ import annotations
@@ -62,6 +35,8 @@ _FB15K237_URL_CANDIDATES = [
     "https://raw.githubusercontent.com/ZhenfengLei/KGDatasets/master/FB15k-237/",
 ]
 _SPLIT_FILES = {"train": "train.txt", "valid": "valid.txt", "test": "test.txt"}
+FB15K_COUNTS = (14951, 1345, 483142, 50000, 59071)
+FB15K_URL = 'https://raw.githubusercontent.com/DeepGraphLearning/KnowledgeGraphEmbedding/master/data/FB15k/'
 
 
 @dataclass
@@ -214,6 +189,46 @@ def load_fb15k237(
         valid=to_ids(split_str_triples["valid"]),
         test=to_ids(split_str_triples["test"]),
     )
+
+
+def validate_fb15k(data: KGDataset) -> None:
+    actual = (data.num_entities, data.num_relations, len(data.train), len(data.valid), len(data.test))
+    if actual != FB15K_COUNTS:
+        raise ValueError(f'Expected original FB15K {FB15K_COUNTS}, received {actual}; no fallback')
+
+
+def load_fb15k(raw_dir: str | Path, download_if_missing: bool = True) -> KGDataset:
+    """Load original FB15K head/relation/tail TSV files; never use FB15k-237.
+
+    Reuse the deterministic train-first ID mapping. Download all splits to a
+    temporary directory, validate them, then publish only into an empty dataset
+    directory. Never overwrite a partial or existing user dataset automatically.
+    """
+    raw_dir = Path(raw_dir)
+    present = [(raw_dir/f).is_file() for f in _SPLIT_FILES.values()]
+    if all(present):
+        data = load_fb15k237(raw_dir, download_if_missing=False)  # Shared TSV parser only.
+        validate_fb15k(data)
+        return data
+    if any(present):
+        raise ValueError(f'Incomplete FB15K directory: {raw_dir}; provide all three splits or use an empty directory')
+    if not download_if_missing:
+        raise FileNotFoundError(f'FB15K splits missing: {raw_dir}')
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='fb15k_') as temporary:
+        staging = Path(temporary)
+        try:
+            _download_split_files(FB15K_URL, staging)
+        except Exception as error:
+            raise RuntimeError(f'FB15K download failed from {FB15K_URL}; provide train.txt/valid.txt/test.txt in {raw_dir}') from error
+        data = load_fb15k237(staging, download_if_missing=False)
+        validate_fb15k(data)
+        for filename in _SPLIT_FILES.values():
+            if (raw_dir/filename).exists():
+                raise FileExistsError(f'Dataset appeared during download: {raw_dir/filename}')
+        for filename in _SPLIT_FILES.values():
+            shutil.move(str(staging/filename), str(raw_dir/filename))
+    return data
 
 
 def load_synthetic_toy_graph(
