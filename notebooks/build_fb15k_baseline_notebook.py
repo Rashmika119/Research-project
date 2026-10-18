@@ -14,7 +14,7 @@ def notebook():
                       'outputs':[], 'execution_count':None})
     markdown('''# FB15K baseline: RGAT + ComplEx
 Existing two-layer baseline, seed0, width100 (50 complex dimensions), 10 negatives,
-300 epochs, no warmup. Batch32768: 15 updates/epoch, 4500 total.
+300 epochs, no warmup. Effective batch32768 = micro4096 × 8: 15 updates/epoch, 4500 total.
 Validation every10 epochs; select by validation MRR and test only the best checkpoint.
 This is not pure ComplEx paper reproduction. No RoBERTa/text is loaded.
 Only section5 launches training. Full GPU memory/runtime capacity must be measured.
@@ -23,6 +23,7 @@ Only section5 launches training. Full GPU memory/runtime capacity must be measur
     code(RUNTIME_SETUP.replace('T4 GPU','GPU').replace('both runs','resumed sessions'))
     markdown('## 2. Fetch main, mount Drive and install dependencies')
     setup = REPOSITORY_SETUP.replace('baseline_shared_c_100', 'fb15k_baseline_300')
+    setup = setup.replace('fb15k_baseline_300_seed0_v1_run1', 'fb15k_baseline_300_seed0_accum8_v2_run1')
     setup = setup.replace('run_final_comparison.py', 'run_baseline_fb15k.py')
     setup = '\n'.join(line for line in setup.splitlines() if 'RESEARCH_MODEL_BACKUP' not in line
                       and 'Verified weights load locally' not in line)
@@ -50,7 +51,9 @@ verify_protocol(protocol, make_config())
 cfg = make_config(RAW_DIR)
 display(pd.DataFrame([{'dataset':'FB15K', 'model':'RGAT + ComplEx', 'seed':0,
                       'width':cfg.model['dim'], 'negatives':cfg.num_negatives,
-                      'epochs':cfg.epochs, 'warmup':cfg.warmup, **expected_budget()}]))
+                      'epochs':cfg.epochs, 'warmup':cfg.warmup,
+                      'effective_batch':cfg.train_batch_size, 'micro_batch':cfg.micro_batch_size,
+                      'accumulation_steps':cfg.accumulation_steps, **expected_budget()}]))
 data, graph, known_train, manifest = prepare_data(str(RAW_DIR),0,0,MANIFEST,dataset='fb15k')
 verify_manifest(manifest)
 assert len(graph.edge_type) == 966284
@@ -72,6 +75,9 @@ else:
 ''')
     markdown('''## 5. Train the existing baseline
 Runs one child process. Logs every epoch; validation at10,20,...,300.
+Effective batch32768 uses8 scoring micro-batches of4096 and one RGAT encoding.
+The final24390 examples use6 micro-batches (5×4096 +3910), weighted by their sizes.
+Clipping and Adam run once per effective batch. Full-graph activations still remain resident.
 Each completed epoch commits last.pt; best validation saves best.pt.
 Resume uses the same tag, source, settings and runtime. If main changes, set
 REPO_REF to the recorded original SHA when resuming. Never mix old study outputs.

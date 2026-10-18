@@ -6,17 +6,22 @@ For the latest baseline experiment, open
 [fb15k_baseline_300.ipynb](notebooks/fb15k_baseline_300.ipynb).
 It fetches **main** and runs only the existing RGAT + ComplEx baseline:
 full **FB15K**, seed **0**, width **100** (50 complex dimensions), **10 negatives**,
-**300 epochs**, no warmup, positive batch **32,768**, **15 updates/epoch**,
+**300 epochs**, no warmup, effective batch **32,768** = **4,096 × 8** micro-batches,
+**15 updates/epoch** (4,500 total),
 validation every **10 epochs**, evaluation batch **512**, Adam lr **0.001**.
 The model architecture and BCE/sampling equations are unchanged.
+Micro-batched scoring shares one RGAT encoding per update. The final smaller
+batch is weighted by actual example counts. This reduces scoring memory, not
+the memory needed for full-graph RGAT activations. Use the new `accum8_v2` run tag;
+old-run checkpoints require their original source/settings.
 
 Run notebook sections 1–4 for setup and verification; **section 5 starts training**.
 Commit and push these changes to main first. Results/checkpoints persist in the
 new `Research/fb15k_baseline_300/` Drive folder. No RoBERTa weights are downloaded.
 
 ```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0 --resume --skip-completed
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0 --report-only
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_accum8_v2 --resume --skip-completed
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_accum8_v2 --report-only
 ```
 
 See [the FB15K guide](docs/FB15K_BASELINE_300.md) and

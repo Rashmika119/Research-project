@@ -23,7 +23,7 @@ from preprocessing.relation_text import (download_relation_text_file,
                                         read_relation_text_mapping, align_relation_texts)
 from training.experiment_io import (digest, environment, file_digest, prepare_data,
                                     save_checkpoint, write_json)
-from training.losses import bce_loss
+from training.accumulation import backward_effective_batch
 from training.negative_sampling import sample_negatives
 from training.text_cache import lm_identity, pooled_text
 from training.variants import (MODEL_CONFIG, ALL_ARCHITECTURES, independent_text,
@@ -46,6 +46,8 @@ class ExperimentConfig:
     num_negatives: int = 4
     grad_clip: float = 1.0
     train_batch_size: int = 32768  # zero = one optimizer step per epoch
+    micro_batch_size: int = 0  # zero means the whole effective batch
+    accumulation_steps: int = 1
     text_batch_size: int = 256
     max_text_length: int = 64
     eval_every: int = 5
@@ -59,6 +61,13 @@ class ExperimentConfig:
     record_step_losses: bool = True
 
     def validate(self):
+        if self.micro_batch_size < 0 or self.accumulation_steps < 1:
+            raise ValueError('Invalid micro-batch/accumulation settings')
+        if self.micro_batch_size:
+            if self.train_batch_size != self.micro_batch_size * self.accumulation_steps:
+                raise ValueError('Effective batch must equal micro-batch times accumulation steps')
+        elif self.accumulation_steps != 1:
+            raise ValueError('Accumulation requires an explicit micro-batch size')
         if self.dataset not in ('fb15k237', 'fb15k'):
             raise ValueError('Unknown dataset')
         if self.dataset == 'fb15k' and self.variant != 'baseline':
@@ -282,6 +291,8 @@ def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     steps_per_epoch = math.ceil(len(data.train) / batch_size)
     print(f'Budget: {warm} structural + {cfg.epochs - warm} main epochs; '
           f'{cfg.epochs * steps_per_epoch} optimizer steps; fixed lr={cfg.lr}', flush=True)
+    print(f'Batching: effective={batch_size}; micro={cfg.micro_batch_size or batch_size}; '
+          f'accumulation={cfg.accumulation_steps}; clip/Adam once per effective batch', flush=True)
     history, best_mrr, best_epoch, start_epoch, optimizer_steps = [], -1., -1, 1, 0
     best_state = None
     initial_validation, elapsed_before, previous_peak = None, 0., 0
@@ -394,23 +405,15 @@ def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
         for offset in range(0, len(permutation), batch_size):
             progress['operation'] = 'training'
             positive_cpu = positives_cpu[permutation[offset:offset + batch_size]]
-            positive = positive_cpu.to(device)
             negative = sample_negatives(positive_cpu, data.num_entities, known,
-                                        cfg.num_negatives, negative_rng).to(device)
+                                        cfg.num_negatives, negative_rng)
             optimizer.zero_grad(set_to_none=True)
-            e, r = encode(structural_only)
-            def score(triples):
-                return ComplExScorer.score_vectors(e[triples[:, 0]], r[triples[:, 1]], e[triples[:, 2]])
-            loss = bce_loss(score(positive), score(negative.reshape(-1, 3)).reshape(
-                len(positive), cfg.num_negatives))
-            if not torch.isfinite(loss):
-                raise RuntimeError('Non-finite loss')
-            loss.backward()
+            loss_value = backward_effective_batch(lambda: encode(structural_only), positive_cpu,
+                negative, cfg.micro_batch_size or len(positive_cpu), device)
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
             if cfg.variant != 'baseline' and any(p.grad is not None for p in model.bridge.lm.parameters()):
                 raise AssertionError('Frozen LM received parameter gradients')
             optimizer.step()
-            loss_value = loss.item()
             total_loss += loss_value
             weighted_loss += loss_value * len(positive_cpu)
             optimizer_steps += 1
@@ -418,8 +421,10 @@ def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
             steps += 1
             if cfg.record_step_losses:
                 step_losses.append({'optimizer_step': optimizer_steps,
-                                    'positive_count': len(positive_cpu), 'loss': loss_value})
-            del e, r, loss, positive, negative
+                                    'positive_count': len(positive_cpu), 'loss': loss_value,
+                                    'micro_batches': math.ceil(len(positive_cpu) /
+                                        (cfg.micro_batch_size or len(positive_cpu)))})
+            del negative
         row = {'epoch': epoch, 'phase': 'structural_warmup' if structural_only else 'main',
                'loss': total_loss / steps, 'optimizer_steps': optimizer_steps,
                'train_seconds': time.perf_counter() - epoch_started}

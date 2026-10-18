@@ -1,6 +1,6 @@
 # FB15K baseline: existing RGAT + ComplEx
 
-Protocol: `fb15k_rgat_complex_dim100_neg10_300_seed0_v1`.
+Protocol: `fb15k_rgat_complex_dim100_neg10_300_seed0_accum8_v2`.
 This is the existing `KGOnlyBaselineRGAT`, not a new baseline class or pure ComplEx
 reproduction. Shared C remains available in the separate FB15k-237 comparison.
 
@@ -19,7 +19,9 @@ reproduction. Shared C remains available in the separate FB15k-237 comparison.
 | Negative filtering | Reject unchanged and known training triples; no held-out labels |
 | Objective | Mean positive BCE plus mean negative BCE, unchanged |
 | Epochs / warmup | 300 / 0 |
-| Positive batch size | 32,768 |
+| Effective positive batch size | 32,768 |
+| Scoring micro-batch size | 4,096 |
+| Accumulation steps | 8 per full effective batch |
 | Updates per epoch | 15: fourteen full batches and one final batch of 24,390 |
 | Total updates | 4,500 |
 | Validation | Full validation set every 10 epochs (30 evaluations) |
@@ -27,7 +29,7 @@ reproduction. Shared C remains available in the separate FB15k-237 comparison.
 | Selection | Earliest best scheduled validation filtered MRR |
 | Test | Selected checkpoint, after all 300 epochs |
 | Precision / determinism | Float32 / strict deterministic algorithms |
-| Early stopping / scheduler / AMP / accumulation | Disabled |
+| Early stopping / scheduler / AMP | Disabled |
 | Checkpoints | Atomic last.pt every epoch; best.pt on validation improvement |
 
 ## Run in Colab
@@ -39,7 +41,7 @@ download/validate FB15K, and optionally run offline checks. Section5 launches on
 training child. It does not run preliminary smoke training or load RoBERTa.
 
 Persistent root:
-`MyDrive/Research/fb15k_baseline_300/fb15k_baseline_300_seed0_v1_run1/`.
+`MyDrive/Research/fb15k_baseline_300/fb15k_baseline_300_seed0_accum8_v2_run1/`.
 The child directory is `runs/baseline_seed0`; the manifest is in `runs/`.
 Data lives separately from FB15k-237 under the shared cache's `data/fb15k/`.
 Set a fresh RUN_TAG for a different source/configuration, not for resuming a run.
@@ -55,7 +57,7 @@ train-only graph construction and split-leakage checks are retained.
 ## Local GPU command
 
 ```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0 --resume --skip-completed
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_accum8_v2 --resume --skip-completed
 ```
 
 Use `--raw-dir /path/to/fb15k` to select existing data. The approved settings are
@@ -82,8 +84,31 @@ step loss,validation metrics and GPU memory. Report-only is CPU-capable and load
 saved JSON, not model checkpoints:
 
 ```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0 --report-only
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_accum8_v2 --report-only
 ```
+
+## Gradient accumulation
+
+Each effective batch samples its negatives in the original order and computes
+one RGAT encoding. Scoring runs on micro-batches, each weighted by
+`micro_positive_count / actual_effective_positive_count`. Gradients accumulate
+on detached entity/relation output leaves; their combined gradients then flow
+through the original encoder once. This retains one dropout realization for the
+effective batch and avoids eight repeated full-graph encodings. Only clipping
+and Adam follow this combined backward, once per effective batch.
+
+The last update contains 24,390 positives: five micro-batches of 4,096 plus one
+of 3,910. It uses six micro-batches, not eight; it is not divided by eight or
+discarded. Per epoch there are 118 scoring micro-batches but still only 15
+optimizer steps; across 300 epochs there are 35,400 micro-batches and 4,500
+updates. Logs/step CSVs record micro-batch counts. Resume is at an epoch boundary,
+so no partially accumulated gradients are checkpointed; uncommitted work replays.
+
+This reduces scoring activation memory while retaining full-graph activations.
+It is not a graph mini-batching or activation-checkpointing implementation.
+Floating-point summation order changes, so gradient equivalence is numerical,
+not a promise of bitwise identity with the earlier non-accumulated run. Use the
+new protocol/tag instead of resuming an old checkpoint with changed settings.
 
 ## Interpretation and verification limits
 
@@ -104,3 +129,11 @@ dataset/budget rejection, mocked CLI/notebook execution, report generation, plus
 the existing architecture/scoring/checkpoint/RNG tests. No optimizer updates or
 GPU training were launched. Actual full FB15K download and GPU memory/runtime
 remain unverified locally; the notebook validates real data before training.
+
+Accumulation verification (2026-10-19): `python run_static_checks.py` ran31
+checks:30 passed,1 existing FB15k-237 audit skipped because local files were
+unreadable. CPU float64 derivative checks compare full-batch and micro-batched
+losses/parameter gradients for full and partial windows with dropout enabled,
+and verify one encoding, matching RNG consumption and no parameter updates.
+This verifies the accumulation equations, not CUDA peak-memory savings or
+bitwise equality between the old and new training runs.

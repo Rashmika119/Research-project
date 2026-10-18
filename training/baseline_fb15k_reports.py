@@ -40,6 +40,7 @@ def validate_result(r):
         if (h['phase'] != 'main' or h['optimizer_steps'] != epoch*15
                 or [s['optimizer_step'] for s in steps] != list(range((epoch-1)*15+1, epoch*15+1))
                 or [s['positive_count'] for s in steps] != [32768]*14+[24390]
+                or [s.get('micro_batches') for s in steps] != [8]*14+[6]
                 or any(not math.isfinite(s['loss']) for s in steps)
                 or not math.isclose(h['loss'], statistics.mean(s['loss'] for s in steps), rel_tol=1e-10, abs_tol=1e-10)
                 or not math.isclose(h['example_weighted_loss'], sum(s['loss']*s['positive_count'] for s in steps)/COUNTS[2], rel_tol=1e-10, abs_tol=1e-10)):
@@ -76,6 +77,8 @@ def baseline_report(directory, result):
                    'duration_seconds', 'peak_gpu_memory_bytes', 'peak_gpu_reserved_bytes',
                    'architecture_diagnostics', 'manifest_sha256', 'dataset_sha256', 'environment')},
                'budget': expected_budget(),
+               'batching': {'effective_batch_size': 32768, 'micro_batch_size': 4096,
+                            'accumulation_steps': 8, 'micro_batches_per_epoch': 118},
                'interpretation': 'One seed; no across-seed SD or significance claim. '
                'Existing two-layer RGAT + ComplEx, not pure ComplEx paper reproduction. '
                'Selected using validation only; test evaluated at the selected checkpoint.'}
@@ -91,6 +94,8 @@ def baseline_report(directory, result):
         f"Best epoch: {result['best_epoch']}; validation MRR: {result['validation']['MRR']:.6f}; "
         f"test MRR: {result['test']['MRR']:.6f}.\n\n"
         '300 epochs, 15 updates/epoch, 4,500 updates; width100, 10 negatives. '
+        'Effective batch32768, micro-batch4096, up to8 micro-batches/update. '
+        'Final update:24390 positives in6 micro-batches, weighted by actual example counts. '
         'No warmup, text, scheduler or early stopping. Adam lr0.001. '
         'Dataset differs from the previous FB15k-237 comparison; scores cannot be directly compared.\n',
         encoding='utf-8')

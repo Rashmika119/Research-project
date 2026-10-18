@@ -45,7 +45,8 @@ def result_fixture():
                'optimizer_steps':15*e, 'train_seconds':1., 'epoch_seconds':2., 'learned_gates':{},
                'peak_gpu_memory_bytes':2**30, 'peak_gpu_reserved_bytes':2**31,
                'step_losses':[{'optimizer_step':(e-1)*15+s+1,'loss':1.5-e*.001,
-                               'positive_count':32768 if s<14 else 24390} for s in range(15)]}
+                               'positive_count':32768 if s<14 else 24390,
+                               'micro_batches':8 if s<14 else 6} for s in range(15)]}
         if e%10==0:
             row['validation'] = dict(r['validation'], MRR=.3 if e in (200,210) else .1+e*.0001)
             row['validation_model'] = 'baseline'
@@ -92,6 +93,7 @@ class FB15KTests(unittest.TestCase):
         self.assertEqual((cfg.dataset,cfg.model['dim'],cfg.num_negatives,cfg.epochs,cfg.warmup,cfg.seed),
                          ('fb15k',100,10,300,0,0))
         self.assertEqual(divmod(COUNTS[2],cfg.train_batch_size),(14,24390))
+        self.assertEqual((cfg.micro_batch_size, cfg.accumulation_steps), (4096, 8))
         verify_manifest(manifest_fixture())
         bad=manifest_fixture();bad['dataset']='fb15k237'
         with self.assertRaises(ValueError):verify_manifest(bad)
@@ -137,7 +139,8 @@ class FB15KTests(unittest.TestCase):
                 for ext in ('png','pdf'):self.assertGreater((Path(directory)/f'{p}.{ext}').stat().st_size,1000)
         mutations=[lambda r:r.update(best_epoch=210),lambda r:r['settings'].update(dataset='fb15k237'),
                    lambda r:r.update(optimizer_steps=4499),lambda r:r['history'][-1]['step_losses'].pop(),
-                   lambda r:r['history'][9].pop('validation'),lambda r:r.update(lm_identity={'unexpected':True})]
+                   lambda r:r['history'][9].pop('validation'),lambda r:r.update(lm_identity={'unexpected':True}),
+                   lambda r:r['history'][0]['step_losses'][-1].update(micro_batches=8)]
         for mutation in mutations:
             bad=copy.deepcopy(r);mutation(bad)
             with self.assertRaises(ValueError):validate_result(bad)

@@ -11,7 +11,7 @@ from training.experiment_io import prepare_data
 from training.research_pipeline import ExperimentConfig, run_experiment
 from training.variants import MODEL_CONFIG
 
-PROTOCOL = 'fb15k_rgat_complex_dim100_neg10_300_seed0_v1'
+PROTOCOL = 'fb15k_rgat_complex_dim100_neg10_300_seed0_accum8_v2'
 COUNTS = FB15K_COUNTS
 
 
@@ -21,6 +21,7 @@ def make_config(raw_dir='data/raw/fb15k'):
         max_entities=0, seed=0, subset_seed=0, epochs=300, warmup=0,
         model={**MODEL_CONFIG, 'dim': 100}, num_negatives=10,
         train_batch_size=32768, eval_every=10, eval_batch_size=512,
+        micro_batch_size=4096, accumulation_steps=8,
         lr=.001, weight_decay=.00001, grad_clip=1., deterministic=True,
         selection_policy='scheduled_only', record_step_losses=True)
     cfg.validate()
@@ -50,7 +51,7 @@ def verify_protocol(protocol, cfg):
     counts = tuple(protocol['counts'][k] for k in
                    ('entities', 'relations', 'train_triples', 'valid_triples', 'test_triples'))
     expected = {'optimizer':'Adam', 'precision':'float32', 'early_stopping':False,
-                'scheduler':None, 'gradient_accumulation':False, 'activation_checkpointing':False}
+                'scheduler':None, 'gradient_accumulation':True, 'activation_checkpointing':False}
     if counts != COUNTS or any(protocol.get(k) != v for k,v in expected.items()):
         raise ValueError('Incorrect dataset or numerical protocol')
 

@@ -1,4 +1,4 @@
-protocol: fb15k_rgat_complex_dim100_neg10_300_seed0_v1
+protocol: fb15k_rgat_complex_dim100_neg10_300_seed0_accum8_v2
 description: Existing RGAT + ComplEx baseline on full FB15K; no text
 counts:
   entities: 14951
@@ -19,6 +19,8 @@ config:
   num_negatives: 10
   grad_clip: 1.0
   train_batch_size: 32768
+  micro_batch_size: 4096
+  accumulation_steps: 8
   text_batch_size: 256
   max_text_length: 64
   eval_every: 10
@@ -48,5 +50,5 @@ optimizer: Adam
 precision: float32
 early_stopping: false
 scheduler: null
-gradient_accumulation: false
+gradient_accumulation: true
 activation_checkpointing: false
