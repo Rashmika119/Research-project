@@ -43,4 +43,5 @@ CPU checks do not certify CUDA determinism, real RoBERTa or T4 capacity.
 Preserve data/caches/results/checkpoints and archived hashes. Use a fresh output
 root/tag for changed source/settings. The notebook builder refuses overwrite;
 preserve user outputs before updates. Do not commit/push unless requested.
-Colab uses the exact pushed SHA containing this protocol.
+Colab defaults to fetching main and records the resolved commit. Resume still
+requires matching source; use the recorded commit if main has changed.

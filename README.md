@@ -18,10 +18,11 @@ executes four, with only two unique layers.
 ## Run in Google Colab
 
 Open [baseline_vs_shared_c_full.ipynb](notebooks/baseline_vs_shared_c_full.ipynb)
-with a GPU runtime. In section 2, set `REPO_REF` to the exact **pushed commit SHA
-containing this cleanup** (`git rev-parse HEAD` after committing). The notebook
-checks out that commit, not a moving branch. Local edits are unavailable in Colab
-until committed and pushed.
+with a GPU runtime. Section 2 uses `REPO_REF = 'main'` to fetch the latest pushed
+code from the main branch, then checks out and records its resolved commit.
+Local changes must be committed and pushed to main before Colab can use them.
+If main changes between sessions, existing runs still require matching source
+to resume; use their recorded commit or a fresh run tag.
 
 Run sections 1–5 for setup/verification, then section 6 for the two sequential
 experiments. No preliminary training is launched. Optional CPU checks are disabled

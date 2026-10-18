@@ -217,7 +217,7 @@ class FinalStudyTests(unittest.TestCase):
             with patch.dict(sys.modules,{'google.colab':SimpleNamespace(drive=SimpleNamespace(mount=lambda p:None))}),patch.dict(os.environ),patch('os.chdir'),patch('subprocess.run',return_value=subprocess.CompletedProcess([],0)),patch('subprocess.check_output',side_effect=output),patch('torch.cuda.is_available',return_value=True),patch('torch.cuda.get_device_name',return_value='fixture'),patch('torch.cuda.get_device_properties',return_value=SimpleNamespace(total_memory=15*2**30)),patch('torch.cuda.mem_get_info',return_value=(14*2**30,15*2**30)),patch('training.reproducibility.seed_everything'),patch('training.experiment_io.environment',return_value={}),patch('training.experiment_io.prepare_data',side_effect=prepare),patch('models.pretrained.prepare_pretrained',return_value=SimpleNamespace(path='fixture',revision='e2da8e2f811d1448a5b465c236feacd80ffbac7b',files=[])),patch('training.process.run_logged',side_effect=research),patch('IPython.display.display'),redirect_stdout(io.StringIO()):
                 for i,c in enumerate(nb['cells']):
                     if c['cell_type']!='code':continue
-                    s=c['source'].replace('SET_EXACT_PUSHED_COMMIT_SHA','a'*40)
+                    s=c['source']
                     s=s.replace("Path('/content/Research-project')",f'Path({str(ROOT)!r})')
                     for folder in ('scratch_pipeline_v1','baseline_shared_c_100'):
                         s=s.replace(f"Path('/content/drive/MyDrive/Research/{folder}')",f'Path({str(Path(d)/folder)!r})')

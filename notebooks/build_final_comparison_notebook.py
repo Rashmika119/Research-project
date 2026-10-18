@@ -33,9 +33,7 @@ RUN_ROOT = STAGE_ROOT / RUN_TAG
 RUN_ROOT.mkdir(parents=True, exist_ok=True)
 os.environ['RESEARCH_MODEL_BACKUP'] = str(SHARED_ROOT / 'verified_roberta_backup')
 REPO_URL = 'https://github.com/Rashmika119/Research-project.git'
-REPO_REF = 'SET_EXACT_PUSHED_COMMIT_SHA'
-import re
-assert re.fullmatch(r'[0-9a-fA-F]{40}', REPO_REF), 'Push this final study and enter its exact 40-character Git commit SHA.'
+REPO_REF = 'main'  # Fetch the latest pushed main; record its resolved commit below.
 REPO_DIR = Path('/content/Research-project')
 if not REPO_DIR.exists():
     subprocess.run(['git', 'clone', REPO_URL, str(REPO_DIR)], check=True)
