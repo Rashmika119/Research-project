@@ -8,13 +8,13 @@ from unittest.mock import patch
 
 import torch
 
-from tests.test_research_pipeline import fake_lm, make_tokens
+from tests.helpers import fake_lm, make_tokens
 from training.variants import build_scratch_model, configuration_settings, CONFIGURATIONS
 from training.research_pipeline import trainable_state, load_model_state, completed_result
 from training.experiment_io import save_checkpoint, file_digest, write_json
 from training.reproducibility import (seed_everything, assert_exact_state, capture_rng,
                                       numerical_policy, restore_training_state)
-from training.full_study import make_config, build_commands
+from training.final_study import make_config, build_commands
 
 
 class SelectedModelTests(TestCase):
@@ -31,20 +31,23 @@ class SelectedModelTests(TestCase):
             with patch('torch.load', side_effect=AssertionError('Scratch may not load a checkpoint')):
                 model = build_scratch_model(architecture, 4, 2)
             models.append(model)
-        baseline, warm, direct = models
+        baseline, shared = models
         self.assertEqual(len(baseline.encoder.layers), 2)
         self.assertFalse(hasattr(baseline, 'bridge'))
-        for model in (warm, direct):
-            self.assertEqual(len(model.structural.encoder.layers), 2)
-            self.assertEqual(len(model.refiner.layers), 2)
-            self.assertFalse(model.soft_prompt)
-            self.assertFalse(hasattr(model.bridge, 'kg_to_lm'))
-            assert_exact_state(baseline.state_dict(), model.structural.state_dict())
-        self.assertIs(type(warm), type(direct))
-        assert_exact_state(warm.state_dict(), direct.state_dict())
-        for retired in ('original', 'original-no-warmup', 'residual', 'no-refinement'):
+        self.assertEqual(len(shared.structural.encoder.layers), 2)
+        self.assertEqual(shared.structural.arrangement, 'c')
+        self.assertTrue(shared.refinement_gated)
+        self.assertFalse(shared.soft_prompt)
+        self.assertFalse(hasattr(shared.bridge, 'kg_to_lm'))
+        assert_exact_state(baseline.state_dict(), shared.structural.state_dict())
+        for retired in ('original', 'residual-no-softprompt', 'residual', 'shared-a-gated', 'shared-b-gated', 'shared-c-ungated'):
             with self.assertRaises(ValueError):
                 build_scratch_model(retired, 4, 2)
+        from models.shared_rgat import SharedStructuralRGAT, SharedRGATRefinement
+        with self.assertRaises(ValueError):
+            SharedStructuralRGAT(4, 2, arrangement='a')
+        with self.assertRaises(ValueError):
+            SharedRGATRefinement(shared.structural, refinement_gated=False)
         from training.model_factory import build_model
         for override in ({'encoder_type': 'rgcn'}, {'scorer_type': 'distmult'}):
             with self.assertRaises(ValueError):
@@ -53,7 +56,7 @@ class SelectedModelTests(TestCase):
     @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_cached_fusion_refinement_equations_and_projection_gradients(self, _):
         seed_everything(7)
-        model = build_scratch_model('residual-no-softprompt', 4, 2).eval()
+        model = build_scratch_model('shared-c-gated', 4, 2).eval()
         edges = torch.tensor([[0, 1, 2, 3, 1, 2, 3, 0], [1, 2, 3, 0, 0, 1, 2, 3]])
         types = torch.tensor([0, 1, 0, 1, 2, 3, 2, 3])
         et, rt = make_tokens(4), make_tokens(2)
@@ -70,12 +73,12 @@ class SelectedModelTests(TestCase):
                                text_batch_size=2, entity_pooled=ep, relation_pooled=rp)
         base = model.structural.encode(edges, types)
         u = base + model.entity_text_gate.tanh() * model.bridge(pooled=ep)
-        expected_e = u + model.refinement_gate.tanh() * model.refiner(u, edges, types)
+        expected_e = u + model.refinement_gate.tanh() * model.structural.refine(u, edges, types)
         expected_r = model.structural.scorer.relation_emb.weight + model.relation_text_gate.tanh() * model.bridge(pooled=rp)
         torch.testing.assert_close(actual[0], expected_e)
         torch.testing.assert_close(actual[1], expected_r)
         (actual[0].square().mean() + actual[1].square().mean()).backward()
-        for module in (model.bridge.lm_to_kg, model.structural.encoder, model.refiner):
+        for module in (model.bridge.lm_to_kg, model.structural.encoder):
             gradients = [p.grad for p in module.parameters() if p.requires_grad and p.grad is not None]
             self.assertTrue(gradients and all(torch.isfinite(g).all() for g in gradients))
             self.assertTrue(any(g.abs().sum() > 0 for g in gradients))
@@ -87,7 +90,7 @@ class SelectedModelTests(TestCase):
 
     @patch('models.frozen_lm.load_pretrained_model', side_effect=fake_lm)
     def test_checkpoint_state_optimizer_rng_and_identity_without_training(self, _):
-        for architecture in ('baseline', 'residual-no-softprompt'):
+        for architecture in ('baseline', 'shared-c-gated'):
             seed_everything(5)
             model = build_scratch_model(architecture, 4, 2)
             optimizer = torch.optim.Adam((p for p in model.parameters() if p.requires_grad), lr=.001)
@@ -127,25 +130,3 @@ class SelectedModelTests(TestCase):
                 path.write_bytes(b'corrupt fixture')
                 with self.assertRaises(ValueError):
                     completed_result(directory, 'matching')
-
-    def test_optional_future_seed_keeps_three_configurations_and_budgets(self):
-        from types import SimpleNamespace
-        from tests.test_full_study import fixture_results
-        from training.full_reports import validate_runs, full_report
-        args = SimpleNamespace(seed=17, raw_dir='raw', text_dir='text', cache_dir='cache',
-                               text_batch_size=256, eval_batch_size=512, resume=False, skip_completed=False)
-        commands = build_commands(args, Path('future_seed17'), Path('manifest.json'))
-        self.assertEqual(len(commands), 3)
-        self.assertEqual({s for _, s, _, _ in commands}, {17})
-        self.assertTrue(all(make_config(c, 17).epochs == 100 for c, _, _, _ in commands))
-        runs = fixture_results()
-        for r in runs:
-            r['settings']['seed'] = 17
-        with self.assertRaises(ValueError):
-            validate_runs(runs)  # Default study still requires only seed zero.
-        validate_runs(runs, seed=17)
-        with tempfile.TemporaryDirectory() as directory, patch('training.full_reports.plot_results'):
-            summary = full_report(directory, runs, seed=17)
-            self.assertEqual(summary['seeds'], [17])
-            self.assertIn('seed17', summary['protocol'])
-            self.assertIn('seed-17', (Path(directory)/'research_analysis.md').read_text())

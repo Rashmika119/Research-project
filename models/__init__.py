@@ -1,1 +1,1 @@
-"""Selected RGAT/ComplEx and independent-text residual model components."""
+"""KG-only baseline and Shared C gated RGAT/ComplEx components."""

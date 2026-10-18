@@ -1,16 +1,14 @@
-"""Full-dataset residual-versus-Shared-C reports from completed measured histories."""
+"""Full-dataset baseline-versus-Shared-C-gated reports from completed measured histories."""
 import math
 import statistics as stats
 from pathlib import Path
 
 from training.experiment_io import digest, write_json
 from training.reports import METRICS, mean_sd, write_csv
-from training.full_reports import behavior
+from training.reports import behavior
 from training.final_study import CONFIGURATIONS, PROTOCOL, SEEDS
 
-CONTRASTS = (('sharing', 'shared-c-gated', 'residual-no-softprompt-warmup'),
-             ('refinement_gate_removal', 'shared-c-ungated', 'shared-c-gated'),
-             ('shared_ungated_vs_independent', 'shared-c-ungated', 'residual-no-softprompt-warmup'))
+CONTRASTS = (('shared_c_vs_baseline', 'shared-c-gated', 'baseline'),)
 PLOTS = ('training_loss', 'optimizer_step_loss', 'validation_mrr_curve', 'validation_hits1_curve',
          'validation_hits3_curve', 'validation_hits10_curve', 'per_seed_validation',
          'validation_mrr', 'test_mrr', 'test_hits10', 'runtime', 'gpu_memory',
@@ -98,15 +96,16 @@ def validate_runs(results, seeds=SEEDS):
         paired = [r for r in results if r['settings']['seed'] == seed]
         if len({r['initial_structural_sha256'] for r in paired}) != 1:
             raise ValueError('Initial structural parameters are not paired')
-        if any(not r.get('initial_projection_sha256') for r in paired) or len({r['initial_projection_sha256'] for r in paired}) != 1:
-            raise ValueError('Initial text projections are not paired')
     for r in results:
-        gated = r['configuration'] != 'shared-c-ungated'
-        if set(r['learned_gates']) != {'entity_text_gate', 'relation_text_gate'} | ({'refinement_gate'} if gated else set()):
+        baseline = r['architecture'] == 'baseline'
+        if (baseline and r.get('initial_projection_sha256') is not None) or (not baseline and not r.get('initial_projection_sha256')):
+            raise ValueError('Incorrect projection identity for architecture')
+        expected_gates = set() if baseline else {'entity_text_gate', 'relation_text_gate', 'refinement_gate'}
+        if set(r['learned_gates']) != expected_gates:
             raise ValueError('Incorrect text/refinement gates')
         d = r['architecture_diagnostics']
-        if (d['unique_rgat_layers'] != (4 if r['architecture'] == 'residual-no-softprompt' else 2)
-                or d['warmup_layer_executions'] != 2 or d['integrated_layer_executions'] != 4
+        if (d['unique_rgat_layers'] != 2
+                or d['warmup_layer_executions'] != 2 or d['integrated_layer_executions'] != (2 if baseline else 4)
                 or d['trainable_parameters'] < 1 or r['final_epoch'] != 100):
             raise ValueError('Invalid model inventory or final epoch')
         if (not r.get('gpu_memory_start') or r['gpu_memory_start']['free_bytes'] <= 0
@@ -118,7 +117,10 @@ def validate_runs(results, seeds=SEEDS):
             raise ValueError('Missing source identity')
         if r['numerical_policy'].get('deterministic_algorithms') is not True:
             raise ValueError('Final study requires strict determinism')
-        if r['initial_validation_epoch'] != 10 or not r['initial_validation']:
+        if baseline:
+            if r['initial_validation_epoch'] is not None or r['initial_validation'] is not None:
+                raise ValueError('Baseline has no integrated-boundary validation')
+        elif r['initial_validation_epoch'] != 10 or not r['initial_validation']:
             raise ValueError('Missing diagnostic warmup-boundary validation')
         for h in r['history']:
             weighted = sum(s['loss']*s['positive_count'] for s in h['step_losses']) / 272115
@@ -133,8 +135,8 @@ def validate_runs(results, seeds=SEEDS):
             raise ValueError('Parameter count changes across seeds')
     for seed in seeds:
         p = {r['configuration']: r['architecture_diagnostics']['trainable_parameters'] for r in results if r['settings']['seed'] == seed}
-        if not (p['residual-no-softprompt-warmup'] > p['shared-c-gated'] == p['shared-c-ungated'] + 1):
-            raise ValueError('Unexpected separate/shared/gated parameter counts')
+        if not (p['shared-c-gated'] > p['baseline']):
+            raise ValueError('Unexpected baseline/shared parameter counts')
 
 
 
@@ -160,7 +162,7 @@ def final_report(directory, results, seeds=SEEDS):
             base = {'configuration': c, 'seed': r['settings']['seed']}
             runs.append({**base, **r['architecture_diagnostics'], **{k: r[k] for k in (
                 'best_epoch', 'final_epoch', 'optimizer_steps', 'structural_optimizer_steps',
-                'integrated_optimizer_steps', 'duration_seconds', 'peak_gpu_memory_bytes', 'peak_gpu_reserved_bytes')},
+                'integrated_optimizer_steps', 'baseline_optimizer_steps', 'duration_seconds', 'peak_gpu_memory_bytes', 'peak_gpu_reserved_bytes')},
                 **{'gpu_start_'+k: v for k, v in r['gpu_memory_start'].items()},
                 'training_seconds': sum(h['train_seconds'] for h in r['history']),
                 'initial_structural_sha256': r['initial_structural_sha256'],
@@ -174,7 +176,8 @@ def final_report(directory, results, seeds=SEEDS):
                     evaluations.append({**base, 'split': 'validation', 'epoch': h['epoch'], 'phase': h['phase'], **h['validation']})
             evaluations.extend({**base, 'split': split, 'epoch': r['best_epoch'], 'phase': 'selected', **r[split]}
                                for split in ('validation', 'test'))
-            evaluations.append({**base, 'split': 'validation', 'epoch': 10, 'phase': 'initial_integrated_diagnostic', **r['initial_validation']})
+            if r['initial_validation'] is not None:
+                evaluations.append({**base, 'split': 'validation', 'epoch': 10, 'phase': 'initial_integrated_diagnostic', **r['initial_validation']})
     paired, contrasts = [], []
     for name, a, b in CONTRASTS:
         metrics = [f'{split}_{m}' for split in ('validation', 'test') for m in ('MRR', 'Hits@1', 'Hits@3', 'Hits@10')]
@@ -206,8 +209,8 @@ def final_report(directory, results, seeds=SEEDS):
                'manifest_sha256': results[0]['manifest_sha256'], 'dataset_sha256': results[0]['dataset_sha256'],
                'interpretation': 'Seed 0 only; across-seed SD is unavailable, with no significance or seed-consistency claims. '
                'Warmup and integrated curves are separated. Test never selects epochs or architecture. '
-               'Shared refinement is warmup-trained; independent refinement is not. '
-               'Do not attribute all differences solely to sharing. Pilot subset scores are not equivalent.'}
+               'Baseline trains structurally for 100 epochs; Shared C gated uses 10 warmup plus 90 integrated epochs. '
+               'This compares complete models, not an isolated effect of sharing, text or warmup. Equal updates do not mean equal compute.'}
     table = []
     for c, s in summaries.items():
         row = {'configuration': c}
@@ -233,49 +236,31 @@ def final_report(directory, results, seeds=SEEDS):
 
 
 def write_analysis(directory, summary, behaviors):
-    s = summary['configurations']
-    lines = ['# Final residual versus Shared C comparison', '', summary['interpretation'], '',
-             f"Selected by mean validation MRR: **{summary['selected_by_validation']}**.", '',
-             '## Ranking and refinement sharing', '']
+    lines = ['# Baseline versus Shared C gated', '', summary['interpretation'], '',
+             f"Selected by validation MRR: **{summary['selected_by_validation']}**.", '',
+             '## Measured differences (Shared C gated minus baseline)', '']
     for p in summary['paired_comparisons']:
-        if p['metric'] in ('validation_MRR', 'test_MRR', 'validation_Hits@1', 'validation_Hits@10'):
-            lines.append(f"- {p['A']} minus {p['B']}, {p['metric']}: {p['mean']:+.6f}, "
-                         f"across-seed SD unavailable; positive/negative seeds {p['positive_seeds']}/{p['negative_seeds']}.")
-    lines += ['', 'A positive sharing contrast favors shared over separate gated refinement on that metric; '
-              'a positive gate-removal contrast favors coefficient 1 over a learned tanh coefficient. '
-              'These comparisons answer observed ranking differences, not their exclusive cause. '
-              'Compare Hits@1 and Hits@10 deltas above to assess where improvements concentrate.', '',
-              '## Parameters and measured execution cost', '']
-    for c, v in s.items():
-        lines.append(f"- {c}: {v['trainable_parameters']:,} trainable parameters, {v['unique_rgat_layers']} unique RGAT layers, "
-                     f"4 integrated executions; total seconds {v['duration_seconds']}; training seconds {v['training_seconds']}; "
-                     f"peak allocated/reserved bytes {v['peak_gpu_memory_bytes']} / {v['peak_gpu_reserved_bytes']}.")
-    for p in summary['paired_comparisons']:
-        if p['metric'] in ('trainable_parameters', 'training_seconds', 'peak_gpu_memory_bytes', 'peak_gpu_reserved_bytes'):
-            lines.append(f"- {p['contrast']} {p['metric']} delta: {p['mean']:+.3f}, across-seed SD unavailable (negative means reduction).")
-    lines += ['', 'Total time includes setup, cache preparation, checkpoint I/O and validation/test. '
-              'Cache misses can make the first run more expensive. Training intervals are also reported. '
-              'Memory peaks include setup. Weight sharing does not halve activation memory.', '',
-              '## Convergence, seed consistency and late behavior', '',
-              f"Per-seed validation winners: {summary['per_seed_validation_winners']}.",
-              'Winner consistency across seeds is not assessable with seed 0 alone.',
-              'Convergence proxy: first scheduled epoch at 95% of each run\'s own observed best validation MRR. '
-              'This is not a common absolute quality target or proof of convergence.', '']
+        lines.append(f"- {p['metric']}: {p['mean']:+.6f}; across-seed SD unavailable.")
+    lines += ['', '## Parameters and cost', '']
+    for c, v in summary['configurations'].items():
+        lines.append(f"- {c}: {v['trainable_parameters']:,} trainable parameters, "
+                     f"{v['unique_rgat_layers']} unique RGAT layers, "
+                     f"{v['integrated_layer_executions']} layer executions per main-phase encoding; "
+                     f"training seconds {v['training_seconds']['mean']:.3f}.")
+    lines += ['', 'Total time includes preparation, cache I/O, checkpoints and evaluation. '
+              'The baseline needs no language model or text cache. Shared C reuses two layers, '
+              'but executes four graph layers per integrated encoding. GPU peaks include setup; '
+              'weight sharing does not halve activation memory.', '', '## Learning behavior', '']
     for b in behaviors:
-        lines.append(f"- {b['configuration']} seed {b['seed']}: 95% epoch {b['first_epoch_at_95pct_observed_best_main_mrr']}, "
-                     f"best epoch {b['best_epoch']}, best-to-final MRR drop {b['best_to_final_validation_mrr_drop']:.6f}; "
-                     f"late loss-falling/validation-stalling flag {b['loss_falls_while_validation_stalls_last_6_evaluations']}.")
-    for p in summary['paired_comparisons']:
-        if p['metric'] == 'first_epoch_at_95pct_observed_best_main_mrr':
-            lines.append(f"- {p['contrast']} threshold-epoch delta: {p['mean']:+.3f} (negative means earlier), across-seed SD unavailable.")
-    lines += ['', 'A late validation decline with decreasing loss suggests overfitting; a best epoch at 100 '
-              'may suggest incomplete convergence. Neither establishes a cause. More seeds/longer runs would '
-              'be separate experiments, not a license to select using test results.', '',
-              '## Architectural interpretation', '',
-              'All first passes and text projections are paired at initialization. Shared C refines using '
-              'the same warmup-trained layers; the independent refiner starts integrated training untrained. '
-              'Parameter count and optimization paths differ. Ungated refinement starts at coefficient 1 '
-              'while gated starts at tanh(0.01). Text gates remain in both. These factors qualify causal claims.']
+        lines.append(f"- {b['configuration']}: best epoch {b['best_epoch']}; best-to-final validation MRR "
+                     f"drop {b['best_to_final_validation_mrr_drop']:.6f}; first epoch at 95% of its own "
+                     f"observed best MRR: {b['first_epoch_at_95pct_observed_best_main_mrr']}.")
+    lines += ['', 'The 95% threshold is relative to each model, not a common quality target. '
+              'Structural weights are paired at scratch initialization. Shared C additionally learns '
+              'text projection and three gates, and reuses its warmup-trained layers for refinement. '
+              'A difference cannot be attributed exclusively to any one of those changes. '
+              'Baseline checkpoint selection begins at epoch 5; Shared C selection begins at epoch 15. '
+              'Test scores do not select the checkpoint or model. Seed 0 alone cannot establish significance.']
     (directory/'research_analysis.md').write_text('\n'.join(lines)+'\n', encoding='utf-8')
 
 
@@ -285,7 +270,7 @@ def plot_results(directory, indexed, summary):
     import matplotlib.pyplot as plt
     seeds = summary['seeds']
     colors = dict(zip(CONFIGURATIONS, plt.get_cmap('tab10').colors))
-    labels = dict(zip(CONFIGURATIONS, ('Independent gated', 'Shared C gated', 'Shared C ungated')))
+    labels = dict(zip(CONFIGURATIONS, ('KG-only baseline', 'Shared C gated')))
     def finish(fig, name):
         fig.tight_layout()
         fig.savefig(directory/(name+'.png'), dpi=300)
@@ -302,19 +287,20 @@ def plot_results(directory, indexed, summary):
                     rows=[h for h in indexed[c,seed]['history'] if h['phase']==phase and (not metric or 'validation' in h)]
                     x=[s['optimizer_step'] for h in rows for s in h['step_losses']] if updates else [h['epoch'] for h in rows]
                     groups.append([s['loss'] for h in rows for s in h['step_losses']] if updates else [h['validation'][metric] if metric else h['loss'] for h in rows])
+                if not x: continue
                 values=[mean_sd(v) for v in zip(*groups)]
                 ax.plot(x,[v['mean'] for v in values],style,color=colors[c],label=labels[c]+' / '+phase)
                 if len(seeds)>1:
                     ax.fill_between(x,[v['mean']-v['std'] for v in values],[v['mean']+v['std'] for v in values],color=colors[c],alpha=.12)
         ax.axvline(90 if updates else 10,color='grey',alpha=.4)
-        ax.set(xlabel='Optimizer update' if updates else 'Epoch',ylabel=metric or 'BCE loss',title='Seed 0; dashed warmup / solid integrated')
+        ax.set(xlabel='Optimizer update' if updates else 'Epoch',ylabel=metric or 'BCE loss',title='Seed 0; dashed: Shared C warmup; solid: main phase')
         ax.legend(fontsize=7); ax.grid(alpha=.2); finish(fig,name)
     fig, axes=plt.subplots(len(seeds),1,figsize=(10,4*len(seeds)),squeeze=False)
     for seed,ax in zip(seeds,axes[:,0]):
         for c in CONFIGURATIONS:
             rows=[h for h in indexed[c,seed]['history'] if h['phase']=='main' and 'validation' in h]
             ax.plot([h['epoch'] for h in rows],[h['validation']['MRR'] for h in rows],label=labels[c],color=colors[c])
-        ax.set(title=f'Seed {seed}: integrated validation',xlabel='Epoch',ylabel='MRR');ax.legend()
+        ax.set(title=f'Seed {seed}: main-phase validation',xlabel='Epoch',ylabel='MRR');ax.legend()
     finish(fig,'per_seed_validation')
     for name,split,metric in [('validation_mrr','validation','MRR'),('test_mrr','test','MRR'),('test_hits10','test','Hits@10'),('runtime',None,'training_seconds')]:
         fig,ax=plt.subplots(figsize=(9,5))
@@ -324,8 +310,8 @@ def plot_results(directory, indexed, summary):
     fig,ax=plt.subplots(figsize=(9,5))
     for offset,field,label in [(-.2,'peak_gpu_memory_bytes','allocated'),(.2,'peak_gpu_reserved_bytes','reserved')]:
         vals=[summary['configurations'][c][field] for c in CONFIGURATIONS]
-        ax.bar([i+offset for i in range(3)],[v['mean']/2**30 for v in vals],width=.4,yerr=[v['std']/2**30 for v in vals] if len(seeds)>1 else None,label=label,capsize=3)
-    ax.set_xticks(range(3),list(labels.values()));ax.set_ylabel('Peak GPU GiB');ax.legend();finish(fig,'gpu_memory')
+        ax.bar([i+offset for i in range(len(CONFIGURATIONS))],[v['mean']/2**30 for v in vals],width=.4,yerr=[v['std']/2**30 for v in vals] if len(seeds)>1 else None,label=label,capsize=3)
+    ax.set_xticks(range(len(CONFIGURATIONS)),list(labels.values()));ax.set_ylabel('Peak GPU GiB');ax.legend();finish(fig,'gpu_memory')
     fig,ax=plt.subplots(figsize=(9,5))
     ax.bar(list(labels.values()),[summary['configurations'][c]['trainable_parameters'] for c in CONFIGURATIONS])
     ax.set_ylabel('Trainable parameters');finish(fig,'parameters')
@@ -333,6 +319,7 @@ def plot_results(directory, indexed, summary):
     for c in CONFIGURATIONS:
         for seed in seeds:
             r=indexed[c,seed]
+            if r['architecture'] == 'baseline': continue
             structural=[h for h in r['history'] if h['epoch']==10][0]['validation']['MRR']
             integrated=[h for h in r['history'] if h['epoch']==15][0]['validation']['MRR']
             axes[0].scatter([0],[structural],color=colors[c],alpha=.6)
@@ -343,7 +330,8 @@ def plot_results(directory, indexed, summary):
     fig,ax=plt.subplots(figsize=(10,5))
     for c in CONFIGURATIONS:
         for seed in seeds:
+            if c == 'baseline': continue
             rows=indexed[c,seed]['history']
-            ax.plot([h['epoch'] for h in rows],[h['learned_gates'].get('refinement_gate',1.) for h in rows],color=colors[c],alpha=.65,label=labels[c] if seed==seeds[0] else None)
-    ax.axvline(10,color='grey',alpha=.4);ax.set(xlabel='Epoch',ylabel='Refinement coefficient: tanh(g) or fixed 1');ax.legend()
+            ax.plot([h['epoch'] for h in rows],[h['learned_gates']['refinement_gate'] for h in rows],color=colors[c],alpha=.65,label=labels[c] if seed==seeds[0] else None)
+    ax.axvline(10,color='grey',alpha=.4);ax.set(xlabel='Epoch',ylabel='Refinement coefficient: tanh(gF)');ax.legend()
     finish(fig,'refinement_gate')

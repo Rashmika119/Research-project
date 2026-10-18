@@ -1,0 +1,145 @@
+{
+  "source_commit": "23fb3617aa14a0e090decfbaaa6d9b5f2a93f29e",
+  "files": [
+    {
+      "original": "notebooks/final_residual_vs_shared_c_full.ipynb",
+      "archived": "docs/archive/pre_two_model/notebooks/final_residual_vs_shared_c_full.ipynb",
+      "sha256": "ddda18e10320b497554cb8857f74ab30db5ba5cd1a349b6c07e89f1add4d5f37"
+    },
+    {
+      "original": "notebooks/full_dataset_comparison_300.ipynb",
+      "archived": "docs/archive/pre_two_model/notebooks/full_dataset_comparison_300.ipynb",
+      "sha256": "8326a4ba39a6b50eb11e1f796e5472d29bf860f04e77ec28e57c5de0fcfe856b"
+    },
+    {
+      "original": "notebooks/research_pipeline.ipynb",
+      "archived": "docs/archive/pre_two_model/notebooks/research_pipeline.ipynb",
+      "sha256": "01a2e302dadd455fac06f4c4fed37ef1809a16632e69a22ade081497633b8831"
+    },
+    {
+      "original": "notebooks/shared_rgat_1000.ipynb",
+      "archived": "docs/archive/pre_two_model/notebooks/shared_rgat_1000.ipynb",
+      "sha256": "5d7c7c7021505d5ffbd3e748ab0cf274ad2ad6758b3e6e237e5d1771a71ed576"
+    },
+    {
+      "original": "notebooks/warmup_ablation_5000.ipynb",
+      "archived": "docs/archive/pre_two_model/notebooks/warmup_ablation_5000.ipynb",
+      "sha256": "3021f6ad649a1f8372ae309a83f79679c5ad4030b4e78ddb45d2290336b580cc"
+    },
+    {
+      "original": "experiments/configs/final_residual_vs_shared_c.yaml",
+      "archived": "docs/archive/pre_two_model/experiments/configs/final_residual_vs_shared_c.yaml",
+      "sha256": "2572625d520d044c5e50e8750d7b50ee543f5e3b7de848b9365eb1b992fb37f1"
+    },
+    {
+      "original": "experiments/configs/full_dataset_100.yaml",
+      "archived": "docs/archive/pre_two_model/experiments/configs/full_dataset_100.yaml",
+      "sha256": "1dd0a0f8d76d2a18eb195f04e6330a23bd75ef7269c273e6a72267d1b8803bbb"
+    },
+    {
+      "original": "experiments/configs/shared_rgat_1000.yaml",
+      "archived": "docs/archive/pre_two_model/experiments/configs/shared_rgat_1000.yaml",
+      "sha256": "1de6d8ab8104254bcb99f1c38d0b04b5ddffab1eae876b3c3fafbcb0971f9e17"
+    },
+    {
+      "original": "docs/CLEANUP.md",
+      "archived": "docs/archive/pre_two_model/docs/CLEANUP.md",
+      "sha256": "9bef896476a67dd183387c3a15f3792dfc3f137ed5241ec8136e0a0d5ce65eb6"
+    },
+    {
+      "original": "docs/CLEANUP_AUDIT.json",
+      "archived": "docs/archive/pre_two_model/docs/CLEANUP_AUDIT.json",
+      "sha256": "72699c79a7ef7786760a6c48e4718659bf3491c85d67f8e6c4238e0b1e6bc2f1"
+    },
+    {
+      "original": "docs/final_full_dataset_audit.json",
+      "archived": "docs/archive/pre_two_model/docs/final_full_dataset_audit.json",
+      "sha256": "6eb14bfbd385fadb8d694fb82cc7d0ba1105219c90e63df10743e6a1254cff8d"
+    },
+    {
+      "original": "docs/FINAL_RESIDUAL_VS_SHARED_C.md",
+      "archived": "docs/archive/pre_two_model/docs/FINAL_RESIDUAL_VS_SHARED_C.md",
+      "sha256": "adcff452406ba82f5a4879c9498bbd5c08231bcd876bfd7bcef6db64317d74bc"
+    },
+    {
+      "original": "docs/FULL_DATASET_300.md",
+      "archived": "docs/archive/pre_two_model/docs/FULL_DATASET_300.md",
+      "sha256": "bcd0660c0ee9a7976c38ad8e83e972393b81707c103080bcff4fc6dede18e3ef"
+    },
+    {
+      "original": "docs/HISTORICAL_NOTES.md",
+      "archived": "docs/archive/pre_two_model/docs/HISTORICAL_NOTES.md",
+      "sha256": "9a4c8342e83b9c4c7fd9fee0fbfb1fc0674e732ffbff3761f003820c4f0eb5cb"
+    },
+    {
+      "original": "docs/IMPLEMENTATION.md",
+      "archived": "docs/archive/pre_two_model/docs/IMPLEMENTATION.md",
+      "sha256": "0ce3268a975cf58b8cb728ad24d549707a2972656973527cb06e5992987eb79b"
+    },
+    {
+      "original": "docs/RELIABILITY.md",
+      "archived": "docs/archive/pre_two_model/docs/RELIABILITY.md",
+      "sha256": "db5827605c2892ea1d01f18a324a067ca39115f134b99526ebc8ff708c578f44"
+    },
+    {
+      "original": "docs/SHARED_RGAT_1000.md",
+      "archived": "docs/archive/pre_two_model/docs/SHARED_RGAT_1000.md",
+      "sha256": "d514dd20d27634086f022fd66adeffa3b5b757ef7a06bf04588c6dbd5dd15f15"
+    },
+    {
+      "original": "docs/shared_rgat_2000_subset_audit.json",
+      "archived": "docs/archive/pre_two_model/docs/shared_rgat_2000_subset_audit.json",
+      "sha256": "3732b5311922f7fa1821138ad73e8d693379d05d1c31bcd6835dedbb59a695e7"
+    },
+    {
+      "original": "docs/shared_rgat_subset_audit.json",
+      "archived": "docs/archive/pre_two_model/docs/shared_rgat_subset_audit.json",
+      "sha256": "de70b8cc6c86ea24ac32f96714847e80233de0f01313413eb55d081752121236"
+    },
+    {
+      "original": "docs/STAGE1_PROTOCOL.md",
+      "archived": "docs/archive/pre_two_model/docs/STAGE1_PROTOCOL.md",
+      "sha256": "323d29339e53a5462c56bded2dcf56beb4d560fbf55397507fd0d635ebf04dd6"
+    },
+    {
+      "original": "docs/STAGE1_RESULTS.md",
+      "archived": "docs/archive/pre_two_model/docs/STAGE1_RESULTS.md",
+      "sha256": "bc679913a6bfa6fae454610764956035308abcc89e8fbd549ca0ca21c8a4c8f4"
+    },
+    {
+      "original": "docs/STAGE2_RESULTS.md",
+      "archived": "docs/archive/pre_two_model/docs/STAGE2_RESULTS.md",
+      "sha256": "f94039782c3109336331df89b8161a10bb10974ad2bab8f516bbb6b2efdf4442"
+    },
+    {
+      "original": "docs/subset_audit_5000.json",
+      "archived": "docs/archive/pre_two_model/docs/subset_audit_5000.json",
+      "sha256": "493f23e3741ce661d037f1e095fdb8c099a713eebef15ae1eb845e38a3d104c1"
+    },
+    {
+      "original": "docs/WARMUP_ABLATION_5000.md",
+      "archived": "docs/archive/pre_two_model/docs/WARMUP_ABLATION_5000.md",
+      "sha256": "4e38771ae464004e06874f5e585ddc16cc3246e4ab3362443a427b880134bba0"
+    },
+    {
+      "original": "docs/WARMUP_STAGE_INSTRUCTIONS.md",
+      "archived": "docs/archive/pre_two_model/docs/WARMUP_STAGE_INSTRUCTIONS.md",
+      "sha256": "2bba65fe58474349b07fef37c560e0528c5f2325a9b8c1e000ac2a3082b84701"
+    },
+    {
+      "original": "docs/WARMUP_STAGE_README.md",
+      "archived": "docs/archive/pre_two_model/docs/WARMUP_STAGE_README.md",
+      "sha256": "1cd431b6360c411adefa246db09e3d3f73679c393f683232c3d5f9fb3c8fd88c"
+    },
+    {
+      "original": "README.md",
+      "archived": "docs/archive/pre_two_model/README.md",
+      "sha256": "1df281ab51bbf738e2c5b029b37c24807f181495e5ad25e6952487ae46d3176b"
+    },
+    {
+      "original": "CLAUDE.md",
+      "archived": "docs/archive/pre_two_model/CLAUDE.md",
+      "sha256": "78a7296ec08fd2e53a7c19907288012f3d0e05c08861f97849d2720f6104c0a7"
+    }
+  ]
+}

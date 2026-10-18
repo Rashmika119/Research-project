@@ -5,7 +5,7 @@ import unittest
 from preprocessing.dataset import KGDataset
 from preprocessing.induced_subset import make_induced_subset, graph_statistics
 from training.experiment_io import prepare_data
-from tests.test_research_pipeline import tiny_data
+from tests.helpers import tiny_data
 
 class SubsetTests(unittest.TestCase):
     def test_induced_complete_exact_count_and_heldout_independence(self):
@@ -34,14 +34,15 @@ class SubsetTests(unittest.TestCase):
         self.assertEqual(subset.num_entities, 5)
         self.assertEqual(graph_statistics(subset)['components'], 3)
 
-    def test_real_5000_when_downloaded(self):
-        if not Path('data/raw/fb15k237/train.txt').exists():
-            self.skipTest('Real dataset not downloaded; synthetic leakage checks still run')
-        data, graph, known, manifest = prepare_data('data/raw/fb15k237', 5000, 0)
-        self.assertEqual(data.num_entities, 5000)
+    def test_full_original_dataset_when_available(self):
+        if not all((Path('data/raw/fb15k237') / f'{split}.txt').exists()
+                   for split in ('train', 'valid', 'test')):
+            self.skipTest('Full dataset not present; no download in offline checks')
+        from training.final_study import verify_manifest
+        try:
+            data, graph, known, manifest = prepare_data('data/raw/fb15k237', 0, 0)
+        except PermissionError as error:
+            self.skipTest(f'Local dataset unreadable in this environment: {error}')
+        verify_manifest(manifest)
+        self.assertEqual(len(graph.edge_type), 544230)
         self.assertEqual(set(data.train), set(known))
-        self.assertGreater(len(data.train), 5000)
-        self.assertEqual(len(graph.edge_type), 2 * len(data.train))
-        self.assertEqual(manifest['statistics']['entities'], 5000)
-
-

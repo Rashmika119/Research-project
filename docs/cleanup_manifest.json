@@ -1,0 +1,53 @@
+{
+  "source_commit": "23fb3617aa14a0e090decfbaaa6d9b5f2a93f29e",
+  "removed_from_active_tree": [
+    "run_full_dataset_comparison.py",
+    "run_shared_rgat_comparison.py",
+    "training/full_study.py",
+    "training/full_reports.py",
+    "training/shared_study.py",
+    "training/shared_reports.py",
+    "models/kg_text_refinement.py",
+    "notebooks/build_full_dataset_notebook.py",
+    "notebooks/build_shared_rgat_notebook.py",
+    "tests/test_full_study.py",
+    "tests/test_shared_study.py",
+    "tests/test_research_pipeline.py",
+    "notebooks/final_residual_vs_shared_c_full.ipynb",
+    "notebooks/full_dataset_comparison_300.ipynb",
+    "notebooks/research_pipeline.ipynb",
+    "notebooks/shared_rgat_1000.ipynb",
+    "notebooks/warmup_ablation_5000.ipynb",
+    "experiments/configs/final_residual_vs_shared_c.yaml",
+    "experiments/configs/full_dataset_100.yaml",
+    "experiments/configs/shared_rgat_1000.yaml",
+    "docs/CLEANUP_AUDIT.json",
+    "docs/final_full_dataset_audit.json",
+    "docs/FINAL_RESIDUAL_VS_SHARED_C.md",
+    "docs/FULL_DATASET_300.md",
+    "docs/HISTORICAL_NOTES.md",
+    "docs/IMPLEMENTATION.md",
+    "docs/SHARED_RGAT_1000.md",
+    "docs/shared_rgat_2000_subset_audit.json",
+    "docs/shared_rgat_subset_audit.json",
+    "docs/STAGE1_PROTOCOL.md",
+    "docs/STAGE1_RESULTS.md",
+    "docs/STAGE2_RESULTS.md",
+    "docs/subset_audit_5000.json",
+    "docs/WARMUP_ABLATION_5000.md",
+    "docs/WARMUP_STAGE_INSTRUCTIONS.md",
+    "docs/WARMUP_STAGE_README.md"
+  ],
+  "archive_manifest": "docs/archive/pre_two_model/manifest.json",
+  "retained_models": [
+    "baseline",
+    "shared-c-gated"
+  ],
+  "preservation": "No data, caches, result directories or checkpoints were deleted. Historical notebooks/configs/docs archived byte-for-byte.",
+  "replaced_active_paths": [
+    "docs/CLEANUP.md",
+    "docs/RELIABILITY.md",
+    "README.md",
+    "CLAUDE.md"
+  ]
+}

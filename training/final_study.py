@@ -1,4 +1,4 @@
-"""Final full FB15k-237 study: residual versus Shared C, seed 0, 100 epochs.
+"""Final full FB15k-237 study: baseline versus Shared C gated, seed 0, 100 epochs.
 
 No preliminary training is performed. Each child initializes its own model;
 only its own last.pt may resume it. Only seed 0 is approved for this study.
@@ -16,12 +16,11 @@ from training.experiment_io import digest, prepare_data, write_json
 from training.process import run_logged
 from training.research_pipeline import ExperimentConfig, run_experiment
 
-PROTOCOL = 'full_fb15k237_residual_vs_shared_c_100_10_v1'
+PROTOCOL = 'full_fb15k237_baseline_shared_c_100_seed0_v1'
 SEEDS = (0,)
 CONFIGURATIONS = {
-    'residual-no-softprompt-warmup': ('residual-no-softprompt', 10),
+    'baseline': ('baseline', 0),
     'shared-c-gated': ('shared-c-gated', 10),
-    'shared-c-ungated': ('shared-c-ungated', 10),
 }
 COUNTS = (14541, 237, 272115, 17535, 20466)
 
@@ -32,10 +31,12 @@ def make_config(identifier, seed, *, raw_dir='data/raw/fb15k237',
         raise ValueError('The full study requires a selected configuration and seed 0')
     if (text_batch_size, eval_batch_size) != (256, 512):
         raise ValueError('Final protocol fixes text/evaluation batch sizes at 256/512')
-    from dataclasses import replace
-    from training.full_study import make_config as original_config
-    cfg = replace(original_config('residual-no-softprompt-warmup', seed,
-                  raw_dir=raw_dir, text_dir=text_dir), variant=CONFIGURATIONS[identifier][0])
+    architecture, warmup = CONFIGURATIONS[identifier]
+    cfg = ExperimentConfig(variant=architecture, max_entities=0, epochs=100,
+        warmup=warmup, seed=seed, subset_seed=0, lr=.001, num_negatives=4,
+        train_batch_size=32768, text_batch_size=text_batch_size, max_text_length=64,
+        eval_every=5, eval_batch_size=eval_batch_size, raw_dir=str(raw_dir), text_dir=str(text_dir),
+        selection_policy='scheduled_only', record_step_losses=True)
     cfg.validate()
     return cfg
 
@@ -49,15 +50,18 @@ def validate_seeds(seeds):
 
 
 def expected_budget(identifier):
-    if identifier not in CONFIGURATIONS:
-        raise ValueError('Unknown final configuration')
+    architecture, warm = CONFIGURATIONS[identifier]
     return {'steps_per_epoch': 9, 'optimizer_steps': 900,
-            'structural_optimizer_steps': 90, 'baseline_optimizer_steps': 0,
-            'integrated_optimizer_steps': 810}
+            'structural_optimizer_steps': warm * 9,
+            'baseline_optimizer_steps': 900 if architecture == 'baseline' else 0,
+            'integrated_optimizer_steps': 0 if architecture == 'baseline' else (100 - warm) * 9}
 
 
-# Full mappings/splits/graph preparation remains in the common data implementation.
-from training.full_study import verify_manifest
+def verify_manifest(manifest):
+    stats = manifest['statistics']
+    actual = tuple(stats[k] for k in ('entities', 'relations', 'train_triples', 'valid_triples', 'test_triples'))
+    if actual != COUNTS or manifest['max_entities'] != 0 or manifest['selection_strategy'] != 'full_original_splits':
+        raise ValueError('Full-study manifest must contain the complete original FB15k-237 splits')
 
 
 def preflight(root, configs, manifest):

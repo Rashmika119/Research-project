@@ -34,28 +34,28 @@ from training.reproducibility import (seed_everything, capture_rng, numerical_po
 
 @dataclass
 class ExperimentConfig:
-    variant: str = 'residual-no-softprompt'
-    max_entities: int = 5000  # zero means the complete original dataset
-    epochs: int = 30  # INCLUDES warmup
-    warmup: int = 5
+    variant: str = 'shared-c-gated'
+    max_entities: int = 0  # zero means the complete original dataset
+    epochs: int = 100  # INCLUDES warmup
+    warmup: int = 10
     seed: int = 0
     subset_seed: int = 0
     lr: float = 0.001
     weight_decay: float = 0.00001
     num_negatives: int = 4
     grad_clip: float = 1.0
-    train_batch_size: int = 0  # zero = one optimizer step per epoch
-    text_batch_size: int = 4
+    train_batch_size: int = 32768  # zero = one optimizer step per epoch
+    text_batch_size: int = 256
     max_text_length: int = 64
-    eval_every: int = 1
-    eval_batch_size: int = 64
+    eval_every: int = 5
+    eval_batch_size: int = 512
     lm_name: str = 'roberta-base'
     raw_dir: str = 'data/raw/fb15k237'
     text_dir: str = 'data/text/fb15k237'
     model: dict = field(default_factory=lambda: dict(MODEL_CONFIG))
     deterministic: bool = True
-    selection_policy: str = 'initial_and_scheduled'  # historical default
-    record_step_losses: bool = False
+    selection_policy: str = 'scheduled_only'
+    record_step_losses: bool = True
 
     def validate(self):
         if self.selection_policy not in ('initial_and_scheduled', 'scheduled_only'):
@@ -150,9 +150,8 @@ def model_diagnostics(model):
     from torch_geometric.nn import RGATConv
     structural = getattr(model, 'structural', model)
     arrangement = getattr(structural, 'arrangement', None)
-    structural_calls = 1 if arrangement in ('a', 'b') else len(structural.encoder.layers)
-    refinement_calls = (1 if arrangement == 'b' else 2) if arrangement else (
-        len(model.refiner.layers) if hasattr(model, 'refiner') else 0)
+    structural_calls = len(structural.encoder.layers)
+    refinement_calls = 2 if arrangement == 'c' else 0
     return {'trainable_parameters': sum(p.numel() for p in model.parameters() if p.requires_grad),
             'unique_rgat_layers': sum(isinstance(m, RGATConv) for m in model.modules()),
             'warmup_layer_executions': structural_calls,

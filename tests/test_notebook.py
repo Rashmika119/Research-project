@@ -1,14 +1,16 @@
-"""Protected historical notebooks remain byte-for-byte research evidence."""
+"""Immutable historical evidence remains readable after cleanup."""
 import hashlib
+import json
 from pathlib import Path
 import unittest
 import nbformat
-from tests.test_full_study import PROTECTED
 
 class NotebookTests(unittest.TestCase):
-    def test_historical_notebooks_unchanged(self):
+    def test_archived_evidence_unchanged(self):
         root = Path(__file__).resolve().parents[1]
-        for path, checksum in PROTECTED.items():
-            with self.subTest(path=path):
-                self.assertEqual(hashlib.sha256((root/path).read_bytes()).hexdigest(), checksum)
-                nbformat.validate(nbformat.read(root/path, as_version=4))
+        manifest = json.loads((root/'docs/archive/pre_two_model/manifest.json').read_text(encoding='utf-8'))
+        for row in manifest['files']:
+            with self.subTest(path=row['archived']):
+                path = root/row['archived']
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),row['sha256'])
+                if path.suffix == '.ipynb': nbformat.validate(nbformat.read(path,as_version=4))

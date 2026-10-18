@@ -41,10 +41,8 @@ def real_lm_smoke(requested_device='auto'):
         scores = model.score_triples(e, r, positives)
         loss = torch.nn.functional.softplus(-scores).mean() + .01 * (e.square().mean() + r.square().mean())
         loss.backward()
-        modules = {'first_RGAT': model.structural.encoder, 'entities': model.structural.entity_emb,
+        modules = {'shared_RGAT': model.structural.encoder, 'entities': model.structural.entity_emb,
                    'relations': model.structural.scorer.relation_emb, 'LM_to_KG': model.bridge.lm_to_kg}
-        if model.refiner is not None:
-            modules['second_RGAT'] = model.refiner
         for label, module in modules.items():
             grads = [p.grad for p in module.parameters() if p.requires_grad and p.grad is not None]
             assert grads and all(torch.isfinite(g).all() for g in grads), (variant, label)

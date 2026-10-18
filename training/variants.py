@@ -1,26 +1,18 @@
 """Scratch model factory and explicit structural warmup accounting."""
-from models.kg_text_refinement import KGTextRefinement
 from training.model_factory import build_model
 
 
-ARCHITECTURES = ('residual-no-softprompt',)
-VARIANTS = ARCHITECTURES  # compatibility name for architecture-oriented callers
-# Separate study registry; existing full-data configurations remain unchanged.
-SHARED_CONFIGURATIONS = {
-    f'shared-{arrangement}-{gate}': (arrangement, gate == 'gated')
-    for arrangement in ('a', 'b', 'c') for gate in ('gated', 'ungated')
-}
-ALL_ARCHITECTURES = (*ARCHITECTURES, *SHARED_CONFIGURATIONS)
+ARCHITECTURES = ('shared-c-gated',)
+VARIANTS = ARCHITECTURES
+ALL_ARCHITECTURES = ARCHITECTURES
+CONFIGURATIONS = {'baseline': ('baseline', False),
+                  'shared-c-gated': ('shared-c-gated', True)}
 
 
 def independent_text(variant):
-    return variant == 'residual-no-softprompt' or variant in SHARED_CONFIGURATIONS
-# Architecture and warmup are independent; no duplicate model classes.
-CONFIGURATIONS = {
-    'baseline': ('baseline', False),
-    'residual-no-softprompt-warmup': ('residual-no-softprompt', True),
-    'residual-no-softprompt-no-warmup': ('residual-no-softprompt', False),
-}
+    return variant == 'shared-c-gated'
+
+
 MODEL_CONFIG = {'encoder_type': 'rgat', 'scorer_type': 'complex', 'dim': 32,
                 'num_layers': 2, 'heads': 1, 'dropout': 0.2, 'num_bases': None}
 
@@ -37,11 +29,9 @@ def warmup_epochs(variant, total_epochs, requested):
 
 
 def configuration_id(architecture, warmup):
-    if architecture in SHARED_CONFIGURATIONS:
-        return architecture
-    if architecture == 'baseline':
-        return 'baseline'
-    return architecture + ('-warmup' if warmup > 0 else '-no-warmup')
+    if architecture not in CONFIGURATIONS:
+        raise ValueError('Unknown architecture: ' + architecture)
+    return architecture
 
 
 def configuration_settings(identifier, requested_warmup=10):
@@ -56,21 +46,12 @@ def build_scratch_model(variant, num_entities, num_relations,
     """No checkpoint or embedding-cache parameter: KG weights always start fresh."""
     if variant not in (*ALL_ARCHITECTURES, 'baseline'):
         raise ValueError('Unknown variant: ' + variant)
-    if variant in SHARED_CONFIGURATIONS:
+    if variant == 'shared-c-gated':
         from models.shared_rgat import SharedStructuralRGAT, SharedRGATRefinement
         settings = dict(model_config or MODEL_CONFIG)
         if settings.pop('encoder_type', 'rgat') != 'rgat' or settings.get('scorer_type') != 'complex':
             raise ValueError('Shared study requires RGAT + ComplEx')
-        arrangement, gated = SHARED_CONFIGURATIONS[variant]
+        arrangement, gated = 'c', True
         structural = SharedStructuralRGAT(num_entities, num_relations, arrangement=arrangement, **settings)
         return SharedRGATRefinement(structural, refinement_gated=gated, lm_name=lm_name, lm_revision=lm_revision)
-    structural = build_model(model_config or MODEL_CONFIG, num_entities, num_relations)
-    if variant == 'baseline':
-        return structural
-    return KGTextRefinement(
-        structural, lm_name=lm_name,
-        residual=True,
-        use_refinement=True,
-        soft_prompt=False,
-        lm_revision=lm_revision,
-    )
+    return build_model(model_config or MODEL_CONFIG, num_entities, num_relations)
