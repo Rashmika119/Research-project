@@ -1,4 +1,4 @@
-"""Full FB15K, existing RGAT + ComplEx baseline, seed 0, 300 epochs."""
+"""Full FB15K, existing RGAT + ComplEx baseline, seed 0, 100 epochs."""
 import argparse
 from dataclasses import asdict
 import json
@@ -11,16 +11,16 @@ from training.experiment_io import prepare_data
 from training.research_pipeline import ExperimentConfig, run_experiment
 from training.variants import MODEL_CONFIG
 
-PROTOCOL = 'fb15k_rgat_complex_dim100_neg10_300_seed0_accum8_v2'
+PROTOCOL = 'fb15k_rgat_complex_dim64_neg10_100_seed0_dim64_accum8_eval5_v4'
 COUNTS = FB15K_COUNTS
 
 
 def make_config(raw_dir='data/raw/fb15k'):
     cfg = ExperimentConfig(dataset='fb15k', variant='baseline', raw_dir=str(raw_dir),
         lm_name='', text_dir='',
-        max_entities=0, seed=0, subset_seed=0, epochs=300, warmup=0,
-        model={**MODEL_CONFIG, 'dim': 100}, num_negatives=10,
-        train_batch_size=32768, eval_every=10, eval_batch_size=512,
+        max_entities=0, seed=0, subset_seed=0, epochs=100, warmup=0,
+        model={**MODEL_CONFIG, 'dim': 64}, num_negatives=10,
+        train_batch_size=32768, eval_every=5, eval_batch_size=512,
         micro_batch_size=4096, accumulation_steps=8,
         lr=.001, weight_decay=.00001, grad_clip=1., deterministic=True,
         selection_policy='scheduled_only', record_step_losses=True)
@@ -29,8 +29,8 @@ def make_config(raw_dir='data/raw/fb15k'):
 
 
 def expected_budget():
-    return {'steps_per_epoch': 15, 'optimizer_steps': 4500,
-            'baseline_optimizer_steps': 4500, 'structural_optimizer_steps': 0,
+    return {'steps_per_epoch': 15, 'optimizer_steps': 1500,
+            'baseline_optimizer_steps': 1500, 'structural_optimizer_steps': 0,
             'integrated_optimizer_steps': 0, 'last_batch_size': 24390}
 
 

@@ -13,9 +13,9 @@ def notebook():
         cells.append({'cell_type':'code', 'metadata':{}, 'source':source.strip()+'\n',
                       'outputs':[], 'execution_count':None})
     markdown('''# FB15K baseline: RGAT + ComplEx
-Existing two-layer baseline, seed0, width100 (50 complex dimensions), 10 negatives,
-300 epochs, no warmup. Effective batch32768 = micro4096 × 8: 15 updates/epoch, 4500 total.
-Validation every10 epochs; select by validation MRR and test only the best checkpoint.
+Existing two-layer baseline, seed0, width64 (32 complex dimensions), 10 negatives,
+100 epochs, no warmup. Effective batch32768 = micro4096 × 8: 15 updates/epoch, 1500 total.
+Validation every5 epochs; select by validation MRR and test only the best checkpoint.
 This is not pure ComplEx paper reproduction. No RoBERTa/text is loaded.
 Only section5 launches training. Full GPU memory/runtime capacity must be measured.
 ''')
@@ -23,7 +23,7 @@ Only section5 launches training. Full GPU memory/runtime capacity must be measur
     code(RUNTIME_SETUP.replace('T4 GPU','GPU').replace('both runs','resumed sessions'))
     markdown('## 2. Fetch main, mount Drive and install dependencies')
     setup = REPOSITORY_SETUP.replace('baseline_shared_c_100', 'fb15k_baseline_300')
-    setup = setup.replace('fb15k_baseline_300_seed0_v1_run1', 'fb15k_baseline_300_seed0_accum8_v2_run1')
+    setup = setup.replace('fb15k_baseline_300_seed0_v1_run1', 'fb15k_baseline_100_seed0_dim64_accum8_eval5_v4_run1')
     setup = setup.replace('run_final_comparison.py', 'run_baseline_fb15k.py')
     setup = '\n'.join(line for line in setup.splitlines() if 'RESEARCH_MODEL_BACKUP' not in line
                       and 'Verified weights load locally' not in line)
@@ -74,7 +74,7 @@ else:
     print('Optional checks disabled. No preliminary training is launched.')
 ''')
     markdown('''## 5. Train the existing baseline
-Runs one child process. Logs every epoch; validation at10,20,...,300.
+Runs one child process. Logs every epoch; validation at5,10,...,100.
 Effective batch32768 uses8 scoring micro-batches of4096 and one RGAT encoding.
 The final24390 examples use6 micro-batches (5×4096 +3910), weighted by their sizes.
 Clipping and Adam run once per effective batch. Full-graph activations still remain resident.
@@ -98,7 +98,7 @@ if history_path.exists():
     display(pd.DataFrame([{k:v for k,v in h.items() if k not in ('step_losses','validation','learned_gates')}
                           for h in history]).tail(10))
     if history:
-        print('Committed progress:', history[-1]['epoch'], '/ 300 epochs;', history[-1]['optimizer_steps'], '/ 4500 updates')
+        print('Committed progress:', history[-1]['epoch'], '/ 100 epochs;', history[-1]['optimizer_steps'], '/ 1500 updates')
 if (EXPERIMENT_DIR/'summary.json').exists():
     display(pd.read_csv(EXPERIMENT_DIR/'metrics.csv'))
     display(Markdown((EXPERIMENT_DIR/'research_analysis.md').read_text(encoding='utf-8')))

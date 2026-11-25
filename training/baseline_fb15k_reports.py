@@ -19,7 +19,7 @@ def validate_result(r):
             or r['architecture'] != 'baseline' or r['initialization'] != 'scratch'
             or r['baseline_checkpoint_used'] or r['dataset_scope'] != 'full'
             or r['candidate_entities'] != COUNTS[0] or r['ranking_policy'] != 'average_exact_ties'
-            or r['final_epoch'] != 300 or r['warmup_epochs'] != 0 or r['main_epochs'] != 300):
+            or r['final_epoch'] != 100 or r['warmup_epochs'] != 0 or r['main_epochs'] != 100):
         raise ValueError('Expected a completed scratch FB15K baseline')
     actual = tuple(r['subset_statistics'][k] for k in
                    ('entities', 'relations', 'train_triples', 'valid_triples', 'test_triples'))
@@ -32,7 +32,7 @@ def validate_result(r):
         if k != 'last_batch_size' and r[k] != v:
             raise ValueError('Wrong update budget: ' + k)
     history = r['history']
-    if [h['epoch'] for h in history] != list(range(1, 301)):
+    if [h['epoch'] for h in history] != list(range(1, 101)):
         raise ValueError('Incomplete epoch history')
     for h in history:
         epoch = h['epoch']
@@ -45,8 +45,8 @@ def validate_result(r):
                 or not math.isclose(h['loss'], statistics.mean(s['loss'] for s in steps), rel_tol=1e-10, abs_tol=1e-10)
                 or not math.isclose(h['example_weighted_loss'], sum(s['loss']*s['positive_count'] for s in steps)/COUNTS[2], rel_tol=1e-10, abs_tol=1e-10)):
             raise ValueError('Incorrect epoch/step/loss budget')
-        if ('validation' in h) != (epoch % 10 == 0):
-            raise ValueError('Expected validation every 10 epochs')
+        if ('validation' in h) != (epoch % 5 == 0):
+            raise ValueError('Expected validation every 5 epochs')
         if 'validation' in h and h['validation_model'] != 'baseline':
             raise ValueError('Incorrect validation model')
     eligible = [h for h in history if 'validation' in h]
@@ -57,7 +57,7 @@ def validate_result(r):
     if r['best_epoch'] != best['epoch'] or r['validation'] != best['validation']:
         raise ValueError('Expected earliest best scheduled validation checkpoint')
     if r['final_epoch_validation'] != history[-1]['validation']:
-        raise ValueError('Final validation is not epoch 300')
+        raise ValueError('Final validation is not epoch 100')
     if not r['environment'].get('source_sha256') or not r.get('manifest_sha256') or not r.get('dataset_sha256'):
         raise ValueError('Missing source/dataset identity')
     if r['numerical_policy'].get('deterministic_algorithms') is not True:
@@ -72,7 +72,7 @@ def baseline_report(directory, result):
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     summary = {'protocol': PROTOCOL, 'model': 'RGAT + ComplEx', 'dataset': 'FB15K',
-               'seed': 0, 'complex_dimension': 50, 'real_width': 100,
+               'seed': 0, 'complex_dimension': 32, 'real_width': 64,
                **{k: result[k] for k in ('best_epoch', 'final_epoch', 'validation', 'test',
                    'duration_seconds', 'peak_gpu_memory_bytes', 'peak_gpu_reserved_bytes',
                    'architecture_diagnostics', 'manifest_sha256', 'dataset_sha256', 'environment')},
@@ -93,7 +93,7 @@ def baseline_report(directory, result):
         '# FB15K RGAT + ComplEx baseline\n\n'+summary['interpretation']+'\n\n'
         f"Best epoch: {result['best_epoch']}; validation MRR: {result['validation']['MRR']:.6f}; "
         f"test MRR: {result['test']['MRR']:.6f}.\n\n"
-        '300 epochs, 15 updates/epoch, 4,500 updates; width100, 10 negatives. '
+        '100 epochs, 15 updates/epoch, 1,500 updates; width64, 10 negatives. '
         'Effective batch32768, micro-batch4096, up to8 micro-batches/update. '
         'Final update:24390 positives in6 micro-batches, weighted by actual example counts. '
         'No warmup, text, scheduler or early stopping. Adam lr0.001. '

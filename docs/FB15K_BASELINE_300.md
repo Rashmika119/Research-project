@@ -1,6 +1,6 @@
 # FB15K baseline: existing RGAT + ComplEx
 
-Protocol: `fb15k_rgat_complex_dim100_neg10_300_seed0_accum8_v2`.
+Protocol: `fb15k_rgat_complex_dim64_neg10_100_seed0_dim64_accum8_eval5_v4`.
 This is the existing `KGOnlyBaselineRGAT`, not a new baseline class or pure ComplEx
 reproduction. Shared C remains available in the separate FB15k-237 comparison.
 
@@ -11,23 +11,23 @@ reproduction. Shared C remains available in the separate FB15k-237 comparison.
 | Train / validation / test triples | 483,142 / 50,000 / 59,071 |
 | Graph | Training edges plus inverses: 966,284 edges, 2,690 message relation types |
 | Seed / subset | 0 / no subset |
-| Real embedding width / complex dimension | 100 / 50 |
+| Real embedding width / complex dimension | 64 / 32 |
 | RGAT | Two layers, one head, no basis decomposition, dropout 0.2 |
 | Activation | ReLU + dropout after L1; no added activation after L2 |
 | Optimizer | Adam, lr 0.001, weight decay 0.00001, gradient clipping 1.0 |
 | Negative sampling | 10 per positive; equal probability of corrupting head/tail |
 | Negative filtering | Reject unchanged and known training triples; no held-out labels |
 | Objective | Mean positive BCE plus mean negative BCE, unchanged |
-| Epochs / warmup | 300 / 0 |
+| Epochs / warmup | 100 / 0 |
 | Effective positive batch size | 32,768 |
 | Scoring micro-batch size | 4,096 |
 | Accumulation steps | 8 per full effective batch |
 | Updates per epoch | 15: fourteen full batches and one final batch of 24,390 |
-| Total updates | 4,500 |
-| Validation | Full validation set every 10 epochs (30 evaluations) |
+| Total updates | 1,500 |
+| Validation | Full validation set every 5 epochs (20 evaluations) |
 | Evaluation batch size | 512 |
 | Selection | Earliest best scheduled validation filtered MRR |
-| Test | Selected checkpoint, after all 300 epochs |
+| Test | Selected checkpoint, after all 100 epochs |
 | Precision / determinism | Float32 / strict deterministic algorithms |
 | Early stopping / scheduler / AMP | Disabled |
 | Checkpoints | Atomic last.pt every epoch; best.pt on validation improvement |
@@ -41,7 +41,7 @@ download/validate FB15K, and optionally run offline checks. Section5 launches on
 training child. It does not run preliminary smoke training or load RoBERTa.
 
 Persistent root:
-`MyDrive/Research/fb15k_baseline_300/fb15k_baseline_300_seed0_accum8_v2_run1/`.
+`MyDrive/Research/fb15k_baseline_300/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4_run1/`.
 The child directory is `runs/baseline_seed0`; the manifest is in `runs/`.
 Data lives separately from FB15k-237 under the shared cache's `data/fb15k/`.
 Set a fresh RUN_TAG for a different source/configuration, not for resuming a run.
@@ -57,7 +57,7 @@ train-only graph construction and split-leakage checks are retained.
 ## Local GPU command
 
 ```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_accum8_v2 --resume --skip-completed
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4 --resume --skip-completed
 ```
 
 Use `--raw-dir /path/to/fb15k` to select existing data. The approved settings are
@@ -68,7 +68,7 @@ instead of silently starting CPU training.
 ## Progress, interruption and results
 
 Every epoch prints loss, updates, elapsed time and allocated/reserved GPU peaks;
-every tenth epoch also prints validation MRR/Hits@10. Step losses and weighted
+every fifth epoch also prints validation MRR/Hits@10. Step losses and weighted
 epoch loss are saved. Notebook section6 displays committed progress even after
 an interruption. It does not label partial histories as final test results.
 
@@ -84,7 +84,7 @@ step loss,validation metrics and GPU memory. Report-only is CPU-capable and load
 saved JSON, not model checkpoints:
 
 ```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_accum8_v2 --report-only
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4 --report-only
 ```
 
 ## Gradient accumulation
@@ -100,7 +100,7 @@ and Adam follow this combined backward, once per effective batch.
 The last update contains 24,390 positives: five micro-batches of 4,096 plus one
 of 3,910. It uses six micro-batches, not eight; it is not divided by eight or
 discarded. Per epoch there are 118 scoring micro-batches but still only 15
-optimizer steps; across 300 epochs there are 35,400 micro-batches and 4,500
+optimizer steps; across 100 epochs there are 11,800 micro-batches and 1,500
 updates. Logs/step CSVs record micro-batch counts. Resume is at an epoch boundary,
 so no partially accumulated gradients are checkpointed; uncommitted work replays.
 
@@ -137,3 +137,5 @@ losses/parameter gradients for full and partial windows with dropout enabled,
 and verify one encoding, matching RNG consumption and no parameter updates.
 This verifies the accumulation equations, not CUDA peak-memory savings or
 bitwise equality between the old and new training runs.
+
+The historical `_300` filenames are retained for existing notebook links; the active settings are now 100 epochs and validation/checkpoint selection every 5 epochs. `best.pt` saves only on validation improvement; `last.pt` still saves every epoch for resume. Use the new `fb15k_baseline_100_seed0_dim64_accum8_eval5_v4_run1` tag for this changed protocol.

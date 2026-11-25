@@ -37,21 +37,21 @@ def manifest_fixture():
 def result_fixture():
     r = fixtures()[0]
     r.update(settings=asdict(make_config()), candidate_entities=14951,
-             final_epoch=300, main_epochs=300, best_epoch=200,
+             final_epoch=100, main_epochs=100, best_epoch=70,
              subset_statistics=manifest_fixture()['statistics'], **{k:v for k,v in expected_budget().items() if k!='last_batch_size'})
     history = []
-    for e in range(1,301):
+    for e in range(1,101):
         row = {'epoch':e, 'phase':'main', 'loss':1.5-e*.001, 'example_weighted_loss':1.5-e*.001,
                'optimizer_steps':15*e, 'train_seconds':1., 'epoch_seconds':2., 'learned_gates':{},
                'peak_gpu_memory_bytes':2**30, 'peak_gpu_reserved_bytes':2**31,
                'step_losses':[{'optimizer_step':(e-1)*15+s+1,'loss':1.5-e*.001,
                                'positive_count':32768 if s<14 else 24390,
                                'micro_batches':8 if s<14 else 6} for s in range(15)]}
-        if e%10==0:
-            row['validation'] = dict(r['validation'], MRR=.3 if e in (200,210) else .1+e*.0001)
+        if e%5==0:
+            row['validation'] = dict(r['validation'], MRR=.3 if e in (70,75) else .1+e*.0001)
             row['validation_model'] = 'baseline'
         history.append(row)
-    r.update(history=history, validation=history[199]['validation'].copy(),
+    r.update(history=history, validation=history[69]['validation'].copy(),
              final_epoch_validation=history[-1]['validation'].copy(), final_training_loss=history[-1]['loss'])
     return r
 
@@ -61,7 +61,7 @@ class FB15KTests(unittest.TestCase):
     def setUpClass(cls):
         torch.set_num_threads(1)
 
-    def test_width100_ten_negatives_real_baseline_forward_backward(self):
+    def test_width64_ten_negatives_real_baseline_forward_backward(self):
         import random
         from training.variants import build_scratch_model
         from training.negative_sampling import sample_negatives
@@ -77,8 +77,8 @@ class FB15KTests(unittest.TestCase):
         self.assertEqual(tuple(negatives.shape),(2,10,3))
         self.assertFalse(known & set(map(tuple,negatives.reshape(-1,3).tolist())))
         entities=model.encode(edges,types)
-        self.assertEqual(tuple(entities.shape),(4,100))
-        self.assertEqual(entities.chunk(2,-1)[0].shape[-1],50)
+        self.assertEqual(tuple(entities.shape),(4,64))
+        self.assertEqual(entities.chunk(2,-1)[0].shape[-1],32)
         loss=bce_loss(model.score_triples(entities,positives),
                       model.score_triples(entities,negatives.reshape(-1,3)).reshape(2,10))
         loss.backward()
@@ -91,7 +91,7 @@ class FB15KTests(unittest.TestCase):
         protocol = yaml.safe_load((ROOT/'experiments/configs/fb15k_baseline_300.yaml').read_text(encoding='utf-8'))
         verify_protocol(protocol,cfg)
         self.assertEqual((cfg.dataset,cfg.model['dim'],cfg.num_negatives,cfg.epochs,cfg.warmup,cfg.seed),
-                         ('fb15k',100,10,300,0,0))
+                         ('fb15k',64,10,100,0,0))
         self.assertEqual(divmod(COUNTS[2],cfg.train_batch_size),(14,24390))
         self.assertEqual((cfg.micro_batch_size, cfg.accumulation_steps), (4096, 8))
         verify_manifest(manifest_fixture())
@@ -133,12 +133,12 @@ class FB15KTests(unittest.TestCase):
         r=result_fixture()
         with tempfile.TemporaryDirectory() as directory:
             summary=baseline_report(directory,r)
-            self.assertEqual(summary['best_epoch'],200)
-            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),4501)
+            self.assertEqual(summary['best_epoch'],70)
+            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),1501)
             for p in PLOTS:
                 for ext in ('png','pdf'):self.assertGreater((Path(directory)/f'{p}.{ext}').stat().st_size,1000)
-        mutations=[lambda r:r.update(best_epoch=210),lambda r:r['settings'].update(dataset='fb15k237'),
-                   lambda r:r.update(optimizer_steps=4499),lambda r:r['history'][-1]['step_losses'].pop(),
+        mutations=[lambda r:r.update(best_epoch=75),lambda r:r['settings'].update(dataset='fb15k237'),
+                   lambda r:r.update(optimizer_steps=1499),lambda r:r['history'][-1]['step_losses'].pop(),
                    lambda r:r['history'][9].pop('validation'),lambda r:r.update(lm_identity={'unexpected':True}),
                    lambda r:r['history'][0]['step_losses'][-1].update(micro_batches=8)]
         for mutation in mutations:
