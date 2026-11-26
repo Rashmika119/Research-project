@@ -28,8 +28,7 @@ No training during implementation; offline/mock/derivative checks only.
 
 Read README.md, docs/BASELINE_SHARED_C.md and experiments/configs/baseline_shared_c.yaml.
 The latest user selected only baseline and shared-c-gated. Other implementations,
-study launchers and choices are retired. docs/archive is historical evidence,
-not current instructions.
+study launchers and choices are retired. Historical output JSON in experiments/historical_outputs is evidence, not code.
 
 Use run_final_comparison.py and notebooks/baseline_vs_shared_c_full.ipynb.
 Exactly two independent scratch runs, seed0 only, complete FB15k-237,100 epochs.
@@ -66,7 +65,7 @@ derivatives and fabricated checkpoint restoration. Do not launch optimizer steps
 or actual training unless explicitly requested. GPU diagnostics are opt-in.
 CPU checks do not certify CUDA determinism, real RoBERTa or T4 capacity.
 
-Preserve data/caches/results/checkpoints and archived hashes. Use a fresh output
+Preserve data/caches/results/checkpoints and historical output JSON. Use a fresh output
 root/tag for changed source/settings. The notebook builder refuses overwrite;
 preserve user outputs before updates. Do not commit/push unless requested.
 Colab defaults to fetching main and records the resolved commit. Resume still

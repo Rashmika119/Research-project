@@ -99,9 +99,9 @@ only. Seed0 alone supports no significance or across-seed stability claims.
 - [Runner](training/final_study.py), [training/resume](training/research_pipeline.py), [reports](training/final_reports.py)
 - [Baseline](models/kg_only_baseline_rgat.py), [Shared C gated](models/shared_rgat.py)
 - [Verification and GPU diagnostics](docs/RELIABILITY.md)
-- [Cleanup record](docs/CLEANUP.md)
 
-Only these two models remain available. Earlier notebooks/configs/docs are
-[archived evidence](docs/archive/README.md), not supported launch paths.
+Only these two models remain available. Obsolete notebooks, configurations and documentation have been removed.
+Recorded historical notebook outputs are retained as JSON in
+`experiments/historical_outputs/`; these are evidence, not runnable pipelines.
 Datasets, cached weights, results and checkpoints were not deleted. Old
 checkpoints require their original source and environment, not this new protocol.

@@ -9,5 +9,4 @@
   seed0, 100 epochs per model; baseline warmup0, Shared C gated warmup10.
   This older comparison retains its fixed Python/YAML contract.
 
-The old duplicated FB15K YAML was moved to the repository root. Historical
-protocols in docs/archive remain evidence, not active settings.
+The old duplicated FB15K YAML was moved to the repository root. Historical notebook outputs are retained separately as JSON evidence.
