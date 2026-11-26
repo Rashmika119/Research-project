@@ -1,13 +1,13 @@
 # Two-model full-dataset protocol
 
-Protocol: `full_fb15k237_baseline_shared_c_100_seed0_v1`.
+Protocol: `full_fb15k_baseline_shared_c_300_dim64_v2`.
 Only `baseline_seed0` and `shared-c-gated_seed0` are launched.
-Settings: `experiments/configs/baseline_shared_c.yaml`.
+Settings: `comparison_config.yaml`.
 
 ## Architecture
 
 L1 means RGATConv followed by ReLU and dropout(.2). L2 means RGATConv with
-no added activation. Both models have two unique graph layers, one head, width32.
+no added activation. Both models have two unique graph layers, one head, width64.
 
 ```text
 BASELINE — KGOnlyBaselineRGAT
@@ -57,7 +57,7 @@ Entity / relation descriptions
       Cached masked-mean pooling (768)
                   ↓
       Same trainable projection module:
-      Linear(768,32) → LayerNorm → GELU → Dropout(.1)
+      Linear(768,64) → LayerNorm → GELU → Dropout(.1)
                   ↓
                 TE / TR
 ```
@@ -91,8 +91,8 @@ Shared C gated:
 
 Pooling includes all unmasked tokens, including special tokens. Cache only frozen
 pooled vectors; Q runs with gradients each update. Entity/relation text shares
-the LM and projection. Each real32 embedding splits into real/imaginary halves
-(complex width16). Both score triples using
+the LM and projection. Each real64 embedding splits into real/imaginary halves
+(complex width32). Both score triples using
 `Re(sum_k e_h[k] × r[k] × conjugate(e_t[k]))`.
 Loss is `mean(softplus(-positive_scores)) + mean(softplus(negative_scores))`.
 Four negatives per positive are filtered against training facts only. Evaluation
@@ -100,24 +100,24 @@ filters facts from all splits. Average exact-tie rank is `1+higher+(equal-1)/2`.
 
 ## Training and evaluation
 
-Full FB15k-237:14541 entities,237 relations,272115/17535/20466 train/valid/test
-triples. Training graph:544230 directed edges,474 message relation types.
+Full FB15K:14951 entities,1345 relations,483142/50000/59071 train/valid/test
+triples. Training graph:966284 directed edges,2690 message relation types.
 Preserve original mappings/splits and all candidates, including isolated entities.
 No subset or synthetic research fallback.
 
 | Setting | Baseline | Shared C gated |
 |---|---|---|
 | Seed | 0 | 0 |
-| Epochs | 100 structural | 10 warmup + 90 integrated |
-| Updates | 900 baseline | 90 warmup + 810 integrated |
+| Epochs | 300 structural | 10 warmup + 290 integrated |
+| Updates | 4500 baseline | 150 warmup + 4350 integrated |
 | First eligible validation | 5 | 15 |
 | LM/projection/gates | None | Frozen LM, live projection,3 learned gates |
 | Unique RGAT layers | 2 | 2 |
 | Layer calls per main encoding | 2 | 4 |
 
-Batch32768,9 updates/epoch,last9971. Adam lr.001,weight decay.00001,clip1,
-four negatives,float32,strict determinism. No scheduler/scaler,early stopping,
-accumulation or activation checkpointing. Text batch256,length64; eval512/every5.
+Batch32768,15 updates/epoch,last24390. Adam lr.001,weight decay.00001,clip1,
+ten negatives,float32,strict determinism. No scheduler/scaler,early stopping,
+activation checkpointing; scoring uses micro4096 and accumulation8. Text batch256,length64; eval512/every5.
 Encode the full graph anew for each update; share encoding across positive and
 negative scores. Equal updates do not imply equal compute.
 
@@ -143,3 +143,17 @@ This compares complete models. Text,gating,refinement,warmup and compute differ;
 a gain cannot be attributed solely to sharing. Seed0 supports no significance or
 across-seed consistency claim. Across-seed SD is null. Synthetic test fixtures
 are not research measurements. CPU checks do not replace actual GPU experiments.
+
+## Current root YAML workflow
+
+comparison_config.yaml controls both independent FB15K runs: 300 epochs, width64,
+10 negatives, batch32768, micro4096, accumulation8, validation every5. Shared C
+uses10 warmup+290 integrated epochs; baseline has no warmup. Both use seed0.
+15 updates/epoch,4500 per run,9000 total. Runtime disables native JIT before torch
+imports. Change YAML and run.tag, push main and rerun the same notebook in a fresh
+session. Child commands receive the same --config path. Changed settings start fresh.
+
+Text resources remain the existing Freebase-ID-keyed resources. Alignment uses
+full FB15K mappings; coverage.json and console output report missing entity text
+and relation ID-word fallbacks. This does not claim complete FB15K descriptions.
+Actual RoBERTa weights and GPU memory capacity still need Colab verification.

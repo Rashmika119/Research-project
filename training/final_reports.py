@@ -6,7 +6,7 @@ from pathlib import Path
 from training.experiment_io import digest, write_json
 from training.reports import METRICS, mean_sd, write_csv
 from training.reports import behavior
-from training.final_study import CONFIGURATIONS, PROTOCOL, SEEDS
+from training.final_study import CONFIGURATIONS, PROTOCOL, SEEDS, COUNTS
 
 CONTRASTS = (('shared_c_vs_baseline', 'shared-c-gated', 'baseline'),)
 PLOTS = ('training_loss', 'optimizer_step_loss', 'validation_mrr_curve', 'validation_hits1_curve',
@@ -35,14 +35,19 @@ def validate_runs(results, seeds=SEEDS):
     for r in results:
         cfg = r['settings']
         identifier = r['configuration']
-        wanted = make_config(identifier, cfg['seed'], **{k: cfg[k] for k in
-                             ('raw_dir', 'text_dir', 'text_batch_size', 'eval_batch_size')})
-        if cfg != asdict(wanted):
-            raise ValueError('Result does not use the approved full-study configuration')
+        from training.research_pipeline import ExperimentConfig
+        wanted = ExperimentConfig(**cfg)
+        wanted.validate()
+        if wanted.dataset != 'fb15k' or wanted.max_entities != 0:
+            raise ValueError('Expected full FB15K')
+        budget = expected_budget(identifier, wanted)
+        nsteps = budget['steps_per_epoch']
+        batch = wanted.train_batch_size or COUNTS[2]
+        sizes = [batch]*(nsteps-1)+[(COUNTS[2]-1)%batch+1]
         numerical_configs.add(digest({k: v for k, v in cfg.items() if k not in ('variant', 'warmup', 'seed')}))
         if (r['status'] != 'complete' or r['initialization'] != 'scratch'
                 or r['baseline_checkpoint_used'] or r['dataset_scope'] != 'full'
-                or r['candidate_entities'] != 14541 or r['ranking_policy'] != 'average_exact_ties'
+                or r['candidate_entities'] != COUNTS[0] or r['ranking_policy'] != 'average_exact_ties'
                 or r['architecture'] != cfg['variant']):
             raise ValueError('Only completed scratch full-data runs with corrected ranking may be compared')
         if cfg['variant'] == 'baseline' and (r['lm_identity'] is not None or r['text_cache_keys'] is not None):
@@ -51,30 +56,31 @@ def validate_runs(results, seeds=SEEDS):
                               ('entities', 'relations', 'train_triples', 'valid_triples', 'test_triples'))
         if actual_counts != COUNTS:
             raise ValueError('Wrong dataset split counts')
-        if r['warmup_epochs'] != cfg['warmup'] or r['main_epochs'] != 100 - cfg['warmup']:
+        if r['warmup_epochs'] != cfg['warmup'] or r['main_epochs'] != cfg['epochs'] - cfg['warmup']:
             raise ValueError('Wrong phase epoch budgets')
-        for k, v in expected_budget(identifier).items():
+        for k, v in budget.items():
             if r[k] != v:
                 raise ValueError('Wrong update budget: ' + k)
         history = r['history']
-        if [h['epoch'] for h in history] != list(range(1, 101)):
+        if [h['epoch'] for h in history] != list(range(1, cfg['epochs']+1)):
             raise ValueError('Incomplete epoch history')
         eligible = []
         for h in history:
             e = h['epoch']
             warm = e <= cfg['warmup']
-            if h['phase'] != ('structural_warmup' if warm else 'main') or h['optimizer_steps'] != e * 9:
+            if h['phase'] != ('structural_warmup' if warm else 'main') or h['optimizer_steps'] != e * nsteps:
                 raise ValueError('Invalid phase or cumulative optimizer steps')
             if not math.isfinite(h['loss']):
                 raise ValueError('Nonfinite loss')
             steps = h['step_losses']
-            if ([s['optimizer_step'] for s in steps] != list(range((e-1)*9+1, e*9+1))
-                    or [s['positive_count'] for s in steps] != [32768]*8 + [9971]
+            if ([s['optimizer_step'] for s in steps] != list(range((e-1)*nsteps+1, e*nsteps+1))
+                    or [s['positive_count'] for s in steps] != sizes
+                    or [s.get('micro_batches') for s in steps] != [(n+(wanted.micro_batch_size or batch)-1)//(wanted.micro_batch_size or batch) for n in sizes]
                     or any(not math.isfinite(s['loss']) for s in steps)):
                 raise ValueError('Incomplete optimizer-step history or dropped final batch')
             if not math.isclose(h['loss'], stats.mean(s['loss'] for s in steps), rel_tol=1e-10, abs_tol=1e-10):
                 raise ValueError('Epoch loss disagrees with optimizer-step mean')
-            if ('validation' in h) != (e % 5 == 0):
+            if ('validation' in h) != (e % cfg['eval_every'] == 0 or e in (cfg['warmup'], cfg['epochs'])):
                 raise ValueError('Validation must follow the five-epoch schedule')
             if 'validation' in h:
                 expected_model = 'baseline' if cfg['variant'] == 'baseline' else 'structural' if warm else 'integrated'
@@ -106,7 +112,7 @@ def validate_runs(results, seeds=SEEDS):
         d = r['architecture_diagnostics']
         if (d['unique_rgat_layers'] != 2
                 or d['warmup_layer_executions'] != 2 or d['integrated_layer_executions'] != (2 if baseline else 4)
-                or d['trainable_parameters'] < 1 or r['final_epoch'] != 100):
+                or d['trainable_parameters'] < 1 or r['final_epoch'] != r['settings']['epochs']):
             raise ValueError('Invalid model inventory or final epoch')
         if (not r.get('gpu_memory_start') or r['gpu_memory_start']['free_bytes'] <= 0
                 or r['gpu_memory_start']['total_bytes'] < r['gpu_memory_start']['free_bytes']
@@ -120,10 +126,10 @@ def validate_runs(results, seeds=SEEDS):
         if baseline:
             if r['initial_validation_epoch'] is not None or r['initial_validation'] is not None:
                 raise ValueError('Baseline has no integrated-boundary validation')
-        elif r['initial_validation_epoch'] != 10 or not r['initial_validation']:
+        elif r['initial_validation_epoch'] != r['settings']['warmup'] or not r['initial_validation']:
             raise ValueError('Missing diagnostic warmup-boundary validation')
         for h in r['history']:
-            weighted = sum(s['loss']*s['positive_count'] for s in h['step_losses']) / 272115
+            weighted = sum(s['loss']*s['positive_count'] for s in h['step_losses']) / COUNTS[2]
             if (not math.isclose(h['example_weighted_loss'], weighted, rel_tol=1e-10, abs_tol=1e-10)
                     or set(h['learned_gates']) != set(r['learned_gates'])
                     or any(not math.isfinite(x) for x in h['learned_gates'].values())
@@ -205,11 +211,11 @@ def final_report(directory, results, seeds=SEEDS):
     summary = {'protocol': PROTOCOL, 'seeds': list(seeds), 'configurations': summaries,
                'selected_by_validation': winner, 'selection_metric': 'mean validation MRR',
                'selected_test_results': summaries[winner]['test'], 'per_seed_validation_winners': seed_winners,
-               'paired_comparisons': contrasts, 'candidate_entities': 14541,
+               'paired_comparisons': contrasts, 'candidate_entities': COUNTS[0],
                'manifest_sha256': results[0]['manifest_sha256'], 'dataset_sha256': results[0]['dataset_sha256'],
                'interpretation': 'Seed 0 only; across-seed SD is unavailable, with no significance or seed-consistency claims. '
                'Warmup and integrated curves are separated. Test never selects epochs or architecture. '
-               'Baseline trains structurally for 100 epochs; Shared C gated uses 10 warmup plus 90 integrated epochs. '
+               'Epoch and warmup budgets are recorded in each run settings. '
                'This compares complete models, not an isolated effect of sharing, text or warmup. Equal updates do not mean equal compute.'}
     table = []
     for c, s in summaries.items():

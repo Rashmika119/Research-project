@@ -40,7 +40,7 @@ def fixtures():
             r.update(configuration=c, architecture=CONFIGURATIONS[c][0], settings=asdict(make_config(c,s)),
                      initial_structural_sha256=f'structural-{s}', initial_projection_sha256=None if c == 'baseline' else f'projection-{s}',
                      environment={'git_commit':'fixture','source_sha256':'fixture'}, numerical_policy={'deterministic_algorithms':True},
-                     initial_validation_epoch=None if c == 'baseline' else 10, final_epoch=100, peak_gpu_reserved_bytes=5*2**30,
+                     initial_validation_epoch=None if c == 'baseline' else 10, final_epoch=300, peak_gpu_reserved_bytes=5*2**30,
                      gpu_memory_start={'free_bytes':14*2**30,'total_bytes':15*2**30},
                      architecture_diagnostics={'trainable_parameters':(1000,2000)[i], 'unique_rgat_layers':2,
                                                'warmup_layer_executions':2,'integrated_layer_executions':2 if c == 'baseline' else 4},
@@ -68,7 +68,7 @@ class FinalStudyTests(unittest.TestCase):
             for c in CONFIGURATIONS:
                 seed_everything(seed)
                 with patch('torch.load',side_effect=AssertionError('No checkpoint transfer')):
-                    m=build_scratch_model(make_config(c,seed).variant,4,2).eval()
+                    m=build_scratch_model(make_config(c,seed).variant,4,2,make_config(c,seed).model).eval()
                 models.append(m)
             self.assertEqual(state_fingerprint(models[0]),state_fingerprint(models[1].structural))
             self.assertFalse(hasattr(models[0], 'bridge'))
@@ -115,8 +115,26 @@ class FinalStudyTests(unittest.TestCase):
                     self.assertGreater(a.abs().sum(),0);self.assertGreater(b.abs().sum(),0)
                     torch.testing.assert_close(g,a+b,rtol=1e-5,atol=1e-7)
 
+    def test_root_yaml_controls_both_children_and_budgets(self):
+        from training.final_study import load_protocol
+        protocol = load_protocol()
+        protocol.update(epochs=17, train_batch_size=8192, micro_batch_size=2048, accumulation_steps=4)
+        protocol['model']['dim'] = 48
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'comparison.yaml'
+            path.write_text(yaml.safe_dump(protocol))
+            for name in CONFIGURATIONS:
+                cfg = make_config(name, 0, config_path=path)
+                self.assertEqual((cfg.dataset,cfg.epochs,cfg.model['dim']), ('fb15k',17,48))
+                budget = expected_budget(name,cfg)
+                self.assertEqual(budget['optimizer_steps'],59*17)
+                if name == 'shared-c-gated': self.assertEqual(budget['integrated_optimizer_steps'],59*7)
+            args = SimpleNamespace(config=str(path),seeds=[0],raw_dir='raw',text_dir='text',cache_dir='cache',text_batch_size=None,eval_batch_size=None,skip_completed=False,resume=False)
+            for _,_,_,cmd in build_commands(args,Path(directory),Path(directory)/'manifest.json'):
+                self.assertEqual(cmd[cmd.index('--config')+1],str(path))
+
     def test_protocol_two_commands_and_seed_zero_only(self):
-        protocol=yaml.safe_load((ROOT/'experiments/configs/baseline_shared_c.yaml').read_text(encoding='utf-8'))
+        protocol=yaml.safe_load((ROOT/'comparison_config.yaml').read_text(encoding='utf-8'))
         self.assertEqual(list(CONFIGURATIONS),list(protocol['configurations']))
         self.assertEqual(tuple(protocol['seeds']),SEEDS)
         args=SimpleNamespace(seeds=SEEDS,raw_dir='raw',text_dir='text',cache_dir='cache',text_batch_size=256,eval_batch_size=512,skip_completed=True,resume=True)
@@ -124,8 +142,8 @@ class FinalStudyTests(unittest.TestCase):
         self.assertEqual(len(commands),2);self.assertEqual(len({str(d) for _,_,d,_ in commands}),2)
         for c,s,_,cmd in commands:
             cfg=make_config(c,s)
-            self.assertEqual((cfg.max_entities,cfg.epochs,cfg.warmup),(0,100,CONFIGURATIONS[c][1]))
-            self.assertEqual(expected_budget(c)['optimizer_steps'],900)
+            self.assertEqual((cfg.max_entities,cfg.epochs,cfg.warmup),(0,300,CONFIGURATIONS[c][1]))
+            self.assertEqual(expected_budget(c)['optimizer_steps'],4500)
             for k in ('model','lr','train_batch_size','epochs','text_batch_size','eval_batch_size'):
                 self.assertEqual(asdict(cfg)[k],protocol[k])
             with patch.object(sys,'argv',cmd[2:]),patch('torch.cuda.is_available',return_value=True),patch('training.final_study.run_experiment') as run:
@@ -142,7 +160,7 @@ class FinalStudyTests(unittest.TestCase):
             self.assertIsNone(summary['configurations']['shared-c-gated']['validation']['MRR']['std'])
             for p in PLOTS:
                 for ext in ('png','pdf'):self.assertGreater((Path(d)/(p+'.'+ext)).stat().st_size,1000)
-            self.assertEqual(len((Path(d)/'steps.csv').read_text().splitlines()),1801)
+            self.assertEqual(len((Path(d)/'steps.csv').read_text().splitlines()),9001)
         mutations=[lambda r:r.pop(),lambda r:r[0].update(best_epoch=10),lambda r:r[0]['settings'].update(max_entities=2000),
                    lambda r:r[0].update(initial_projection_sha256='wrong'),lambda r:r[0]['history'][0]['step_losses'].pop(),
                    lambda r:r[0]['architecture_diagnostics'].update(unique_rgat_layers=4),
@@ -204,12 +222,12 @@ class FinalStudyTests(unittest.TestCase):
             def output(cmd,**kw):
                 if '-c' in cmd:return str(torch.__version__)
                 return '' if 'status' in cmd else 'a'*40
-            def prepare(raw,count,seed,path):
+            def prepare(raw,count,seed,path,**kwargs):
                 self.assertEqual(count,0)
                 manifest={'max_entities':0,'selection_strategy':'full_original_splits','sha256':'fixture','dataset_sha256':'fixture',
                           'statistics':dict(zip(('entities','relations','train_triples','valid_triples','test_triples'),COUNTS))}
                 write_json(path,manifest)
-                return SimpleNamespace(train=[(0,0,1)]),SimpleNamespace(edge_index=range(544230)),[(0,0,1)],manifest
+                return SimpleNamespace(train=[(0,0,1)]),SimpleNamespace(edge_index=range(966284)),[(0,0,1)],manifest
             def research(cmd,log):
                 calls.append(cmd);dest=Path(cmd[cmd.index('--output-dir')+1])
                 for r in fixtures():write_json(dest/f"{r['configuration']}_seed{r['settings']['seed']}"/'results.json',r)

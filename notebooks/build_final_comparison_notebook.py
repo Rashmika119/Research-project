@@ -73,16 +73,28 @@ def notebook():
     def source(i, text): nb['cells'][i]['source'] = text.strip()+'\n'
     source(0, '''# Full-dataset comparison: KG-only baseline versus Shared C gated
 Two models, seed 0: two independent scratch runs.
-Full FB15k-237, 100 epochs and 900 optimizer updates per run.
-Baseline: 100 structural epochs, no RoBERTa. Shared C gated: 10 warmup + 90 integrated
+Full FB15K; epochs and budgets come from root comparison_config.yaml.
+Default: baseline 300 structural epochs. Shared C gated: 10 warmup + 290 integrated
 epochs, frozen independent RoBERTa, live projection, text/refinement gates and ComplEx.
 Sections 1-5 do not train. Section 6 alone starts research training.
-Full-data T4 capacity is unverified; OOM never silently changes the protocol.
+Full-data GPU capacity is unverified; OOM never silently changes the protocol.
 ''')
     source(1, '## 1. Runtime and CUDA environment')
     source(2, RUNTIME_SETUP)
     source(3, '## 2. Drive, repository and dependencies')
-    source(4, REPOSITORY_SETUP)
+    setup = '\n'.join(line for line in REPOSITORY_SETUP.splitlines()
+                      if not line.startswith(('RUN_TAG =', 'RUN_ROOT =', 'RUN_ROOT.mkdir')))
+    setup = setup.replace("LOCK = RUN_ROOT / 'dependencies.txt'", """subprocess.run([sys.executable, '-m', 'pip', 'install', 'pyyaml'], check=True)
+import yaml
+CONFIG_PATH = REPO_DIR / 'comparison_config.yaml'
+protocol = yaml.safe_load(CONFIG_PATH.read_text(encoding='utf-8'))
+RUN_TAG = protocol['run']['tag']
+assert RUN_TAG not in ('.', '..') and '/' not in RUN_TAG and chr(92) not in RUN_TAG
+RUN_ROOT = STAGE_ROOT / RUN_TAG
+RUN_ROOT.mkdir(parents=True, exist_ok=True)
+LOCK = RUN_ROOT / 'dependencies.txt'
+""")
+    source(4, setup)
     source(5,'## 3. Final experiment configuration')
     source(6,'''import json
 import yaml
@@ -101,16 +113,16 @@ RESUME_INTERRUPTED = True
 RUN_STATIC_CHECKS = False  # Non-training checks only; CPU/offline.
 EXPERIMENT_DIR = RUN_ROOT / 'runs'
 MANIFEST = EXPERIMENT_DIR / 'dataset_manifest.json'
-RAW_DIR = SHARED_ROOT / 'data' / 'fb15k237'
-TEXT_DIR = SHARED_ROOT / 'data' / 'text'
+RAW_DIR = SHARED_ROOT / 'data' / 'fb15k'
+TEXT_DIR = SHARED_ROOT / 'data' / 'text_fb15k'
 POOLED_CACHE = SHARED_ROOT / 'pooled_text_cache'
 LOG_DIR = RUN_ROOT / 'logs' / datetime.now().strftime('%Y%m%d_%H%M%S_%f')
 LOG_DIR.mkdir(parents=True, exist_ok=True)
-protocol = yaml.safe_load(Path('experiments/configs/baseline_shared_c.yaml').read_text(encoding='utf-8'))
+protocol = yaml.safe_load(CONFIG_PATH.read_text(encoding='utf-8'))
 assert protocol['protocol'] == PROTOCOL, 'Notebook/repository protocol mismatch; select the final-study commit.'
 assert list(CONFIGURATIONS) == list(protocol['configurations'])
 assert SEEDS == list(APPROVED_SEEDS) == protocol['seeds']
-configs = {f'{c}_seed{s}': make_config(c,s,raw_dir=RAW_DIR,text_dir=TEXT_DIR) for c in CONFIGURATIONS for s in SEEDS}
+configs = {f'{c}_seed{s}': make_config(c,s,raw_dir=RAW_DIR,text_dir=TEXT_DIR,config_path=CONFIG_PATH) for c in CONFIGURATIONS for s in SEEDS}
 for cfg in configs.values():
     assert cfg.warmup == protocol['configurations'][cfg.variant]['warmup']
     for key in ('max_entities','epochs','train_batch_size','lr','weight_decay','num_negatives','grad_clip','model','text_batch_size','eval_batch_size','max_text_length','eval_every','selection_policy','record_step_losses','deterministic','lm_name'):
@@ -118,8 +130,8 @@ for cfg in configs.values():
 seed_everything(0, True)
 print(json.dumps(protocol, indent=2))
 print('Numerical policy:', numerical_policy())
-display(pd.DataFrame([{'configuration':c,'seed':s,**expected_budget(c)} for c in CONFIGURATIONS for s in SEEDS]))
-print('2 independent runs; 1,800 committed optimizer updates; no preliminary training.')
+display(pd.DataFrame([{'configuration':c,'seed':s,**expected_budget(c,configs[f'{c}_seed{s}'])} for c in CONFIGURATIONS for s in SEEDS]))
+print('2 independent runs; total updates:', sum(expected_budget(c,configs[f'{c}_seed0'])['optimizer_steps'] for c in CONFIGURATIONS))
 write_json(LOG_DIR/'environment.json',environment())
 with (LOG_DIR/'pip_freeze.txt').open('w') as f:
     subprocess.run([sys.executable,'-m','pip','freeze'],stdout=f,check=True)
@@ -133,9 +145,9 @@ text and checkpoint identity before resume or skip.
     source(8,'''from training.experiment_io import prepare_data
 from models.pretrained import prepare_pretrained
 
-data, graph, known_train, manifest = prepare_data(str(RAW_DIR),0,0,MANIFEST)
+data, graph, known_train, manifest = prepare_data(str(RAW_DIR),0,0,MANIFEST,dataset="fb15k")
 verify_manifest(manifest)
-assert len(graph.edge_index) == 544230
+assert len(graph.edge_index) == 966284
 assert set(data.train) == set(known_train)
 print('Full dataset:',manifest['statistics'])
 print('Dataset SHA:',manifest['dataset_sha256'],'; manifest SHA:',manifest['sha256'])
@@ -156,8 +168,8 @@ else:
 ''')
     source(11,'''## 6. Actual final research training
 Two child processes run sequentially: baseline, then Shared C gated, seed 0.
-Baseline trains structurally for all 100 epochs; selection starts at epoch 5.
-Shared C uses warmup epochs 1-10, integrated epochs 11-100, selection from epoch 15.
+Baseline trains structurally for all configured epochs; selection starts at epoch 5.
+Shared C uses warmup epochs 1-10, integrated epochs 11-300, selection from epoch 15.
 Its warmup and integrated-boundary evaluations are diagnostic only.
 Both select by scheduled validation MRR; earliest equal best wins.
 Each epoch prints phase/loss/updates/validation/time/allocated and reserved peaks.
@@ -167,7 +179,7 @@ An uncommitted epoch replays. Preserve old outputs if identities change.
 ''')
     source(12,'''command = [sys.executable,'-u','run_final_comparison.py','--output-dir',str(EXPERIMENT_DIR),
            '--raw-dir',str(RAW_DIR),'--text-dir',str(TEXT_DIR),'--cache-dir',str(POOLED_CACHE),
-           '--seeds',*map(str,SEEDS)]
+           '--seeds',*map(str,SEEDS),'--config',str(CONFIG_PATH)]
 if SKIP_COMPLETED: command.append('--skip-completed')
 if RESUME_INTERRUPTED: command.append('--resume')
 run_logged(command,LOG_DIR/'final_study.log')

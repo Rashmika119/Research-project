@@ -70,8 +70,6 @@ class ExperimentConfig:
             raise ValueError('Accumulation requires an explicit micro-batch size')
         if self.dataset not in ('fb15k237', 'fb15k'):
             raise ValueError('Unknown dataset')
-        if self.dataset == 'fb15k' and self.variant != 'baseline':
-            raise ValueError('The approved FB15K protocol supports the baseline only')
         if self.selection_policy not in ('initial_and_scheduled', 'scheduled_only'):
             raise ValueError('Unknown checkpoint-selection policy')
         if self.variant not in (*ALL_ARCHITECTURES, 'baseline'):
@@ -101,9 +99,16 @@ def load_model_state(model, state):
 
 def text_inputs(data, cfg, revision=None):
     long_path, short_path = download_entity_text_files(cfg.text_dir)
-    entities = align_entity_texts(data.entity2id, long_path, short_path).texts_by_id
-    relations = align_relation_texts(data.relation2id, read_relation_text_mapping(
-        download_relation_text_file(cfg.text_dir))).texts_by_id
+    entity_alignment = align_entity_texts(data.entity2id, long_path, short_path)
+    entities = entity_alignment.texts_by_id
+    relation_alignment = align_relation_texts(data.relation2id, read_relation_text_mapping(
+        download_relation_text_file(cfg.text_dir)))
+    relations = relation_alignment.texts_by_id
+    coverage = {"dataset": cfg.dataset, "entities_matched": entity_alignment.matched,
+                "entities_missing": entity_alignment.missing, "relations_matched": relation_alignment.matched,
+                "relations_using_id_text": relation_alignment.missing}
+    print("Text coverage (existing keyed resources; missing entities use marker, missing relations use ID words):", coverage, flush=True)
+    write_json(Path(cfg.text_dir)/"coverage.json", coverage)
     tokenizer = load_pretrained_tokenizer(cfg.lm_name, revision=revision)
     def tokenize(texts):
         encoded = tokenizer([s if s.strip() else '[Missing description]' for s in texts],

@@ -31,19 +31,19 @@ python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_30
 
 See [the FB15K guide](docs/FB15K_BASELINE_300.md) and
 [configuration](baseline_config.yaml). This is a separate
-baseline study; the FB15k-237 two-model comparison below retains its settings.
-Scores from the two datasets must not be directly compared.
+baseline study; the comparison uses root `comparison_config.yaml` with matching settings.
+Both active pipelines now use full FB15K; historical FB15k-237 results remain incomparable.
 
-## Existing FB15k-237 comparison
+## Existing FB15K comparison
 
 This repository compares exactly two knowledge-graph link-prediction models on
-full FB15k-237. Both use RGAT and ComplEx. Shared C gated adds frozen RoBERTa text
+full FB15K. Both use RGAT and ComplEx. Shared C gated adds frozen RoBERTa text
 features and gated refinement using the same two RGAT layers twice.
 
 | Model | Seed | Structural warmup | Main training | Total epochs | Updates |
 |---|---:|---:|---|---:|---:|
-| `baseline` | 0 | None | 100 structural epochs | 100 | 900 |
-| `shared-c-gated` | 0 | 10 epochs | 90 integrated epochs | 100 | 900 |
+| `baseline` | 0 | None | 300 structural epochs | 300 | 4500 |
+| `shared-c-gated` | 0 | 10 epochs | 290 integrated epochs | 300 | 4500 |
 
 All trainable weights start from scratch independently. Shared C retains its own
 warmup weights and Adam state; it never loads the baseline checkpoint. Matching
@@ -67,7 +67,7 @@ reports from completed runs without training.
 
 Each epoch prints phase, loss, cumulative updates, scheduled validation, timing,
 and GPU memory. Outputs persist under
-`MyDrive/Research/baseline_shared_c_100/baseline_shared_c_100_seed0_v1_run1/`.
+`MyDrive/Research/baseline_shared_c_100/baseline_shared_c_fb15k_300_dim64_v2_run1/`.
 Existing shared data and verified frozen-text caches can be reused. Full-dataset
 Shared C capacity on a 15 GB T4 remains unverified; OOM never silently changes
 the experiment settings.
@@ -95,7 +95,7 @@ only. Seed0 alone supports no significance or across-seed stability claims.
 ## Active code
 
 - [Protocol and equations](docs/BASELINE_SHARED_C.md)
-- [Approved settings](experiments/configs/baseline_shared_c.yaml)
+- [Approved settings](comparison_config.yaml)
 - [Runner](training/final_study.py), [training/resume](training/research_pipeline.py), [reports](training/final_reports.py)
 - [Baseline](models/kg_only_baseline_rgat.py), [Shared C gated](models/shared_rgat.py)
 - [Verification and GPU diagnostics](docs/RELIABILITY.md)

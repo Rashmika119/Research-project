@@ -1,12 +1,12 @@
-protocol: full_fb15k237_baseline_shared_c_100_seed0_v1
-dataset: FB15k-237
+protocol: full_fb15k_baseline_shared_c_300_dim64_v2
+dataset: FB15K
 max_entities: 0
-entities: 14541
-relations: 237
+entities: 14951
+relations: 1345
 splits:
-  train: 272115
-  valid: 17535
-  test: 20466
+  train: 483142
+  valid: 50000
+  test: 59071
 seeds:
 - 0
 configurations:
@@ -15,30 +15,22 @@ configurations:
     warmup: 0
     unique_rgat_layers: 2
     integrated_layer_executions: 2
-    baseline_updates: 900
-    structural_updates: 0
-    integrated_updates: 0
   shared-c-gated:
     architecture: shared-c-gated
     warmup: 10
     unique_rgat_layers: 2
     integrated_layer_executions: 4
-    structural_updates: 90
-    integrated_updates: 810
-    baseline_updates: 0
-epochs: 100
+epochs: 300
 train_batch_size: 32768
-steps_per_epoch: 9
-optimizer_steps: 900
 lr: 0.001
 weight_decay: 1.0e-05
 optimizer: Adam
-num_negatives: 4
+num_negatives: 10
 grad_clip: 1.0
 model:
   encoder_type: rgat
   scorer_type: complex
-  dim: 32
+  dim: 64
   num_layers: 2
   heads: 1
   dropout: 0.2
@@ -59,3 +51,9 @@ resume_interrupted: true
 preliminary_training_tests: false
 projection_dropout: 0.1
 activation_checkpointing: false
+micro_batch_size: 4096
+accumulation_steps: 8
+runtime:
+  disable_native_jit: true
+run:
+  tag: baseline_shared_c_fb15k_300_dim64_v2_run1

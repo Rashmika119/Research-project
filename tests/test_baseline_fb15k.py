@@ -100,7 +100,8 @@ class FB15KTests(unittest.TestCase):
         protocol['config']['seed']=1
         with self.assertRaises(ValueError):verify_protocol(protocol,cfg)
         cfg.variant='shared-c-gated'
-        with self.assertRaises(ValueError):cfg.validate()
+        from training.baseline_fb15k import validate_config
+        with self.assertRaises(ValueError):validate_config(cfg)
 
     def test_yaml_changes_drive_config_and_budget(self):
         from training.baseline_config import load_protocol

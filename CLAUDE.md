@@ -19,28 +19,28 @@ then backpropagate once through the same RGAT encoding/dropout realization. Clip
 and update Adam once per effective batch. Keep full-graph activations resident;
 do not claim graph-memory reduction. Protocol/run tag is dim64_nativejitoff_v5; reject old
 checkpoint identities. No extra optimizer updates for micro-batches.
-Explicit dataset identity must reject FB15k-237. No LM/text downloads for this run.
+Explicit dataset identity must reject FB15K. No LM/text downloads for this run.
 Use the new output root/tag; fetch main and record the resolved commit. Do not
-alter Shared C's earlier FB15k-237 protocol or compare cross-dataset scores.
+alter Shared C's earlier FB15K protocol or compare cross-dataset scores.
 No training during implementation; offline/mock/derivative checks only.
 
-## Retained FB15k-237 comparison
+## Retained FB15K comparison
 
-Read README.md, docs/BASELINE_SHARED_C.md and experiments/configs/baseline_shared_c.yaml.
+Read README.md, docs/BASELINE_SHARED_C.md and comparison_config.yaml.
 The latest user selected only baseline and shared-c-gated. Other implementations,
 study launchers and choices are retired. Historical output JSON in experiments/historical_outputs is evidence, not code.
 
 Use run_final_comparison.py and notebooks/baseline_vs_shared_c_full.ipynb.
-Exactly two independent scratch runs, seed0 only, complete FB15k-237,100 epochs.
-Baseline:100 structural epochs, no separate warmup. Shared C:10 warmup+90 integrated,
+Exactly two independent scratch runs, seed0 only, complete FB15K,300 epochs.
+Baseline:300 structural epochs, no separate warmup. Shared C:10 warmup+290 integrated,
 retaining its own Adam state. Never transfer the baseline checkpoint.
 
-Preserve width32, two RGAT layers/one head, graph dropout.2, projection dropout.1,
-Adam lr.001, weight decay.00001, clipping1, four negatives, BCE positive mean plus
-negative mean, float32 and strict determinism. Batch32768 gives9 updates/epoch,
-last9971;900 updates/run,1800/study. Text256/length64, eval512/every5. No scheduler,
-AMP, early stopping, accumulation or activation checkpointing. Preserve original
-splits/mappings, train-only graph/inverses, all14541 candidates, corrected tie ranks.
+Preserve width64, two RGAT layers/one head, graph dropout.2, projection dropout.1,
+Adam lr.001, weight decay.00001, clipping1, ten negatives, BCE positive mean plus
+negative mean, float32 and strict determinism. Batch32768 gives15 updates/epoch,
+last24390;4500 updates/run,9000/study. Text256/length64, eval512/every5. No scheduler,
+AMP, early stopping, activation checkpointing; scoring uses micro4096 and accumulation8. Preserve original
+splits/mappings, train-only graph/inverses, all14951 candidates, corrected tie ranks.
 
 Shared C: H=L2(dropout(ReLU(L1(E0)))); U=H+tanh(gE)*TE;
 V=SAME_L2(dropout(ReLU(SAME_L1(U)))); Efinal=U+tanh(gF)*V;

@@ -12,12 +12,12 @@ def fixture_results():
         for seed in SEEDS:
             cfg = make_config(c, seed)
             history = []
-            for e in range(1, 101):
+            for e in range(1, cfg.epochs+1):
                 h = {'epoch': e, 'phase': 'structural_warmup' if e <= cfg.warmup else 'main',
                      'loss': 1.5-e*.001, 'example_weighted_loss': 1.5-e*.001,
-                     'optimizer_steps': e*9, 'train_seconds': 1., 'epoch_seconds': 2.,
-                     'step_losses': [{'optimizer_step': (e-1)*9+s+1, 'loss': 1.5-e*.001,
-                                      'positive_count': 32768 if s < 8 else 9971} for s in range(9)]}
+                     'optimizer_steps': e*15, 'train_seconds': 1., 'epoch_seconds': 2.,
+                     'step_losses': [{'optimizer_step': (e-1)*15+s+1, 'loss': 1.5-e*.001,
+                                      'positive_count': 32768 if s < 14 else 24390, 'micro_batches':8 if s < 14 else 6} for s in range(15)]}
                 if e % 5 == 0:
                     h['validation'] = metrics(.8 if e <= cfg.warmup else
                         .05 + index*.01 + seed*.001 + (min(e,75)-max(0,e-75)*.1)*.0001)
@@ -25,14 +25,14 @@ def fixture_results():
                 history.append(h)
             results.append({'configuration': c, 'architecture': cfg.variant, 'settings': asdict(cfg),
                 'status': 'complete', 'initialization': 'scratch', 'baseline_checkpoint_used': False,
-                'dataset_scope': 'full', 'candidate_entities': 14541, 'ranking_policy': 'average_exact_ties',
+                'dataset_scope': 'full', 'candidate_entities': 14951, 'ranking_policy': 'average_exact_ties',
                 'manifest_sha256': 'fabricated-manifest', 'dataset_sha256': 'fabricated-data',
                 'environment': {'source_sha256': 'fixture'}, 'numerical_policy': {'fixture': True},
                 'lm_identity': None if c == 'baseline' else {'name': 'fixture-LM'},
                 'text_cache_keys': None if c == 'baseline' else {'entities': 'fixture', 'relations': 'fixture'},
                 'initial_structural_sha256': f'paired-structural-{seed}',
                 'initial_trainable_sha256': f'{cfg.variant}-{seed}',
-                'warmup_epochs': cfg.warmup, 'main_epochs': 100-cfg.warmup,
+                'warmup_epochs': cfg.warmup, 'main_epochs': cfg.epochs-cfg.warmup,
                 **expected_budget(c), 'best_epoch': 75, 'validation': history[74]['validation'],
                 'test': metrics(.2-index*.01), 'final_epoch_validation': history[-1]['validation'],
                 'initial_validation': None if c == 'baseline' else metrics(.9),

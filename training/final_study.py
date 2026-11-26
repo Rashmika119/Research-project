@@ -1,4 +1,4 @@
-"""Final full FB15k-237 study: baseline versus Shared C gated, seed 0, 100 epochs.
+"""Final full FB15K study: baseline versus Shared C gated, seed 0, 300 epochs.
 
 No preliminary training is performed. Each child initializes its own model;
 only its own last.pt may resume it. Only seed 0 is approved for this study.
@@ -11,33 +11,42 @@ from pathlib import Path
 import sys
 
 import torch
+import yaml
+
+DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "comparison_config.yaml"
+
+def load_protocol(path=None):
+    return yaml.safe_load(Path(path or DEFAULT_CONFIG).read_text(encoding="utf-8"))
 
 from training.experiment_io import digest, prepare_data, write_json
 from training.process import run_logged
 from training.research_pipeline import ExperimentConfig, run_experiment
 
-PROTOCOL = 'full_fb15k237_baseline_shared_c_100_seed0_v1'
+PROTOCOL = load_protocol()['protocol']
 SEEDS = (0,)
 CONFIGURATIONS = {
     'baseline': ('baseline', 0),
     'shared-c-gated': ('shared-c-gated', 10),
 }
-COUNTS = (14541, 237, 272115, 17535, 20466)
+COUNTS = (14951, 1345, 483142, 50000, 59071)
 
 
-def make_config(identifier, seed, *, raw_dir='data/raw/fb15k237',
-                text_dir='data/text/fb15k237', text_batch_size=256, eval_batch_size=512):
+def make_config(identifier, seed, *, raw_dir='data/raw/fb15k',
+                text_dir='data/text/fb15k', text_batch_size=None, eval_batch_size=None, config_path=None):
     if identifier not in CONFIGURATIONS or type(seed) is not int or seed != 0:
-        raise ValueError('The full study requires a selected configuration and seed 0')
-    if (text_batch_size, eval_batch_size) != (256, 512):
-        raise ValueError('Final protocol fixes text/evaluation batch sizes at 256/512')
-    architecture, warmup = CONFIGURATIONS[identifier]
-    cfg = ExperimentConfig(variant=architecture, max_entities=0, epochs=100,
-        warmup=warmup, seed=seed, subset_seed=0, lr=.001, num_negatives=4,
-        train_batch_size=32768, text_batch_size=text_batch_size, max_text_length=64,
-        eval_every=5, eval_batch_size=eval_batch_size, raw_dir=str(raw_dir), text_dir=str(text_dir),
-        selection_policy='scheduled_only', record_step_losses=True)
+        raise ValueError('Expected baseline or Shared C gated, seed 0')
+    protocol = load_protocol(config_path)
+    from dataclasses import fields
+    settings = {f.name: protocol[f.name] for f in fields(ExperimentConfig) if f.name in protocol}
+    settings.update(dataset='fb15k', variant=identifier, seed=seed, subset_seed=0,
+                    raw_dir=str(raw_dir), text_dir=str(text_dir),
+                    warmup=protocol['configurations'][identifier]['warmup'])
+    for name,value in (('text_batch_size',text_batch_size),('eval_batch_size',eval_batch_size)):
+        if value is not None: settings[name] = value
+    cfg = ExperimentConfig(**settings)
     cfg.validate()
+    if cfg.max_entities != 0 or cfg.model['dim'] % 2 or cfg.model['dim'] < 2:
+        raise ValueError('Expected full FB15K and even embedding width')
     return cfg
 
 
@@ -49,19 +58,20 @@ def validate_seeds(seeds):
 
 
 
-def expected_budget(identifier):
-    architecture, warm = CONFIGURATIONS[identifier]
-    return {'steps_per_epoch': 9, 'optimizer_steps': 900,
-            'structural_optimizer_steps': warm * 9,
-            'baseline_optimizer_steps': 900 if architecture == 'baseline' else 0,
-            'integrated_optimizer_steps': 0 if architecture == 'baseline' else (100 - warm) * 9}
+def expected_budget(identifier, cfg=None):
+    cfg = cfg or make_config(identifier, 0)
+    steps = (COUNTS[2] + (cfg.train_batch_size or COUNTS[2]) - 1) // (cfg.train_batch_size or COUNTS[2])
+    return {'steps_per_epoch': steps, 'optimizer_steps': steps*cfg.epochs,
+            'structural_optimizer_steps': cfg.warmup*steps,
+            'baseline_optimizer_steps': steps*cfg.epochs if identifier == 'baseline' else 0,
+            'integrated_optimizer_steps': 0 if identifier == 'baseline' else (cfg.epochs-cfg.warmup)*steps}
 
 
 def verify_manifest(manifest):
     stats = manifest['statistics']
     actual = tuple(stats[k] for k in ('entities', 'relations', 'train_triples', 'valid_triples', 'test_triples'))
     if actual != COUNTS or manifest['max_entities'] != 0 or manifest['selection_strategy'] != 'full_original_splits':
-        raise ValueError('Full-study manifest must contain the complete original FB15k-237 splits')
+        raise ValueError('Full-study manifest must contain the complete original FB15K splits')
 
 
 def preflight(root, configs, manifest):
@@ -103,8 +113,10 @@ def build_commands(args, root, manifest):
             directory = root / f'{identifier}_seed{seed}'
             command = [sys.executable, '-u', str(runner), '--single', identifier, '--seed', str(seed),
                        '--manifest', str(manifest), '--output-dir', str(directory)]
+            command.extend(['--config', str(getattr(args, 'config', DEFAULT_CONFIG))])
             for key in ('raw_dir', 'text_dir', 'cache_dir', 'text_batch_size', 'eval_batch_size'):
-                command.extend(['--' + key.replace('_', '-'), str(getattr(args, key))])
+                if getattr(args, key) is not None:
+                    command.extend(['--' + key.replace('_', '-'), str(getattr(args, key))])
             for key in ('skip_completed', 'resume'):
                 if getattr(args, key):
                     command.append('--' + key.replace('_', '-'))
@@ -115,11 +127,12 @@ def build_commands(args, root, manifest):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', required=True)
-    parser.add_argument('--raw-dir', default='data/raw/fb15k237')
-    parser.add_argument('--text-dir', default='data/text/fb15k237')
+    parser.add_argument('--config', default=str(DEFAULT_CONFIG))
+    parser.add_argument('--raw-dir', default='data/raw/fb15k')
+    parser.add_argument('--text-dir', default='data/text/fb15k')
     parser.add_argument('--cache-dir', default='data/cache/pooled_text')
-    parser.add_argument('--text-batch-size', type=int, default=256)
-    parser.add_argument('--eval-batch-size', type=int, default=512)
+    parser.add_argument('--text-batch-size', type=int, default=None)
+    parser.add_argument('--eval-batch-size', type=int, default=None)
     parser.add_argument('--skip-completed', action='store_true')
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--single', choices=CONFIGURATIONS, help='One independent child; also useful for explicit manual launch')
@@ -144,7 +157,7 @@ def main():
         return
     if not torch.cuda.is_available():
         raise RuntimeError('Full research training requires CUDA; no CPU fallback or smoke training was started')
-    cfg_kwargs = dict(raw_dir=args.raw_dir, text_dir=args.text_dir,
+    cfg_kwargs = dict(config_path=args.config, raw_dir=args.raw_dir, text_dir=args.text_dir,
                       text_batch_size=args.text_batch_size, eval_batch_size=args.eval_batch_size)
     if args.single:
         run_experiment(make_config(args.single, args.seed, **cfg_kwargs), root,
@@ -153,7 +166,7 @@ def main():
         return
     manifest_path = root / 'dataset_manifest.json'
     configs = {f'{c}_seed{s}': asdict(make_config(c, s, **cfg_kwargs)) for c in CONFIGURATIONS for s in args.seeds}
-    config = {'protocol': PROTOCOL, 'seeds': list(args.seeds), 'configurations': configs,
+    config = {'protocol': load_protocol(args.config)['protocol'], 'yaml': load_protocol(args.config), 'seeds': list(args.seeds), 'configurations': configs,
               'cache_dir': str(args.cache_dir)}
     config_path = root / 'comparison_config.json'
     if config_path.exists():
@@ -164,7 +177,7 @@ def main():
     elif root.exists() and any(root.iterdir()):
         if {p.name for p in root.iterdir()} != {'dataset_manifest.json'}:
             raise FileExistsError('Refusing an unrecognized nonempty output directory')
-    _, _, _, manifest = prepare_data(args.raw_dir, 0, 0, manifest_path)
+    _, _, _, manifest = prepare_data(args.raw_dir, 0, 0, manifest_path, dataset="fb15k")
     verify_manifest(manifest)
     preflight(root, {name: ExperimentConfig(**cfg) for name, cfg in configs.items()}, manifest)
     write_json(config_path, config)
