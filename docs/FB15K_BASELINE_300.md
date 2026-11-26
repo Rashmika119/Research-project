@@ -1,141 +1,55 @@
-# FB15K baseline: existing RGAT + ComplEx
+# FB15K baseline: one notebook, root YAML
 
-Protocol: `fb15k_rgat_complex_dim64_neg10_100_seed0_dim64_accum8_eval5_v4`.
-This is the existing `KGOnlyBaselineRGAT`, not a new baseline class or pure ComplEx
-reproduction. Shared C remains available in the separate FB15k-237 comparison.
+Use `notebooks/fb15k_baseline_300.ipynb`. It fetches `main` and prints the resolved
+commit. `baseline_config.yaml` in the repository root is the single settings source.
+The Python runner reads it directly; it is no longer a duplicate validation file.
 
-| Setting | Value |
-|---|---|
-| Dataset | Full original FB15K |
-| Entities / relations | 14,951 / 1,345 |
-| Train / validation / test triples | 483,142 / 50,000 / 59,071 |
-| Graph | Training edges plus inverses: 966,284 edges, 2,690 message relation types |
-| Seed / subset | 0 / no subset |
-| Real embedding width / complex dimension | 64 / 32 |
-| RGAT | Two layers, one head, no basis decomposition, dropout 0.2 |
-| Activation | ReLU + dropout after L1; no added activation after L2 |
-| Optimizer | Adam, lr 0.001, weight decay 0.00001, gradient clipping 1.0 |
-| Negative sampling | 10 per positive; equal probability of corrupting head/tail |
-| Negative filtering | Reject unchanged and known training triples; no held-out labels |
-| Objective | Mean positive BCE plus mean negative BCE, unchanged |
-| Epochs / warmup | 100 / 0 |
-| Effective positive batch size | 32,768 |
-| Scoring micro-batch size | 4,096 |
-| Accumulation steps | 8 per full effective batch |
-| Updates per epoch | 15: fourteen full batches and one final batch of 24,390 |
-| Total updates | 1,500 |
-| Validation | Full validation set every 5 epochs (20 evaluations) |
-| Evaluation batch size | 512 |
-| Selection | Earliest best scheduled validation filtered MRR |
-| Test | Selected checkpoint, after all 100 epochs |
-| Precision / determinism | Float32 / strict deterministic algorithms |
-| Early stopping / scheduler / AMP | Disabled |
-| Checkpoints | Atomic last.pt every epoch; best.pt on validation improvement |
+## Current experiment
 
-## Run in Colab
+Full FB15K (14,951 entities, 1,345 relations; 483,142/50,000/59,071 splits).
+Seed 0, width 64 (32 complex dimensions), two RGAT layers, one head, dropout 0.2.
+300 epochs, no warmup, 10 negatives, effective batch 32,768, micro-batch 4,096,
+8 accumulation steps: 15 updates per epoch, 4,500 total. The last batch has 24,390
+positives and six micro-batches. Budgets are calculated from the YAML settings.
+Adam lr 0.001, weight decay 0.00001, clipping 1.0, float32, strict determinism.
+Validation every 5 epochs and at the final epoch. Best validation MRR selects the
+checkpoint evaluated on test. `last.pt` saves every epoch; `best.pt` on improvement.
+No scheduler, early stopping, text or pretrained weights.
 
-Open `notebooks/fb15k_baseline_300.ipynb` and select a GPU runtime. Push the code to
-main before running; the notebook fetches main and records its resolved commit.
-Sections1–4 configure the environment, verify the fixed YAML/runner settings,
-download/validate FB15K, and optionally run offline checks. Section5 launches one
-training child. It does not run preliminary smoke training or load RoBERTa.
+`runtime.disable_native_jit: true` sets `TORCH_DISABLE_NATIVE_JIT=1` before the
+training subprocess imports torch, bypassing the previously failing native Triton
+path. The backend setting is included in checkpoint numerical identity. The switch
+is an environment-dependent workaround; local CPU checks do not certify GPU success.
 
-Persistent root:
-`MyDrive/Research/fb15k_baseline_300/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4_run1/`.
-The child directory is `runs/baseline_seed0`; the manifest is in `runs/`.
-Data lives separately from FB15k-237 under the shared cache's `data/fb15k/`.
-Set a fresh RUN_TAG for a different source/configuration, not for resuming a run.
+## Workflow
 
-The loader uses the [RotatE repository's FB15K TSV files](https://github.com/DeepGraphLearning/KnowledgeGraphEmbedding/tree/master/data/FB15k).
-All three splits are downloaded to staging and their counts validated before
-publication. An existing partial directory is rejected without overwriting it.
-You can instead place train.txt,valid.txt,test.txt in the configured raw directory,
-using head-tab-relation-tab-tail format. There is no synthetic research fallback.
-Deterministic train-first ID mapping, dataset fingerprints, all-entity candidates,
-train-only graph construction and split-leakage checks are retained.
+1. Change training values under `config` in root `baseline_config.yaml`.
+2. Change `run.tag` for a new experiment and update the descriptive `protocol` name.
+3. Commit and push code and YAML to main.
+4. Open the same notebook in Colab. Start a fresh Python session after code changes,
+   then run sections 1-4 to fetch/install/verify. Section 5 launches training.
+5. Results and plots use the saved run settings, not hardcoded epoch counts.
 
-## Local GPU command
+The notebook forwards `--config` to the runner. Training writes a configuration
+snapshot alongside the run. Dataset location is overridden to persistent Drive.
+Output tags separate experiments; no existing 100-epoch output is overwritten.
+This 300-epoch study starts from scratch, not from the completed 100-epoch weights.
+To resume an interrupted run, retain its tag, config, backend, packages and original
+source commit (`REPO_REF` may be set to that recorded SHA). Fetching changed main
+is for a new experiment, not a way to bypass strict resume identity.
 
 ```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4 --resume --skip-completed
+python run_baseline_fb15k.py --config baseline_config.yaml --output-dir experiments/research/fb15k_300_v5 --resume --skip-completed
+python run_baseline_fb15k.py --report-only --output-dir experiments/research/fb15k_300_v5
 ```
 
-Use `--raw-dir /path/to/fb15k` to select existing data. The approved settings are
-fixed by `training/baseline_fb15k.py` and checked against the YAML in Colab;
-changing YAML alone does not alter training. The GPU requirement fails loudly
-instead of silently starting CPU training.
+Report-only validates saved settings and can regenerate earlier 100-epoch reports.
+The historical notebook filename is retained. Other FB15k-237 comparisons are
+unchanged and must not be directly compared with these FB15K metrics.
 
-## Progress, interruption and results
+## Completed 100-epoch evidence
 
-Every epoch prints loss, updates, elapsed time and allocated/reserved GPU peaks;
-every fifth epoch also prints validation MRR/Hits@10. Step losses and weighted
-epoch loss are saved. Notebook section6 displays committed progress even after
-an interruption. It does not label partial histories as final test results.
-
-Resume verifies source, settings, dataset, environment and numerical identity,
-then restores the same model, optimizer, all RNG/sampler/shuffle state and progress.
-An uncommitted epoch replays. If main changed, set REPO_REF to the recorded original
-commit for resume. Earlier FB15k-237 checkpoints cannot initialize this run.
-
-The child saves config/manifest,history.json/history.csv,steps.csv,metrics.csv,
-last.pt,best.pt and results.json. The study root adds summary.json,epochs.csv,
-steps.csv,metrics.csv,research_analysis.md and four PNG/PDF figures: epoch loss,
-step loss,validation metrics and GPU memory. Report-only is CPU-capable and loads
-saved JSON, not model checkpoints:
-
-```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4 --report-only
-```
-
-## Gradient accumulation
-
-Each effective batch samples its negatives in the original order and computes
-one RGAT encoding. Scoring runs on micro-batches, each weighted by
-`micro_positive_count / actual_effective_positive_count`. Gradients accumulate
-on detached entity/relation output leaves; their combined gradients then flow
-through the original encoder once. This retains one dropout realization for the
-effective batch and avoids eight repeated full-graph encodings. Only clipping
-and Adam follow this combined backward, once per effective batch.
-
-The last update contains 24,390 positives: five micro-batches of 4,096 plus one
-of 3,910. It uses six micro-batches, not eight; it is not divided by eight or
-discarded. Per epoch there are 118 scoring micro-batches but still only 15
-optimizer steps; across 100 epochs there are 11,800 micro-batches and 1,500
-updates. Logs/step CSVs record micro-batch counts. Resume is at an epoch boundary,
-so no partially accumulated gradients are checkpointed; uncommitted work replays.
-
-This reduces scoring activation memory while retaining full-graph activations.
-It is not a graph mini-batching or activation-checkpointing implementation.
-Floating-point summation order changes, so gradient equivalence is numerical,
-not a promise of bitwise identity with the earlier non-accumulated run. Use the
-new protocol/tag instead of resuming an old checkpoint with changed settings.
-
-## Interpretation and verification limits
-
-This uses the requested dimension/negative/epoch increases while keeping the RGAT
-architecture and existing optimization objective. It is not the original pure
-ComplEx experiment and does not guarantee the paper's scores. FB15K results must
-not be compared directly with FB15k-237 results. Seed0 alone supports no
-across-seed stability or statistical significance claim.
-
-Graph encoding runs once per optimizer update. GPU capacity and runtime must be
-measured; 95.6GB VRAM is not proof the full RGAT computation fits. CPU negative
-sampling and checkpoint I/O also contribute to runtime. The code never silently
-changes batch size, precision or epoch budget after OOM. Preserve checkpoints if
-the compute-unit budget is exhausted; do not claim an unmeasured completion time.
-
-Implementation verification: offline fixture-based loader/mapping checks, wrong
-dataset/budget rejection, mocked CLI/notebook execution, report generation, plus
-the existing architecture/scoring/checkpoint/RNG tests. No optimizer updates or
-GPU training were launched. Actual full FB15K download and GPU memory/runtime
-remain unverified locally; the notebook validates real data before training.
-
-Accumulation verification (2026-10-19): `python run_static_checks.py` ran31
-checks:30 passed,1 existing FB15k-237 audit skipped because local files were
-unreadable. CPU float64 derivative checks compare full-batch and micro-batched
-losses/parameter gradients for full and partial windows with dropout enabled,
-and verify one encoding, matching RNG consumption and no parameter updates.
-This verifies the accumulation equations, not CUDA peak-memory savings or
-bitwise equality between the old and new training runs.
-
-The historical `_300` filenames are retained for existing notebook links; the active settings are now 100 epochs and validation/checkpoint selection every 5 epochs. `best.pt` saves only on validation improvement; `last.pt` still saves every epoch for resume. Use the new `fb15k_baseline_100_seed0_dim64_accum8_eval5_v4_run1` tag for this changed protocol.
+The user-supplied Colab log completed with return code 0. Best epoch: 100;
+validation MRR 0.18495816, Hits@10 0.34463999; test MRR 0.18612306,
+Hits@10 0.34420446. Training loss 0.170458; elapsed training/validation 7,224.3s.
+These are observed 100-epoch results, not predictions for the new 300-epoch run.

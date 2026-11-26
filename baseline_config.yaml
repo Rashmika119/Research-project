@@ -1,16 +1,10 @@
-protocol: fb15k_rgat_complex_dim64_neg10_100_seed0_dim64_accum8_eval5_v4
+protocol: fb15k_rgat_complex_dim64_neg10_300_seed0_nativejitoff_v5
 description: Existing RGAT + ComplEx baseline on full FB15K; no text
-counts:
-  entities: 14951
-  relations: 1345
-  train_triples: 483142
-  valid_triples: 50000
-  test_triples: 59071
 config:
   dataset: fb15k
   variant: baseline
   max_entities: 0
-  epochs: 100
+  epochs: 300
   warmup: 0
   seed: 0
   subset_seed: 0
@@ -39,16 +33,7 @@ config:
   deterministic: true
   selection_policy: scheduled_only
   record_step_losses: true
-budget:
-  steps_per_epoch: 15
-  optimizer_steps: 1500
-  baseline_optimizer_steps: 1500
-  structural_optimizer_steps: 0
-  integrated_optimizer_steps: 0
-  last_batch_size: 24390
-optimizer: Adam
-precision: float32
-early_stopping: false
-scheduler: null
-gradient_accumulation: true
-activation_checkpointing: false
+runtime:
+  disable_native_jit: true
+run:
+  tag: fb15k_baseline_300_seed0_dim64_nativejitoff_v5_run1

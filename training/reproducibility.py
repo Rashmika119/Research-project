@@ -7,7 +7,8 @@ import torch
 
 
 def numerical_policy():
-    return {'deterministic_algorithms': torch.are_deterministic_algorithms_enabled(),
+    return {'native_jit_disabled': os.environ.get('TORCH_DISABLE_NATIVE_JIT', '0') == '1',
+            'deterministic_algorithms': torch.are_deterministic_algorithms_enabled(),
             'deterministic_warn_only': torch.is_deterministic_algorithms_warn_only_enabled(),
             'cudnn_deterministic': torch.backends.cudnn.deterministic,
             'cudnn_benchmark': torch.backends.cudnn.benchmark,

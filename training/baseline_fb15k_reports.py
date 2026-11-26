@@ -1,10 +1,10 @@
 """Single-baseline reports from completed FB15K histories; no evaluation/training."""
-from dataclasses import asdict
 import math
 from pathlib import Path
 import statistics
 
-from training.baseline_fb15k import PROTOCOL, COUNTS, make_config, expected_budget
+from training.baseline_fb15k import COUNTS, validate_config, expected_budget
+from training.research_pipeline import ExperimentConfig
 from training.experiment_io import write_json
 from training.reports import METRICS, write_csv
 
@@ -13,13 +13,18 @@ PLOTS = ('training_loss', 'optimizer_step_loss', 'validation_metrics', 'gpu_memo
 
 def validate_result(r):
     cfg = r['settings']
-    if cfg != asdict(make_config(cfg['raw_dir'])):
-        raise ValueError('Result settings differ from the approved FB15K baseline')
+    config = validate_config(ExperimentConfig(**cfg))
+    budget = expected_budget(config)
+    steps_per_epoch = budget['steps_per_epoch']
+    batch = config.train_batch_size or COUNTS[2]
+    sizes = [batch] * (steps_per_epoch - 1) + [budget['last_batch_size']]
+    micro = config.micro_batch_size or batch
+    micros = [(n + micro - 1) // micro for n in sizes]
     if (r['status'] != 'complete' or r['configuration'] != 'baseline'
             or r['architecture'] != 'baseline' or r['initialization'] != 'scratch'
             or r['baseline_checkpoint_used'] or r['dataset_scope'] != 'full'
             or r['candidate_entities'] != COUNTS[0] or r['ranking_policy'] != 'average_exact_ties'
-            or r['final_epoch'] != 100 or r['warmup_epochs'] != 0 or r['main_epochs'] != 100):
+            or r['final_epoch'] != config.epochs or r['warmup_epochs'] != 0 or r['main_epochs'] != config.epochs):
         raise ValueError('Expected a completed scratch FB15K baseline')
     actual = tuple(r['subset_statistics'][k] for k in
                    ('entities', 'relations', 'train_triples', 'valid_triples', 'test_triples'))
@@ -28,25 +33,25 @@ def validate_result(r):
     if any(r[k] is not None for k in ('lm_identity', 'text_cache_keys', 'initial_projection_sha256',
                                      'initial_validation', 'initial_validation_epoch')) or r['learned_gates']:
         raise ValueError('Baseline must not use text, gates or integrated validation')
-    for k, v in expected_budget().items():
+    for k, v in budget.items():
         if k != 'last_batch_size' and r[k] != v:
             raise ValueError('Wrong update budget: ' + k)
     history = r['history']
-    if [h['epoch'] for h in history] != list(range(1, 101)):
+    if [h['epoch'] for h in history] != list(range(1, config.epochs + 1)):
         raise ValueError('Incomplete epoch history')
     for h in history:
         epoch = h['epoch']
         steps = h['step_losses']
-        if (h['phase'] != 'main' or h['optimizer_steps'] != epoch*15
-                or [s['optimizer_step'] for s in steps] != list(range((epoch-1)*15+1, epoch*15+1))
-                or [s['positive_count'] for s in steps] != [32768]*14+[24390]
-                or [s.get('micro_batches') for s in steps] != [8]*14+[6]
+        if (h['phase'] != 'main' or h['optimizer_steps'] != epoch*steps_per_epoch
+                or [s['optimizer_step'] for s in steps] != list(range((epoch-1)*steps_per_epoch+1, epoch*steps_per_epoch+1))
+                or [s['positive_count'] for s in steps] != sizes
+                or [s.get('micro_batches') for s in steps] != micros
                 or any(not math.isfinite(s['loss']) for s in steps)
                 or not math.isclose(h['loss'], statistics.mean(s['loss'] for s in steps), rel_tol=1e-10, abs_tol=1e-10)
                 or not math.isclose(h['example_weighted_loss'], sum(s['loss']*s['positive_count'] for s in steps)/COUNTS[2], rel_tol=1e-10, abs_tol=1e-10)):
             raise ValueError('Incorrect epoch/step/loss budget')
-        if ('validation' in h) != (epoch % 5 == 0):
-            raise ValueError('Expected validation every 5 epochs')
+        if ('validation' in h) != (epoch % config.eval_every == 0 or epoch == config.epochs):
+            raise ValueError('Incorrect validation schedule')
         if 'validation' in h and h['validation_model'] != 'baseline':
             raise ValueError('Incorrect validation model')
     eligible = [h for h in history if 'validation' in h]
@@ -57,7 +62,7 @@ def validate_result(r):
     if r['best_epoch'] != best['epoch'] or r['validation'] != best['validation']:
         raise ValueError('Expected earliest best scheduled validation checkpoint')
     if r['final_epoch_validation'] != history[-1]['validation']:
-        raise ValueError('Final validation is not epoch 100')
+        raise ValueError('Final validation does not match final epoch')
     if not r['environment'].get('source_sha256') or not r.get('manifest_sha256') or not r.get('dataset_sha256'):
         raise ValueError('Missing source/dataset identity')
     if r['numerical_policy'].get('deterministic_algorithms') is not True:
@@ -71,14 +76,19 @@ def baseline_report(directory, result):
     validate_result(result)
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
-    summary = {'protocol': PROTOCOL, 'model': 'RGAT + ComplEx', 'dataset': 'FB15K',
-               'seed': 0, 'complex_dimension': 32, 'real_width': 64,
+    cfg = ExperimentConfig(**result['settings'])
+    budget = expected_budget(cfg)
+    batch = cfg.train_batch_size or COUNTS[2]
+    micro = cfg.micro_batch_size or batch
+    summary = {'protocol': 'saved_fb15k_baseline_settings', 'settings': result['settings'], 'model': 'RGAT + ComplEx', 'dataset': 'FB15K',
+               'seed': 0, 'complex_dimension': cfg.model['dim']//2, 'real_width': cfg.model['dim'],
                **{k: result[k] for k in ('best_epoch', 'final_epoch', 'validation', 'test',
                    'duration_seconds', 'peak_gpu_memory_bytes', 'peak_gpu_reserved_bytes',
                    'architecture_diagnostics', 'manifest_sha256', 'dataset_sha256', 'environment')},
-               'budget': expected_budget(),
-               'batching': {'effective_batch_size': 32768, 'micro_batch_size': 4096,
-                            'accumulation_steps': 8, 'micro_batches_per_epoch': 118},
+               'budget': budget,
+               'batching': {'effective_batch_size': batch, 'micro_batch_size': micro,
+                            'accumulation_steps': cfg.accumulation_steps,
+                            'micro_batches_per_epoch': (budget['steps_per_epoch']-1)*((batch+micro-1)//micro) + (budget['last_batch_size']+micro-1)//micro},
                'interpretation': 'One seed; no across-seed SD or significance claim. '
                'Existing two-layer RGAT + ComplEx, not pure ComplEx paper reproduction. '
                'Selected using validation only; test evaluated at the selected checkpoint.'}
@@ -93,10 +103,10 @@ def baseline_report(directory, result):
         '# FB15K RGAT + ComplEx baseline\n\n'+summary['interpretation']+'\n\n'
         f"Best epoch: {result['best_epoch']}; validation MRR: {result['validation']['MRR']:.6f}; "
         f"test MRR: {result['test']['MRR']:.6f}.\n\n"
-        '100 epochs, 15 updates/epoch, 1,500 updates; width64, 10 negatives. '
-        'Effective batch32768, micro-batch4096, up to8 micro-batches/update. '
-        'Final update:24390 positives in6 micro-batches, weighted by actual example counts. '
-        'No warmup, text, scheduler or early stopping. Adam lr0.001. '
+        f"{cfg.epochs} epochs, {budget['steps_per_epoch']} updates/epoch, {budget['optimizer_steps']} updates; "
+        f"width{cfg.model['dim']}, {cfg.num_negatives} negatives. "
+        f"Effective batch{batch}, micro-batch{micro}, accumulation{cfg.accumulation_steps}. "
+        f"No warmup, text, scheduler or early stopping. Adam lr{cfg.lr}. "
         'Dataset differs from the previous FB15k-237 comparison; scores cannot be directly compared.\n',
         encoding='utf-8')
     plot_results(root, result)

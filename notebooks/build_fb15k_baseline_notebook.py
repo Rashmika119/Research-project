@@ -12,21 +12,33 @@ def notebook():
     def code(source):
         cells.append({'cell_type':'code', 'metadata':{}, 'source':source.strip()+'\n',
                       'outputs':[], 'execution_count':None})
-    markdown('''# FB15K baseline: RGAT + ComplEx
-Existing two-layer baseline, seed0, width64 (32 complex dimensions), 10 negatives,
-100 epochs, no warmup. Effective batch32768 = micro4096 × 8: 15 updates/epoch, 1500 total.
-Validation every5 epochs; select by validation MRR and test only the best checkpoint.
-This is not pure ComplEx paper reproduction. No RoBERTa/text is loaded.
-Only section5 launches training. Full GPU memory/runtime capacity must be measured.
+    markdown('''# FB15K baseline: YAML-configured RGAT + ComplEx
+This notebook fetches main and reads `baseline_config.yaml` from the repository root.
+Edit and push that YAML to change epochs, dimensions, batching, validation interval,
+backend setting and run tag. The default study is 300 epochs, width64, seed0.
+Only section5 launches training. No RoBERTa/text is loaded.
+A changed budget starts a new scratch run; it does not extend the completed 100-epoch run.
 ''')
     markdown('## 1. GPU runtime')
     code(RUNTIME_SETUP.replace('T4 GPU','GPU').replace('both runs','resumed sessions'))
     markdown('## 2. Fetch main, mount Drive and install dependencies')
     setup = REPOSITORY_SETUP.replace('baseline_shared_c_100', 'fb15k_baseline_300')
-    setup = setup.replace('fb15k_baseline_300_seed0_v1_run1', 'fb15k_baseline_100_seed0_dim64_accum8_eval5_v4_run1')
     setup = setup.replace('run_final_comparison.py', 'run_baseline_fb15k.py')
-    setup = '\n'.join(line for line in setup.splitlines() if 'RESEARCH_MODEL_BACKUP' not in line
+    setup = '\n'.join(line for line in setup.splitlines()
+                      if not line.startswith(('RUN_TAG =', 'RUN_ROOT =', 'RUN_ROOT.mkdir'))
+                      and 'RESEARCH_MODEL_BACKUP' not in line
                       and 'Verified weights load locally' not in line)
+    setup = setup.replace("LOCK = RUN_ROOT / 'dependencies.txt'", '''# Read the freshly fetched YAML before choosing the persistent run folder.
+subprocess.run([sys.executable, '-m', 'pip', 'install', 'pyyaml'], check=True)
+import yaml
+CONFIG_PATH = REPO_DIR / 'baseline_config.yaml'
+protocol = yaml.safe_load(CONFIG_PATH.read_text(encoding='utf-8'))
+RUN_TAG = protocol['run']['tag']
+assert RUN_TAG not in ('.', '..') and '/' not in RUN_TAG and chr(92) not in RUN_TAG
+RUN_ROOT = STAGE_ROOT / RUN_TAG
+RUN_ROOT.mkdir(parents=True, exist_ok=True)
+LOCK = RUN_ROOT / 'dependencies.txt'
+''')
     code(setup)
     markdown('## 3. Approved configuration and full dataset verification')
     code('''import json
@@ -34,7 +46,7 @@ import yaml
 import pandas as pd
 from datetime import datetime
 from IPython.display import display, Image, Markdown
-from training.baseline_fb15k import PROTOCOL, make_config, expected_budget, verify_protocol, verify_manifest
+from training.baseline_fb15k import make_config, expected_budget, verify_protocol, verify_manifest
 from training.experiment_io import prepare_data, write_json, environment
 from training.process import run_logged
 
@@ -46,14 +58,16 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 SKIP_COMPLETED = True
 RESUME_INTERRUPTED = True
 RUN_STATIC_CHECKS = False
-protocol = yaml.safe_load(Path('experiments/configs/fb15k_baseline_300.yaml').read_text(encoding='utf-8'))
-verify_protocol(protocol, make_config())
-cfg = make_config(RAW_DIR)
+protocol = yaml.safe_load(CONFIG_PATH.read_text(encoding='utf-8'))
+cfg = make_config(RAW_DIR, CONFIG_PATH)
+verify_protocol(protocol, cfg)
+print('Fetched configuration:', CONFIG_PATH, protocol)
+write_json(LOG_DIR/'requested_configuration.json', protocol)
 display(pd.DataFrame([{'dataset':'FB15K', 'model':'RGAT + ComplEx', 'seed':0,
                       'width':cfg.model['dim'], 'negatives':cfg.num_negatives,
                       'epochs':cfg.epochs, 'warmup':cfg.warmup,
                       'effective_batch':cfg.train_batch_size, 'micro_batch':cfg.micro_batch_size,
-                      'accumulation_steps':cfg.accumulation_steps, **expected_budget()}]))
+                      'accumulation_steps':cfg.accumulation_steps, **expected_budget(cfg)}]))
 data, graph, known_train, manifest = prepare_data(str(RAW_DIR),0,0,MANIFEST,dataset='fb15k')
 verify_manifest(manifest)
 assert len(graph.edge_type) == 966284
@@ -74,9 +88,10 @@ else:
     print('Optional checks disabled. No preliminary training is launched.')
 ''')
     markdown('''## 5. Train the existing baseline
-Runs one child process. Logs every epoch; validation at5,10,...,100.
-Effective batch32768 uses8 scoring micro-batches of4096 and one RGAT encoding.
-The final24390 examples use6 micro-batches (5×4096 +3910), weighted by their sizes.
+Runs one child process using `--config baseline_config.yaml`. Logs every epoch.
+Validation and total epochs come from YAML; final-epoch validation also runs.
+Scoring micro-batches use YAML sizes and one RGAT encoding per optimizer update.
+Partial final batches are weighted by actual example counts.
 Clipping and Adam run once per effective batch. Full-graph activations still remain resident.
 Each completed epoch commits last.pt; best validation saves best.pt.
 Resume uses the same tag, source, settings and runtime. If main changes, set
@@ -85,7 +100,8 @@ No automatic batch-size, precision or epoch-budget changes on OOM.
 Your compute-unit balance is not a runtime guarantee: use observed epoch timings.
 ''')
     code('''command = [sys.executable,'-u','run_baseline_fb15k.py',
-           '--output-dir',str(EXPERIMENT_DIR),'--raw-dir',str(RAW_DIR)]
+           '--output-dir',str(EXPERIMENT_DIR),'--raw-dir',str(RAW_DIR),
+           '--config',str(CONFIG_PATH)]
 if SKIP_COMPLETED: command.append('--skip-completed')
 if RESUME_INTERRUPTED: command.append('--resume')
 run_logged(command,LOG_DIR/'baseline_training.log')
@@ -98,7 +114,11 @@ if history_path.exists():
     display(pd.DataFrame([{k:v for k,v in h.items() if k not in ('step_losses','validation','learned_gates')}
                           for h in history]).tail(10))
     if history:
-        print('Committed progress:', history[-1]['epoch'], '/ 100 epochs;', history[-1]['optimizer_steps'], '/ 1500 updates')
+        saved_settings = json.loads((EXPERIMENT_DIR/'baseline_seed0/config.json').read_text(encoding='utf-8'))['config']
+        from training.research_pipeline import ExperimentConfig
+        saved_budget = expected_budget(ExperimentConfig(**saved_settings))
+        print('Committed progress:', history[-1]['epoch'], '/', saved_settings['epochs'], 'epochs;',
+              history[-1]['optimizer_steps'], '/', saved_budget['optimizer_steps'], 'updates')
 if (EXPERIMENT_DIR/'summary.json').exists():
     display(pd.read_csv(EXPERIMENT_DIR/'metrics.csv'))
     display(Markdown((EXPERIMENT_DIR/'research_analysis.md').read_text(encoding='utf-8')))

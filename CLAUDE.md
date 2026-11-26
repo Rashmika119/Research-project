@@ -2,19 +2,22 @@
 
 ## Latest approved experiment: FB15K baseline
 
+Root YAML is authoritative; do not duplicate numeric settings in notebook/runner.
+Set native-JIT policy before torch import and include it in resume identity.
+Reports must use saved settings, including older 100-epoch runs.
 The user approved docs/FB15K_BASELINE_300.md and
-experiments/configs/fb15k_baseline_300.yaml. Use run_baseline_fb15k.py and
+baseline_config.yaml. Use run_baseline_fb15k.py and
 notebooks/fb15k_baseline_300.ipynb for this baseline-only study. Keep the existing
 RGAT + ComplEx class: seed0, width64 (complex32), 2 layers, 1 head, dropout.2,
-10 negatives, 100 epochs, warmup0, effective batch32768, micro4096, accumulation8
+10 negatives, 300 epochs, warmup0, effective batch32768, micro4096, accumulation8
 (15 updates/epoch, last24390 in six micro-batches:5*4096+3910),
-1500 updates total. Validate every5 epochs with eval batch512. Adam lr.001,
+4500 updates total. Validate every5 epochs with eval batch512. Adam lr.001,
 weight decay.00001, clip1, float32, strict determinism; no scheduler/early stopping.
 Full original FB15K counts:14951 entities,1345 relations,483142/50000/59071 splits.
 Accumulate example-weighted scoring gradients on detached encoder-output leaves,
 then backpropagate once through the same RGAT encoding/dropout realization. Clip
 and update Adam once per effective batch. Keep full-graph activations resident;
-do not claim graph-memory reduction. Protocol/run tag is dim64_accum8_eval5_v4; reject old
+do not claim graph-memory reduction. Protocol/run tag is dim64_nativejitoff_v5; reject old
 checkpoint identities. No extra optimizer updates for micro-batches.
 Explicit dataset identity must reject FB15k-237. No LM/text downloads for this run.
 Use the new output root/tag; fetch main and record the resolved commit. Do not

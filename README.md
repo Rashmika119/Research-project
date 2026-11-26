@@ -1,18 +1,23 @@
 # KG-only baseline versus Shared C gated
 
-## New: FB15K baseline, 100 epochs
+## New: FB15K baseline, 300 epochs
+
+Edit root `baseline_config.yaml`, push to main, and reuse the same notebook.
+The runner reads YAML directly; budgets and plots derive from saved settings.
+Native JIT is disabled before torch imports via the YAML runtime setting.
+The new 300-epoch run starts from scratch and preserves the old results.
 
 For the latest baseline experiment, open
 [fb15k_baseline_300.ipynb](notebooks/fb15k_baseline_300.ipynb).
 It fetches **main** and runs only the existing RGAT + ComplEx baseline:
 full **FB15K**, seed **0**, width **64** (32 complex dimensions), **10 negatives**,
-**100 epochs**, no warmup, effective batch **32,768** = **4,096 × 8** micro-batches,
-**15 updates/epoch** (1,500 total),
+**300 epochs**, no warmup, effective batch **32,768** = **4,096 × 8** micro-batches,
+**15 updates/epoch** (4,500 total),
 validation every **5 epochs**, evaluation batch **512**, Adam lr **0.001**.
 The model architecture and BCE/sampling equations are unchanged.
 Micro-batched scoring shares one RGAT encoding per update. The final smaller
 batch is weighted by actual example counts. This reduces scoring memory, not
-the memory needed for full-graph RGAT activations. Use the new `dim64_accum8_eval5_v4` run tag;
+the memory needed for full-graph RGAT activations. Use the new `dim64_nativejitoff_v5` run tag;
 old-run checkpoints require their original source/settings.
 
 Run notebook sections 1–4 for setup and verification; **section 5 starts training**.
@@ -20,12 +25,12 @@ Commit and push these changes to main first. Results/checkpoints persist in the
 new `Research/fb15k_baseline_300/` Drive folder. No RoBERTa weights are downloaded.
 
 ```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4 --resume --skip-completed
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_100_seed0_dim64_accum8_eval5_v4 --report-only
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_dim64_nativejitoff_v5 --resume --skip-completed
+python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_dim64_nativejitoff_v5 --report-only
 ```
 
 See [the FB15K guide](docs/FB15K_BASELINE_300.md) and
-[configuration](experiments/configs/fb15k_baseline_300.yaml). This is a separate
+[configuration](baseline_config.yaml). This is a separate
 baseline study; the FB15k-237 two-model comparison below retains its settings.
 Scores from the two datasets must not be directly compared.
 

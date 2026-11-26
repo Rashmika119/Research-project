@@ -37,10 +37,10 @@ def manifest_fixture():
 def result_fixture():
     r = fixtures()[0]
     r.update(settings=asdict(make_config()), candidate_entities=14951,
-             final_epoch=100, main_epochs=100, best_epoch=70,
+             final_epoch=300, main_epochs=300, best_epoch=70,
              subset_statistics=manifest_fixture()['statistics'], **{k:v for k,v in expected_budget().items() if k!='last_batch_size'})
     history = []
-    for e in range(1,101):
+    for e in range(1,301):
         row = {'epoch':e, 'phase':'main', 'loss':1.5-e*.001, 'example_weighted_loss':1.5-e*.001,
                'optimizer_steps':15*e, 'train_seconds':1., 'epoch_seconds':2., 'learned_gates':{},
                'peak_gpu_memory_bytes':2**30, 'peak_gpu_reserved_bytes':2**31,
@@ -88,10 +88,10 @@ class FB15KTests(unittest.TestCase):
 
     def test_protocol_and_dataset_identity(self):
         cfg = make_config()
-        protocol = yaml.safe_load((ROOT/'experiments/configs/fb15k_baseline_300.yaml').read_text(encoding='utf-8'))
+        protocol = yaml.safe_load((ROOT/'baseline_config.yaml').read_text(encoding='utf-8'))
         verify_protocol(protocol,cfg)
         self.assertEqual((cfg.dataset,cfg.model['dim'],cfg.num_negatives,cfg.epochs,cfg.warmup,cfg.seed),
-                         ('fb15k',64,10,100,0,0))
+                         ('fb15k',64,10,300,0,0))
         self.assertEqual(divmod(COUNTS[2],cfg.train_batch_size),(14,24390))
         self.assertEqual((cfg.micro_batch_size, cfg.accumulation_steps), (4096, 8))
         verify_manifest(manifest_fixture())
@@ -101,6 +101,66 @@ class FB15KTests(unittest.TestCase):
         with self.assertRaises(ValueError):verify_protocol(protocol,cfg)
         cfg.variant='shared-c-gated'
         with self.assertRaises(ValueError):cfg.validate()
+
+    def test_yaml_changes_drive_config_and_budget(self):
+        from training.baseline_config import load_protocol
+        protocol = load_protocol()
+        protocol['config'].update(epochs=7, eval_every=3, train_batch_size=8192,
+                                  micro_batch_size=2048, accumulation_steps=4)
+        protocol['config']['model']['dim'] = 48
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'custom.yaml'
+            path.write_text(yaml.safe_dump(protocol))
+            cfg = make_config('custom_data', path)
+            self.assertEqual((cfg.epochs, cfg.eval_every, cfg.model['dim']), (7,3,48))
+            self.assertEqual(cfg.raw_dir, 'custom_data')
+            self.assertEqual(expected_budget(cfg)['steps_per_epoch'], 59)
+            self.assertEqual(expected_budget(cfg)['optimizer_steps'], 413)
+            verify_protocol(protocol, cfg)
+            protocol['config']['accumulation_steps'] = 8
+            path.write_text(yaml.safe_dump(protocol))
+            with self.assertRaises(ValueError): make_config(config_path=path)
+
+    def test_previous_100_epoch_report_uses_saved_settings(self):
+        r = result_fixture()
+        r['settings']['epochs'] = 100
+        r.update(final_epoch=100, main_epochs=100, optimizer_steps=1500,
+                 baseline_optimizer_steps=1500)
+        r['history'] = r['history'][:100]
+        r['final_epoch_validation'] = r['history'][-1]['validation']
+        r['final_training_loss'] = r['history'][-1]['loss']
+        validate_result(r)
+        with tempfile.TemporaryDirectory() as directory, patch('training.baseline_fb15k_reports.plot_results'):
+            summary = baseline_report(directory, r)
+            self.assertEqual(summary['budget']['optimizer_steps'], 1500)
+            self.assertIn('100 epochs', (Path(directory)/'research_analysis.md').read_text())
+
+    def test_launcher_sets_backend_before_torch_import(self):
+        from training.baseline_config import load_protocol
+        protocol = load_protocol()
+        script = """import os, sys, types, runpy
+fake = types.ModuleType('training.baseline_fb15k')
+def main():
+    assert 'torch' not in sys.modules
+    print(os.environ['TORCH_DISABLE_NATIVE_JIT'])
+fake.main = main
+sys.modules['training.baseline_fb15k'] = fake
+sys.argv = ['run_baseline_fb15k.py', '--config', sys.argv[1]]
+runpy.run_path('run_baseline_fb15k.py', run_name='__main__')
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'runtime.yaml'
+            for enabled in (True, False):
+                protocol['runtime']['disable_native_jit'] = enabled
+                path.write_text(yaml.safe_dump(protocol))
+                result = subprocess.run([sys.executable, '-c', script, str(path)],
+                                        cwd=ROOT, capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout.strip(), '1' if enabled else '0')
+        from training.reproducibility import numerical_policy
+        with patch.dict(os.environ, {'TORCH_DISABLE_NATIVE_JIT':'1'}):
+            enabled_policy = numerical_policy()
+        with patch.dict(os.environ, {'TORCH_DISABLE_NATIVE_JIT':'0'}):
+            self.assertNotEqual(enabled_policy, numerical_policy())
 
     def test_loader_staging_mapping_rejection_and_no_fallback(self):
         content={'train.txt':'a\tr\tb\nb\tr\tc\n','valid.txt':'a\tr\tc\n','test.txt':'c\tr\ta\n'}
@@ -134,7 +194,7 @@ class FB15KTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             summary=baseline_report(directory,r)
             self.assertEqual(summary['best_epoch'],70)
-            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),1501)
+            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),4501)
             for p in PLOTS:
                 for ext in ('png','pdf'):self.assertGreater((Path(directory)/f'{p}.{ext}').stat().st_size,1000)
         mutations=[lambda r:r.update(best_epoch=75),lambda r:r['settings'].update(dataset='fb15k237'),
