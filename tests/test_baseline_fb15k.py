@@ -39,14 +39,17 @@ def result_fixture():
     r.update(settings=asdict(make_config()), candidate_entities=14951,
              final_epoch=300, main_epochs=300, best_epoch=70,
              subset_statistics=manifest_fixture()['statistics'], **{k:v for k,v in expected_budget().items() if k!='last_batch_size'})
+    cfg = make_config()
+    budget = expected_budget(cfg)
+    steps = budget['steps_per_epoch']
     history = []
-    for e in range(1,301):
+    for e in range(1,cfg.epochs+1):
         row = {'epoch':e, 'phase':'main', 'loss':1.5-e*.001, 'example_weighted_loss':1.5-e*.001,
-               'optimizer_steps':15*e, 'train_seconds':1., 'epoch_seconds':2., 'learned_gates':{},
+               'optimizer_steps':steps*e, 'train_seconds':1., 'epoch_seconds':2., 'learned_gates':{},
                'peak_gpu_memory_bytes':2**30, 'peak_gpu_reserved_bytes':2**31,
-               'step_losses':[{'optimizer_step':(e-1)*15+s+1,'loss':1.5-e*.001,
-                               'positive_count':32768 if s<14 else 24390,
-                               'micro_batches':8 if s<14 else 6} for s in range(15)]}
+               'step_losses':[{'optimizer_step':(e-1)*steps+s+1,'loss':1.5-e*.001,
+                               'positive_count':cfg.train_batch_size if s<steps-1 else budget['last_batch_size'],
+                               'micro_batches':1} for s in range(steps)]}
         if e%5==0:
             row['validation'] = dict(r['validation'], MRR=.3 if e in (70,75) else .1+e*.0001)
             row['validation_model'] = 'baseline'
@@ -92,8 +95,8 @@ class FB15KTests(unittest.TestCase):
         verify_protocol(protocol,cfg)
         self.assertEqual((cfg.dataset,cfg.model['dim'],cfg.num_negatives,cfg.epochs,cfg.warmup,cfg.seed),
                          ('fb15k',64,10,300,0,0))
-        self.assertEqual(divmod(COUNTS[2],cfg.train_batch_size),(14,24390))
-        self.assertEqual((cfg.micro_batch_size, cfg.accumulation_steps), (4096, 8))
+        self.assertEqual(divmod(COUNTS[2],cfg.train_batch_size),(100,42))
+        self.assertEqual((cfg.micro_batch_size, cfg.accumulation_steps), (4831, 1))
         verify_manifest(manifest_fixture())
         bad=manifest_fixture();bad['dataset']='fb15k237'
         with self.assertRaises(ValueError):verify_manifest(bad)
@@ -102,6 +105,28 @@ class FB15KTests(unittest.TestCase):
         cfg.variant='shared-c-gated'
         from training.baseline_fb15k import validate_config
         with self.assertRaises(ValueError):validate_config(cfg)
+
+    def test_logistic_l2_formula_and_gradients(self):
+        from training.losses import logistic_loss, embedding_l2
+        pos = torch.tensor([0., 2.], dtype=torch.double, requires_grad=True)
+        neg = torch.tensor([[-1., 1.], [2., -2.]], dtype=torch.double, requires_grad=True)
+        e = torch.tensor([[1., -2.]], dtype=torch.double, requires_grad=True)
+        r = torch.tensor([[3., 4.]], dtype=torch.double, requires_grad=True)
+        objective = logistic_loss(pos, neg) + embedding_l2(e, r, .01)
+        reference = torch.nn.functional.binary_cross_entropy_with_logits(
+            torch.cat((pos, neg.flatten())), torch.tensor([1.,1.,0.,0.,0.,0.], dtype=torch.double)) + .3
+        torch.testing.assert_close(objective, reference)
+        objective.backward()
+        torch.testing.assert_close(e.grad, .02*e.detach())
+        torch.testing.assert_close(r.grad, .02*r.detach())
+        torch.testing.assert_close(pos.grad, (pos.detach().sigmoid()-1)/6)
+        torch.testing.assert_close(neg.grad, neg.detach().sigmoid()/6)
+        cfg = make_config()
+        self.assertEqual((cfg.optimizer,cfg.lr,cfg.loss,cfg.l2_coefficient,cfg.weight_decay),
+                         ('Adagrad',.5,'regularized_logistic',.01,0.))
+        self.assertEqual(expected_budget(cfg)['optimizer_steps'],30300)
+        cfg.weight_decay=.01
+        with self.assertRaises(ValueError): cfg.validate()
 
     def test_yaml_changes_drive_config_and_budget(self):
         from training.baseline_config import load_protocol
@@ -125,15 +150,15 @@ class FB15KTests(unittest.TestCase):
     def test_previous_100_epoch_report_uses_saved_settings(self):
         r = result_fixture()
         r['settings']['epochs'] = 100
-        r.update(final_epoch=100, main_epochs=100, optimizer_steps=1500,
-                 baseline_optimizer_steps=1500)
+        r.update(final_epoch=100, main_epochs=100, optimizer_steps=10100,
+                 baseline_optimizer_steps=10100)
         r['history'] = r['history'][:100]
         r['final_epoch_validation'] = r['history'][-1]['validation']
         r['final_training_loss'] = r['history'][-1]['loss']
         validate_result(r)
         with tempfile.TemporaryDirectory() as directory, patch('training.baseline_fb15k_reports.plot_results'):
             summary = baseline_report(directory, r)
-            self.assertEqual(summary['budget']['optimizer_steps'], 1500)
+            self.assertEqual(summary['budget']['optimizer_steps'], 10100)
             self.assertIn('100 epochs', (Path(directory)/'research_analysis.md').read_text())
 
     def test_launcher_sets_backend_before_torch_import(self):
@@ -195,7 +220,7 @@ runpy.run_path('run_baseline_fb15k.py', run_name='__main__')
         with tempfile.TemporaryDirectory() as directory:
             summary=baseline_report(directory,r)
             self.assertEqual(summary['best_epoch'],70)
-            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),4501)
+            self.assertEqual(len((Path(directory)/'steps.csv').read_text().splitlines()),30301)
             for p in PLOTS:
                 for ext in ('png','pdf'):self.assertGreater((Path(directory)/f'{p}.{ext}').stat().st_size,1000)
         mutations=[lambda r:r.update(best_epoch=75),lambda r:r['settings'].update(dataset='fb15k237'),

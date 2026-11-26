@@ -2,10 +2,10 @@
 import torch
 
 from models.scorer import ComplExScorer
-from training.losses import bce_loss
+from training.losses import bce_loss, logistic_loss
 
 
-def backward_effective_batch(encode, positives, negatives, micro_batch_size, device):
+def backward_effective_batch(encode, positives, negatives, micro_batch_size, device, *, loss_name='bce'):
     """Accumulate example-weighted gradients without retaining scoring graphs.
 
     Inputs stay on CPU until each scoring micro-batch. Encode once, accumulate
@@ -14,6 +14,9 @@ def backward_effective_batch(encode, positives, negatives, micro_batch_size, dev
     realization and avoids eight full-graph encodings/backwards. Encoder activations
     still remain resident until the final backward. No optimizer step occurs here.
     """
+    if loss_name not in ('bce', 'regularized_logistic'):
+        raise ValueError('Unknown loss')
+    objective = bce_loss if loss_name == 'bce' else logistic_loss
     count = len(positives)
     if count < 1 or micro_batch_size < 1 or len(negatives) != count:
         raise ValueError('Invalid effective/micro batch sizes')
@@ -28,7 +31,7 @@ def backward_effective_batch(encode, positives, negatives, micro_batch_size, dev
         negative = negatives[start:start+micro].to(device)
         def score(triples):
             return ComplExScorer.score_vectors(e[triples[:,0]], r[triples[:,1]], e[triples[:,2]])
-        loss = bce_loss(score(positive), score(negative.reshape(-1,3)).reshape(len(positive), -1))
+        loss = objective(score(positive), score(negative.reshape(-1,3)).reshape(len(positive), -1))
         if not torch.isfinite(loss):
             raise RuntimeError('Non-finite loss')
         weight = len(positive) / count

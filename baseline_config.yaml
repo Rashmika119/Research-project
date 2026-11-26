@@ -1,4 +1,4 @@
-protocol: fb15k_rgat_complex_dim64_neg10_300_seed0_nativejitoff_v5
+protocol: fb15k_baseline_dim64_300_adagrad_logistic_l2_v6
 description: Existing RGAT + ComplEx baseline on full FB15K; no text
 config:
   dataset: fb15k
@@ -8,13 +8,13 @@ config:
   warmup: 0
   seed: 0
   subset_seed: 0
-  lr: 0.001
-  weight_decay: 1.0e-05
+  lr: 0.5
+  weight_decay: 0.0
   num_negatives: 10
   grad_clip: 1.0
-  train_batch_size: 32768
-  micro_batch_size: 4096
-  accumulation_steps: 8
+  train_batch_size: 4831
+  micro_batch_size: 4831
+  accumulation_steps: 1
   text_batch_size: 256
   max_text_length: 64
   eval_every: 5
@@ -33,7 +33,10 @@ config:
   deterministic: true
   selection_policy: scheduled_only
   record_step_losses: true
+  optimizer: Adagrad
+  loss: regularized_logistic
+  l2_coefficient: 0.01
 runtime:
   disable_native_jit: true
 run:
-  tag: fb15k_baseline_300_seed0_dim64_nativejitoff_v5_run1
+  tag: fb15k_baseline_dim64_300_adagrad_logistic_l2_v6_run1

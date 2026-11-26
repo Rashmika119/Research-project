@@ -1,38 +1,23 @@
 # KG-only baseline versus Shared C gated
 
-## New: FB15K baseline, 300 epochs
+## FB15K baseline: AdaGrad and regularized logistic loss
 
-Edit root `baseline_config.yaml`, push to main, and reuse the same notebook.
-The runner reads YAML directly; budgets and plots derive from saved settings.
-Native JIT is disabled before torch imports via the YAML runtime setting.
-The new 300-epoch run starts from scratch and preserves the old results.
+Use [fb15k_baseline_300.ipynb](notebooks/fb15k_baseline_300.ipynb).
+Edit [baseline_config.yaml](baseline_config.yaml), push main and reuse the notebook.
+Full FB15K, seed0,width64 (complex32),300 epochs,10 negatives,no warmup.
+Batch4831,micro4831,accumulation1;101 updates/epoch,30300 total,last batch42.
+AdaGrad lr0.5; logistic loss averaged over all positive and negative examples plus
+0.01 times the squared L2 norms of the input entity and relation embedding tables.
+Optimizer weight decay0; clipping1; validation every5; eval batch512.
+Native JIT remains disabled. Start fresh with the new YAML run tag.
 
-For the latest baseline experiment, open
-[fb15k_baseline_300.ipynb](notebooks/fb15k_baseline_300.ipynb).
-It fetches **main** and runs only the existing RGAT + ComplEx baseline:
-full **FB15K**, seed **0**, width **64** (32 complex dimensions), **10 negatives**,
-**300 epochs**, no warmup, effective batch **32,768** = **4,096 × 8** micro-batches,
-**15 updates/epoch** (4,500 total),
-validation every **5 epochs**, evaluation batch **512**, Adam lr **0.001**.
-The model architecture and BCE/sampling equations are unchanged.
-Micro-batched scoring shares one RGAT encoding per update. The final smaller
-batch is weighted by actual example counts. This reduces scoring memory, not
-the memory needed for full-graph RGAT activations. Use the new `dim64_nativejitoff_v5` run tag;
-old-run checkpoints require their original source/settings.
+Section5 starts training. Reports derive budgets and objective labels from saved
+settings. No RoBERTa is used in this baseline-only study. See
+[the protocol guide](docs/FB15K_BASELINE_300.md) for the exact objective.
 
-Run notebook sections 1–4 for setup and verification; **section 5 starts training**.
-Commit and push these changes to main first. Results/checkpoints persist in the
-new `Research/fb15k_baseline_300/` Drive folder. No RoBERTa weights are downloaded.
-
-```bash
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_dim64_nativejitoff_v5 --resume --skip-completed
-python run_baseline_fb15k.py --output-dir experiments/research/fb15k_baseline_300_seed0_dim64_nativejitoff_v5 --report-only
-```
-
-See [the FB15K guide](docs/FB15K_BASELINE_300.md) and
-[configuration](baseline_config.yaml). This is a separate
-baseline study; the comparison uses root `comparison_config.yaml` with matching settings.
-Both active pipelines now use full FB15K; historical FB15k-237 results remain incomparable.
+The separate comparison pipeline retains Adam/BCE and its existing batch settings.
+Its baseline scores are not a controlled architecture comparison against this new
+AdaGrad experiment unless training settings are matched.
 
 ## Existing FB15K comparison
 

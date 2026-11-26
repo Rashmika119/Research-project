@@ -6,15 +6,25 @@ The Python runner reads it directly; it is no longer a duplicate validation file
 
 ## Current experiment
 
-Full FB15K (14,951 entities, 1,345 relations; 483,142/50,000/59,071 splits).
-Seed 0, width 64 (32 complex dimensions), two RGAT layers, one head, dropout 0.2.
-300 epochs, no warmup, 10 negatives, effective batch 32,768, micro-batch 4,096,
-8 accumulation steps: 15 updates per epoch, 4,500 total. The last batch has 24,390
-positives and six micro-batches. Budgets are calculated from the YAML settings.
-Adam lr 0.001, weight decay 0.00001, clipping 1.0, float32, strict determinism.
-Validation every 5 epochs and at the final epoch. Best validation MRR selects the
-checkpoint evaluated on test. `last.pt` saves every epoch; `best.pt` on improvement.
-No scheduler, early stopping, text or pretrained weights.
+Full FB15K, seed0,width64 (complex32),300 epochs,no warmup,10 negatives.
+Effective batch4831,micro4831,accumulation1:101 updates/epoch,30300 total.
+The final batch has42 positive triples. AdaGrad lr0.5, default eps1e-10,
+lr_decay0, initial accumulator0; gradient clipping1.0 remains enabled.
+Validation every5 epochs plus final epoch; last.pt each epoch, best.pt on improvement.
+Float32, strict determinism; no scheduler/early stopping.
+
+The explicit objective per update is:
+
+`sum(softplus(-positive_scores)) + sum(softplus(negative_scores))`, divided by
+`number_of_positive_scores + number_of_negative_scores`, then add
+`0.01 * (sum(entity_embedding_table**2) + sum(relation_embedding_table**2))`.
+
+L2 is applied once per effective update to the complete trainable input entity
+and scorer relation tables, not RGAT weights or intermediate graph embeddings.
+Optimizer weight decay is zero to avoid double regularization. This differs from
+the former separately averaged positive/negative BCE: with10 negatives, positive
+examples now carry1/11 of the data-loss weight. This is an RGAT-baseline objective,
+not a claim of exact ComplEx-paper reproduction. Comparison YAML remains Adam/BCE.
 
 `runtime.disable_native_jit: true` sets `TORCH_DISABLE_NATIVE_JIT=1` before the
 training subprocess imports torch, bypassing the previously failing native Triton
@@ -39,8 +49,8 @@ source commit (`REPO_REF` may be set to that recorded SHA). Fetching changed mai
 is for a new experiment, not a way to bypass strict resume identity.
 
 ```bash
-python run_baseline_fb15k.py --config baseline_config.yaml --output-dir experiments/research/fb15k_300_v5 --resume --skip-completed
-python run_baseline_fb15k.py --report-only --output-dir experiments/research/fb15k_300_v5
+python run_baseline_fb15k.py --config baseline_config.yaml --output-dir experiments/research/fb15k_300_adagrad_v6 --resume --skip-completed
+python run_baseline_fb15k.py --report-only --output-dir experiments/research/fb15k_300_adagrad_v6
 ```
 
 Report-only validates saved settings and can regenerate earlier 100-epoch reports.

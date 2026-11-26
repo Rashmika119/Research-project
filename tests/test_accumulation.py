@@ -69,12 +69,12 @@ class AccumulationTests(unittest.TestCase):
     def test_batch_contract_and_final_window(self):
         cfg=make_config()
         self.assertEqual(cfg.train_batch_size,cfg.micro_batch_size*cfg.accumulation_steps)
-        windows=[min(32768,483142-start) for start in range(0,483142,32768)]
-        micro_counts=[len(range(0,n,4096)) for n in windows]
-        self.assertEqual(micro_counts,[8]*14+[6])
-        self.assertEqual(sum(micro_counts),118)
-        self.assertEqual(windows[-1],5*4096+3910)
-        for bad in (replace(cfg,accumulation_steps=7),replace(cfg,micro_batch_size=0),
+        windows=[min(cfg.train_batch_size,483142-start) for start in range(0,483142,cfg.train_batch_size)]
+        micro_counts=[len(range(0,n,cfg.micro_batch_size)) for n in windows]
+        self.assertEqual(micro_counts,[1]*101)
+        self.assertEqual(sum(micro_counts),101)
+        self.assertEqual(windows[-1],42)
+        for bad in (replace(cfg,accumulation_steps=7),replace(cfg,micro_batch_size=0,accumulation_steps=2),
                     replace(cfg,micro_batch_size=-1),replace(cfg,accumulation_steps=0)):
             with self.assertRaises(ValueError):bad.validate()
 

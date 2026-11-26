@@ -106,7 +106,7 @@ def baseline_report(directory, result):
         f"{cfg.epochs} epochs, {budget['steps_per_epoch']} updates/epoch, {budget['optimizer_steps']} updates; "
         f"width{cfg.model['dim']}, {cfg.num_negatives} negatives. "
         f"Effective batch{batch}, micro-batch{micro}, accumulation{cfg.accumulation_steps}. "
-        f"No warmup, text, scheduler or early stopping. Adam lr{cfg.lr}. "
+        f"No warmup, text, scheduler or early stopping. {cfg.optimizer} lr{cfg.lr}; loss={cfg.loss}; embedding L2={cfg.l2_coefficient}. "
         'Dataset differs from the previous FB15k-237 comparison; scores cannot be directly compared.\n',
         encoding='utf-8')
     plot_results(root, result)
@@ -121,10 +121,10 @@ def plot_results(root, result):
     validation = [h for h in history if 'validation' in h]
     steps = [s for h in history for s in h['step_losses']]
     specs = {
-        'training_loss': ('Epoch', 'BCE loss', [h['epoch'] for h in history],
+        'training_loss': ('Epoch', 'Training objective', [h['epoch'] for h in history],
                           {'mean update loss': [h['loss'] for h in history],
                            'example-weighted loss': [h['example_weighted_loss'] for h in history]}),
-        'optimizer_step_loss': ('Update', 'BCE loss', [s['optimizer_step'] for s in steps],
+        'optimizer_step_loss': ('Update', 'Training objective', [s['optimizer_step'] for s in steps],
                                 {'loss': [s['loss'] for s in steps]}),
         'validation_metrics': ('Epoch', 'Filtered metric', [h['epoch'] for h in validation],
                                {m: [h['validation'][m] for h in validation] for m in ('MRR','Hits@1','Hits@3','Hits@10')}),

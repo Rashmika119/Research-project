@@ -15,3 +15,13 @@ def bce_loss(pos_scores: torch.Tensor, neg_scores: torch.Tensor) -> torch.Tensor
         neg_scores, torch.zeros_like(neg_scores)
     )
     return pos_loss + neg_loss
+
+
+def logistic_loss(pos_scores, neg_scores):
+    """Mean softplus(-y*score) over all positive and negative examples."""
+    return (F.softplus(-pos_scores).sum() + F.softplus(neg_scores).sum()) / (pos_scores.numel() + neg_scores.numel())
+
+
+def embedding_l2(entities, relations, coefficient):
+    """Explicit coefficient * squared Frobenius norms; no half or averaging."""
+    return coefficient * (entities.square().sum() + relations.square().sum())

@@ -42,6 +42,9 @@ class ExperimentConfig:
     seed: int = 0
     subset_seed: int = 0
     lr: float = 0.001
+    optimizer: str = 'Adam'
+    loss: str = 'bce'
+    l2_coefficient: float = 0.0
     weight_decay: float = 0.00001
     num_negatives: int = 4
     grad_clip: float = 1.0
@@ -61,6 +64,15 @@ class ExperimentConfig:
     record_step_losses: bool = True
 
     def validate(self):
+        if self.optimizer not in ('Adam', 'Adagrad') or self.loss not in ('bce', 'regularized_logistic'):
+            raise ValueError('Unsupported optimizer or loss')
+        if self.l2_coefficient < 0:
+            raise ValueError('L2 coefficient must be nonnegative')
+        if self.loss == 'regularized_logistic':
+            if self.variant != 'baseline' or self.weight_decay != 0:
+                raise ValueError('Explicit embedding L2 requires baseline and zero optimizer weight decay')
+        elif self.l2_coefficient != 0:
+            raise ValueError('Explicit L2 requires regularized_logistic loss')
         if self.micro_batch_size < 0 or self.accumulation_steps < 1:
             raise ValueError('Invalid micro-batch/accumulation settings')
         if self.micro_batch_size:
@@ -289,7 +301,7 @@ def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     positives_cpu = torch.tensor(data.train, dtype=torch.long)
     known = set(known_train)
     filters = build_filter_index(known_train + data.valid + data.test)
-    optimizer = torch.optim.Adam((p for p in model.parameters() if p.requires_grad),
+    optimizer = getattr(torch.optim, cfg.optimizer)((p for p in model.parameters() if p.requires_grad),
                                  lr=cfg.lr, weight_decay=cfg.weight_decay)
     warm = warmup_epochs(cfg.variant, cfg.epochs, cfg.warmup)
     batch_size = cfg.train_batch_size or len(data.train)
@@ -297,7 +309,7 @@ def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
     print(f'Budget: {warm} structural + {cfg.epochs - warm} main epochs; '
           f'{cfg.epochs * steps_per_epoch} optimizer steps; fixed lr={cfg.lr}', flush=True)
     print(f'Batching: effective={batch_size}; micro={cfg.micro_batch_size or batch_size}; '
-          f'accumulation={cfg.accumulation_steps}; clip/Adam once per effective batch', flush=True)
+          f'accumulation={cfg.accumulation_steps}; clip/{cfg.optimizer} once per effective batch', flush=True)
     history, best_mrr, best_epoch, start_epoch, optimizer_steps = [], -1., -1, 1, 0
     best_state = None
     initial_validation, elapsed_before, previous_peak = None, 0., 0
@@ -414,7 +426,13 @@ def _run_experiment(cfg, output_dir, *, manifest_path=None, cache_dir=None,
                                         cfg.num_negatives, negative_rng)
             optimizer.zero_grad(set_to_none=True)
             loss_value = backward_effective_batch(lambda: encode(structural_only), positive_cpu,
-                negative, cfg.micro_batch_size or len(positive_cpu), device)
+                negative, cfg.micro_batch_size or len(positive_cpu), device,
+                loss_name=cfg.loss)
+            if cfg.loss == 'regularized_logistic':
+                from training.losses import embedding_l2
+                penalty = embedding_l2(model.entity_emb.weight, model.scorer.relation_emb.weight, cfg.l2_coefficient)
+                penalty.backward()
+                loss_value += penalty.detach().item()
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip, error_if_nonfinite=True)
             if cfg.variant != 'baseline' and any(p.grad is not None for p in model.bridge.lm.parameters()):
                 raise AssertionError('Frozen LM received parameter gradients')

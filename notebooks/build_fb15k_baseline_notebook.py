@@ -65,6 +65,7 @@ print('Fetched configuration:', CONFIG_PATH, protocol)
 write_json(LOG_DIR/'requested_configuration.json', protocol)
 display(pd.DataFrame([{'dataset':'FB15K', 'model':'RGAT + ComplEx', 'seed':0,
                       'width':cfg.model['dim'], 'negatives':cfg.num_negatives,
+                      'optimizer':cfg.optimizer, 'lr':cfg.lr, 'loss':cfg.loss, 'l2':cfg.l2_coefficient,
                       'epochs':cfg.epochs, 'warmup':cfg.warmup,
                       'effective_batch':cfg.train_batch_size, 'micro_batch':cfg.micro_batch_size,
                       'accumulation_steps':cfg.accumulation_steps, **expected_budget(cfg)}]))
@@ -92,7 +93,7 @@ Runs one child process using `--config baseline_config.yaml`. Logs every epoch.
 Validation and total epochs come from YAML; final-epoch validation also runs.
 Scoring micro-batches use YAML sizes and one RGAT encoding per optimizer update.
 Partial final batches are weighted by actual example counts.
-Clipping and Adam run once per effective batch. Full-graph activations still remain resident.
+Clipping and the configured optimizer run once per effective batch. Full-graph activations still remain resident.
 Each completed epoch commits last.pt; best validation saves best.pt.
 Resume uses the same tag, source, settings and runtime. If main changes, set
 REPO_REF to the recorded original SHA when resuming. Never mix old study outputs.
